@@ -109,6 +109,8 @@
 # cat Testing/Temporary/MemoryChecker.*
 #
 
+set(CMAKE_BUILD_RPATH "@loader_path/../../lib")
+
 ###-------------------------------------------------------------------------------------
 # Set the output dir for test executables
 ###-------------------------------------------------------------------------------------
