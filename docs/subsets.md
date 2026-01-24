@@ -475,8 +475,9 @@ For this reason, where a specific application of MRG trees is desired (to repres
 
   The first character of `ns_str` is treated as the *delimiter character definition*.
   Wherever this delimiter character appears (except as the first character), this will indicate the end of one substring within `ns_str` and the beginning of a next substring.
-  The delimiter character cannot be any of the characters used in the expression language (see below).
   The delimiter character divides `ns_str` into substrings.
+  The delimiter character cannot be any of the characters used in the expression language (see below).
+  It is best, though not a strict requirement, if the delimiter character is not any of the characters that form a valid Silo object name.
   For constant valued nameschemes, there is no need to divide the namescheme string into substrings.
   So, the delimiter character is not necessary and if found to be present will be ignored.
 
