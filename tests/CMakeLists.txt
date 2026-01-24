@@ -344,6 +344,9 @@ target_include_directories(rocket_silo PRIVATE
         ${silo_build_include_dir}
         ${Silo_SOURCE_DIR}/src/silo
         ${SILO_TESTS_SOURCE_DIR})
+if(APPLE)
+  target_link_options(rocket_silo PRIVATE "-Wl,-undefined,dynamic_lookup")
+endif()
 set_target_properties(rocket_silo PROPERTIES PREFIX "")
 
 add_library(testlib_obj OBJECT testlib.c)
