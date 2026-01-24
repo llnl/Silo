@@ -206,6 +206,44 @@ int main(int argc, char **argv)
         TEST_GET_NAME(ns, 1, "radar");
         TEST_GET_NAME(ns, 137, "radar");
         DBFreeNamescheme(ns);
+
+        /* Test nameschemes from docs */
+        ns = DBMakeNamescheme("@/mesh1");
+        TEST_GET_NAME(ns, 0, "/mesh1");
+        TEST_GET_NAME(ns, 1, "/mesh1");
+        TEST_GET_NAME(ns, 137, "/mesh1");
+        TEST_GET_NAME(ns, 102337, "/mesh1");
+        DBFreeNamescheme(ns);
+        ns = DBMakeNamescheme("/mesh1");
+        TEST_GET_NAME(ns, 0, "/mesh1");
+        TEST_GET_NAME(ns, 1, "/mesh1");
+        TEST_GET_NAME(ns, 137, "/mesh1");
+        TEST_GET_NAME(ns, 102337, "/mesh1");
+        DBFreeNamescheme(ns);
+        ns = DBMakeNamescheme("~slide_%d_%s~n/2~(n%2)?'leader':'follower':");
+        TEST_GET_NAME(ns, 0, "slide_0_follower");
+        TEST_GET_NAME(ns, 1, "slide_0_leader");
+        TEST_GET_NAME(ns, 2, "slide_1_follower");
+        TEST_GET_NAME(ns, 3, "slide_1_leader");
+        DBFreeNamescheme(ns);
+        ns = DBMakeNamescheme("Hblock_%02Xx%02XHn/16Hn%16");
+        TEST_GET_NAME(ns, 0, "block_00x00");
+        TEST_GET_NAME(ns, 1, "block_00x01");
+        TEST_GET_NAME(ns, 2, "block_00x02");
+        TEST_GET_NAME(ns, 15, "block_00x0F");
+        TEST_GET_NAME(ns, 16, "block_01x00");
+        TEST_GET_NAME(ns, 17, "block_01x01");
+        TEST_GET_NAME(ns, 255, "block_0Fx0F");
+        DBFreeNamescheme(ns);
+        ns = DBMakeNamescheme("@domain_%03d@n");
+        TEST_GET_NAME(ns, 0, "domain_000");
+        TEST_GET_NAME(ns, 1, "domain_001");
+        TEST_GET_NAME(ns, 137, "domain_137");
+        DBFreeNamescheme(ns);
+        ns = DBMakeNamescheme("@domain_%03d@n+1");
+        TEST_GET_NAME(ns, 0, "domain_001");
+        TEST_GET_NAME(ns, 1, "domain_002");
+        TEST_GET_NAME(ns, 137, "domain_138");
     }
 
     /* Test a somewhat complex expression */ 

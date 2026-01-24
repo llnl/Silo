@@ -476,39 +476,41 @@ For this reason, where a specific application of MRG trees is desired (to repres
   The first character of `ns_str` is treated as the *delimiter character definition*.
   Wherever this delimiter character appears (except as the first character), this will indicate the end of one substring within `ns_str` and the beginning of a next substring.
   The delimiter character divides `ns_str` into substrings.
-  The delimiter character cannot be any of the characters used in the expression language (see below).
+  It is best, though not a strict requirement, if the delimiter character is not any of the characters used in the expression language (see below).
   It is best, though not a strict requirement, if the delimiter character is not any of the characters that form a valid Silo object name.
-  This is indeed a *requirement* if the namescheme is constant valued (e.g. contains no other substrings).
+  The second of these is indeed a *requirement* if the namescheme is constant valued (e.g. contains no other substrings).
 
   The first substring of `ns_strs` (that is the characters from position 1 to the first delimiter character after its definition at index 0) will contain the complete printf-style format string the namescheme will generate.
   The remaining substrings will contain simple expressions, one for each conversion specifier found in the format substring, which when evaluated will be used as the corresponding argument in an sprintf call to generate the actual name, when and if needed, on demand.
 
   The expression language for building up the arguments to be used along with the printf-style format string is pretty simple.
 
-  It supports the '+', '-', '*', '/', '%' (modulo), '|', '&', '^' integer operators and a variant of the question-mark-colon operator, '? : :' which requires an extra, terminating colon.
+  It supports the `+`, `-`, `*`, `/`, `%` (modulo), `|`, `&`, `^` integer operators and a variant of the question-mark-colon operator, `? : :` which requires an extra, terminating colon.
 
-  It supports grouping via '(' and ')' characters.
+  It supports grouping via `(` and `)` characters.
 
-  It supports grouping of characters into arbitrary strings via the single quote character (').
+  It supports grouping of characters into arbitrary strings via the single quote character (`'`).
   Any characters appearing between enclosing single quotes are treated as a literal string suitable for an argument to be associated with a %s-type conversion specifier in the format string.
 
-  It supports references to external, integer valued arrays introduced via a '#' character appearing before an array's name and external, string valued arrays introduced via a '$' character appearing before an array's name.
+  It supports references to external, integer valued arrays introduced via a `#` character appearing before an array's name and external, string valued arrays introduced via a `$` character appearing before an array's name.
 
-  Finally, the special operator 'n' appearing in an expression represents a *natural number* within the sequence of names (zero-origin index).
+  Finally, the special operator `n` appearing in an expression represents a *natural number* within the sequence of names (zero-origin index).
 
   Except for singly quoted strings which evaluate to a literal string suitable for output via a %s type conversion specifier, and $-type external array references which evaluate to an external string, all other expressions are treated as evaluating to integer values suitable for any of the integer conversion specifiers (%[ouxXdi]) which may be used in the format substring.
 
   Here are some examples...
 
-  `/mesh1`
-  : There is no delimiter character because the namescheme is constant valued, `/mesh1`.
+  `"@/mesh1"`
+  : The delimiter character is `@`.
+    The namescheme is constant valued, returning `/mesh1` for all `n`.
     That is, there are no `%` characters appearing in the the first (only) substring of `ns_str`.
     This could be the *block* path part (see `DBOPT_MB_BLOCK_NS` option of [`DBPutMultimesh()`](./parallel.md#dbputmultimesh)) of a namescheme where each block is at the same path but in a *different* Silo file.
 
-  `"|slide_%s|(n%2)?'leader':'follower':"`
-  : The delimiter character is `|`.
-    The format substring is `slide_%s`.
-    The expression substring for the argument to the first (and only in this case) conversion specifier (`%s`) is `(n%2)?'leader':'follower':`
+  `"~slide_%d_%s~n/2~(n%2)?'leader':'follower':"`
+  : The delimiter character is `~`.
+    The format substring is `slide_%d_%s`.
+    The expression substring for the argument to the first conversion specifier (`%d`) is `n/2`.
+    The expression substring for the argument to the second conversion specifier (`%s`) is `(n%2)?'leader':'follower':`
     When this expression is evaluated for a given region, the region's natural number will be inserted for `n`.
     The modulo operation with `2` will be applied.
     If that result is non-zero, the `?::` expression will evaluate to `'leader'`.
@@ -517,13 +519,13 @@ For this reason, where a specific application of MRG trees is desired (to repres
     This naming scheme might be useful for an array of regions representing, alternately, the two halves of a contact surface.
     Note also for the `?::` operator, the caller can assume that only the sub-expression corresponding to the whichever half of the operator is satisfied is actually evaluated.
 
-  `"Hblock_%02dx%02dHn/16Hn%16"`
+  `"Hblock_%02Xx%02XHn/16Hn%16"`
   : The delimiter character is `H`.
-    The format substring is `block_%02dx%02d`.
-    The expression substring for the argument to the first conversion specifier (`%02d`) is `n/256`.
-    The expression substring for the argument to the second conversion specifier (also `%02d`) is `n%16`.
+    The format substring is `block_%02Xx%02X`.
+    The expression substring for the argument to the first conversion specifier (`%02X`) is `n/256`.
+    The expression substring for the argument to the second conversion specifier (also `%02X`) is `n%16`.
     When this expression is evaluated, the region's natural number will be inserted for `n` and the div and mod operators will be evaluated.
-    This naming scheme might be useful for a region array of 256 regions to be named as a 2D array of regions with names like "block_09x11".
+    This naming scheme might be useful for a region array of 256 regions to be named as a 2D array of regions with names like "block_0Ax1C".
 
   `"@domain_%03d@n"`
   : The delimiter character is `@`.
@@ -536,16 +538,16 @@ For this reason, where a specific application of MRG trees is desired (to repres
   : This is just like the case above except that region names begin with "domain_001" instead of "domain_000".
     This might be useful to deal with different indexing origins; Fortran vs. C.
 
-  `"|foo_%03dx%03d|#P[n]|#U[n%4]"`
-  : The delimiter character is `|`.
+  `"!foo_%03dx%03d!#P[n]!#U[n%4]"`
+  : The delimiter character is `!`.
     The format substring is `foo_%03dx%03d`.
     The expression substring for the first argument is an external array reference `#P[n]` where the index into the array is just the natural number, n.
     The expression substring for the second argument is another external array reference, `#U[n%4]` where the index is an expression `n%4` on the natural number n. 
 
     If the caller is handling externally referenced arrays explicitly, because `P` is the first externally referenced array in the format string, a pointer to `P` must be the first to appear in the `...` list of additional args to `DBMakeNamescheme`.
-    Similarly, because `U` appears as the second externally referenced array in the format string, a pointer to `U` must appear second in the `...` as in `DBMakeNamescheme("|foo_%03dx%03d|#P[n]|#U[n%4]", P, U)`
+    Similarly, because `U` appears as the second externally referenced array in the format string, a pointer to `U` must appear second in the `...` as in `DBMakeNamescheme("!foo_%03dx%03d!#P[n]!#U[n%4]", P, U)`
 
-    Alternatively, if the caller wants the Silo library to find `P` and `U` in a Silo file, read the arrays from the file and bind them into the namescheme automatically, then `P` and `U` must be simple arrays in the current working directory of the file that is passed in as the 3-tuple `"(int) 0, (DBfile *) dbfile, 0"` in the `...` argument to `DBMakeNamescheme` as in `DBMakeNamescheme("|foo_%03dx%03d|#P[n]|#U[n%4]", 0, dbfile, 0)`.
+    Alternatively, if the caller wants the Silo library to find `P` and `U` in a Silo file, read the arrays from the file and bind them into the namescheme automatically, then `P` and `U` must be simple arrays in the current working directory of the file that is passed in as the 3-tuple `"(int) 0, (DBfile *) dbfile, 0"` in the `...` argument to `DBMakeNamescheme` as in `DBMakeNamescheme("!foo_%03dx%03d!#P[n]!#U[n%4]", 0, dbfile, 0)`.
 
   Use `DBFreeNamescheme()` to free up the space associated with a namescheme.
   Also note that there are numerous examples of nameschemes in the [nameschemes.c](https://raw.githubusercontent.com/LLNL/Silo/refs/heads/main/tests/nameschemes.c) test on GitHub and in the Silo source release tarball.
