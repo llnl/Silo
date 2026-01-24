@@ -478,8 +478,7 @@ For this reason, where a specific application of MRG trees is desired (to repres
   The delimiter character divides `ns_str` into substrings.
   The delimiter character cannot be any of the characters used in the expression language (see below).
   It is best, though not a strict requirement, if the delimiter character is not any of the characters that form a valid Silo object name.
-  For constant valued nameschemes, there is no need to divide the namescheme string into substrings.
-  So, the delimiter character is not necessary and if found to be present will be ignored.
+  This is indeed a *requirement* if the namescheme is constant valued (e.g. contains no other substrings).
 
   The first substring of `ns_strs` (that is the characters from position 1 to the first delimiter character after its definition at index 0) will contain the complete printf-style format string the namescheme will generate.
   The remaining substrings will contain simple expressions, one for each conversion specifier found in the format substring, which when evaluated will be used as the corresponding argument in an sprintf call to generate the actual name, when and if needed, on demand.
