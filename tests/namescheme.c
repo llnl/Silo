@@ -244,6 +244,7 @@ int main(int argc, char **argv)
         TEST_GET_NAME(ns, 0, "domain_001");
         TEST_GET_NAME(ns, 1, "domain_002");
         TEST_GET_NAME(ns, 137, "domain_138");
+        DBFreeNamescheme(ns);
     }
 
     /* Test a somewhat complex expression */ 
