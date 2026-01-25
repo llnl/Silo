@@ -496,7 +496,7 @@ For this reason, where a specific application of MRG trees is desired (to repres
 
   Finally, the special operator `n` appearing in an expression represents a *natural number* within the sequence of names (zero-origin index).
 
-  Except for singly quoted strings which evaluate to a literal string suitable for output via a %s type conversion specifier, and $-type external array references which evaluate to an external string, all other expressions are treated as evaluating to integer values suitable for any of the integer conversion specifiers (%[ouxXdi]) which may be used in the format substring.
+  Except for singly quoted strings which evaluate to a literal string suitable for output via a `%s` type conversion specifier, and `$`-type external array references which evaluate to an external string, all other expressions are treated as evaluating to integer values suitable for any of the integer conversion specifiers (`%[ouxXdi]`) which may be used in the format substring.
 
   Here are some examples...
 
@@ -551,6 +551,12 @@ For this reason, where a specific application of MRG trees is desired (to repres
 
   Use `DBFreeNamescheme()` to free up the space associated with a namescheme.
   Also note that there are numerous examples of nameschemes in the [nameschemes.c](https://raw.githubusercontent.com/LLNL/Silo/refs/heads/main/tests/nameschemes.c) test on GitHub and in the Silo source release tarball.
+  For convenience, some of those are shown below
+
+  ```{literalinclude} ../test/namescheme.c
+  :start-at: "/* Test nameschemes from docs */"
+  :end-at: "/* Test DBnamescheme construction from arrays in a Silo file */"
+  ``` 
 
 {{ EndFunc }}
 
