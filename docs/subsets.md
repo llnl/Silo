@@ -550,10 +550,10 @@ For this reason, where a specific application of MRG trees is desired (to repres
     Alternatively, if the caller wants the Silo library to find `P` and `U` in a Silo file, read the arrays from the file and bind them into the namescheme automatically, then `P` and `U` must be simple arrays in the current working directory of the file that is passed in as the 3-tuple `"(int) 0, (DBfile *) dbfile, 0"` in the `...` argument to `DBMakeNamescheme` as in `DBMakeNamescheme("!foo_%03dx%03d!#P[n]!#U[n%4]", 0, dbfile, 0)`.
 
   Use `DBFreeNamescheme()` to free up the space associated with a namescheme.
-  Also note that there are numerous examples of nameschemes in the [nameschemes.c](https://raw.githubusercontent.com/LLNL/Silo/refs/heads/main/tests/nameschemes.c) test on GitHub and in the Silo source release tarball.
+  Also note that there are numerous examples of nameschemes in the [nameschemes.c](https://raw.githubusercontent.com/LLNL/Silo/refs/heads/main/tests/namescheme.c) test on GitHub and in the Silo source release tarball.
   For convenience, some of those are shown below
 
-  ```{literalinclude} ../test/namescheme.c
+  ```{literalinclude} ../tests/namescheme.c
   :start-at: "/* Test nameschemes from docs */"
   :end-at: "/* Test DBnamescheme construction from arrays in a Silo file */"
   ``` 
