@@ -95,14 +95,12 @@ jobs:
         ctest --output-log ctest.log
 
     - name: Package Artifact CMake
-      id: pack-cmake
       if: ${{ steps.makecheck-cmake.outcome == 'failure' }}
       run: |
         cd cmake_build
         tar -cJf ctest.tar.xz Testing/Temporary ctest.log
 
     - name: Package Artifact CMake-Asan
-      id: pack-cmake-asan
       if: ${{ steps.makecheck-cmake-asan.outcome == 'failure' }}
       run: |
         cd cmake_asan_build
@@ -116,7 +114,7 @@ jobs:
         path: |
           cmake_build/tests/ctest.tar.xz
           cmake_asan_build/tests/ctest.tar.xz
-        if-no-files-found: error
+        if-no-files-found: ignore
         retention-days: 14
 
     # Re-signal the failure so the job ends red.
