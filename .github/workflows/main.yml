@@ -114,7 +114,6 @@ jobs:
       with:
         name: silo-test-artifacts
         path: |
-          build/tests/testsuite.dir.tar.xz
           cmake_build/tests/ctest.tar.xz
           cmake_asan_build/tests/ctest.tar.xz
         if-no-files-found: error
