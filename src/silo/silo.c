@@ -11377,7 +11377,7 @@ _DBdarrminmax(double arr[], int len, double *arr_min, double *arr_max)
     return 0;
 }
 
-INTERNAL int
+static int
 include_point(int ptidx, int ndims, int const *dims,
     int const *minidx, int const *maxidx)
 {
@@ -11410,7 +11410,7 @@ include_point(int ptidx, int ndims, int const *dims,
  *      Mark C. Miller, Mon May 20 12:25:25 PDT 2024
  *      Adjusted to avoid strict pointer aliasing optimization issues.
  *--------------------------------------------------------------------*/
-INTERNAL int
+static int
 _CalcExtents(DBVCP2_t coord_arrays, int datatype, int ndims, int npts,
              void *min_extents, void *max_extents,
              int const *dims, int const *minidx, int const *maxidx)
