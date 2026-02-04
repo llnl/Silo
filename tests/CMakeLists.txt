@@ -109,6 +109,8 @@
 # cat Testing/Temporary/MemoryChecker.*
 #
 
+set(CMAKE_BUILD_RPATH "@loader_path/../../lib")
+
 ###-------------------------------------------------------------------------------------
 # Set the output dir for test executables
 ###-------------------------------------------------------------------------------------
@@ -230,18 +232,16 @@ endif()
 
 set(SILO_TESTS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    set(HDF5_ONLY_SOURCES
-        compression.c
-        grab.c
-        largefile.c
-        memfile_simple.c
-        mk_nasf_h5.c
-        partial_io.c
-        readstuff.c
-        testhdf5.c
-    )
-endif()
+set(HDF5_ONLY_SOURCES
+    compression.c
+    grab.c
+    largefile.c
+    memfile_simple.c
+    mk_nasf_h5.c
+    partial_io.c
+    readstuff.c
+    testhdf5.c
+)
 
 set(PDB_ONLY_SOURCES
     mk_nasf_pdb.c
@@ -344,6 +344,9 @@ target_include_directories(rocket_silo PRIVATE
         ${silo_build_include_dir}
         ${Silo_SOURCE_DIR}/src/silo
         ${SILO_TESTS_SOURCE_DIR})
+if(APPLE)
+  target_link_options(rocket_silo PRIVATE "-Wl,-undefined,dynamic_lookup")
+endif()
 set_target_properties(rocket_silo PROPERTIES PREFIX "")
 
 add_library(testlib_obj OBJECT testlib.c)
@@ -362,6 +365,11 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
     # Skip any parallel tests if we don't have parallel enabled
     if(NOT SILO_PARALLEL AND srcFile IN_LIST PARALLEL_SOURCES)
+        continue()
+    endif()
+
+    # Skip any HDF5 specific executables if we're not building with HDF5
+    if(srcFile IN_LIST HDF5_ONLY_SOURCES AND NOT (SILO_ENABLE_HDF5 AND HDF5_FOUND))
         continue()
     endif()
 
@@ -417,11 +425,14 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
     # Add default tests for HDF5 or PDB drivers or BOTH 
     #
     if(srcFile IN_LIST HDF5_ONLY_SOURCES)
-        add_test(NAME ${base}-hdf5 COMMAND $<TARGET_FILE:${base}> DB_HDF5)
-        set_tests_properties(${base}-hdf5 PROPERTIES LABELS "hdf5")
-        set_tests_properties(${base}-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval})
-        if(src IN_LIST F_TEST_SOURCES)
-            set_tests_properties(${base}-hdf5 PROPERTIES LABELS "fortran")
+        if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+            message(FATAL "adding hdf5 test \"${srcFile}\"")
+            add_test(NAME ${base}-hdf5 COMMAND $<TARGET_FILE:${base}> DB_HDF5)
+            set_tests_properties(${base}-hdf5 PROPERTIES LABELS "hdf5")
+            set_tests_properties(${base}-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval})
+            if(src IN_LIST F_TEST_SOURCES)
+                set_tests_properties(${base}-hdf5 PROPERTIES LABELS "fortran")
+            endif()
         endif()
     elseif(srcFile IN_LIST PDB_ONLY_SOURCES)
         add_test(NAME ${base} COMMAND $<TARGET_FILE:${base}>)
