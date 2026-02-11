@@ -373,6 +373,9 @@ list(APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 list(APPEND CMAKE_INSTALL_RPATH "${HDF5_LIBDIR}")
 list(REMOVE_DUPLICATES CMAKE_INSTALL_RPATH)
 
+set(CMAKE_BUILD_RPATH "${CMAKE_BINARY_DIR}/lib")
+
+
 ###-----------------------------------------------------------------------------
 # Define and populate CMAKE_INSTALL_*DIR variables
 ###-----------------------------------------------------------------------------
