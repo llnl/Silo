@@ -74,7 +74,7 @@ if(ZLIB_FOUND)
     set(HAVE_LIBZ 1)
     set(HAVE_ZLIB_H 1)
     if(WIN32)
-        get_target_property(ZLIB_DLL zlib IMPORTED_LOCATION_RELEASE)
+        get_target_property(ZLIB_DLL ZLIB::ZLIB IMPORTED_LOCATION_RELEASE)
         if(SILO_ENABLE_SILEX OR SILO_ENABLE_BROWSER)
             install(FILES ${ZLIB_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR}
                     PERMISSIONS OWNER_READ OWNER_WRITE
