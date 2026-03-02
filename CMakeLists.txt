@@ -226,6 +226,10 @@ find_program(perl_exe NAMES perl perl.exe REQUIRED)
 # HDF5
 ##
 if(SILO_ENABLE_HDF5)
+    if(SILO_ZLIB_DIR)
+        # ensure HDF5 finds the correct zlib
+        set(ZLIB_ROOT ${SILO_ZLIB_DIR})
+    endif()
     include(SiloFindHDF5)
 endif()
 
