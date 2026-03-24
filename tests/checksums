@@ -116,10 +116,10 @@ mkdir h5_check_files
 # will be associated with the first "fl1" object raw data written to
 # the file for block 2.
 #
-minoffset=$(ls -l h5_check_files/multi_ucd3d.h5 | cut -d' ' -f5)
+minoffset=$(ls -l h5_check_files/multi_ucd3d.h5 | tr '[:blank:]' ' ' | tr -s ' ' | cut -d' ' -f5)
 skip=0
 while [ $skip -lt 16 ]; do
-    offset=$(od -j $skip -A d -t d4 h5_check_files/multi_ucd3d.h5 | tr '\t' ' ' | tr -s ' ' | grep '167 179 323 311' | cut -d' ' -f1 | head -n 1)
+    offset=$(od -j $skip -A d -t d4 h5_check_files/multi_ucd3d.h5 | tr '[:blank:]' ' ' | tr -s ' ' | grep '167 179 323 311' | cut -d' ' -f1 | head -n 1)
     if [ -n "$offset" ] && [ $offset -lt $minoffset ]; then
         minoffset=$offset
     fi
