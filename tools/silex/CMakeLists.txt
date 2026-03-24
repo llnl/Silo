@@ -113,12 +113,14 @@ if(WIN32 AND TARGET Qt6::windeployqt)
     # execute windeployqt directory after build
     # creates tmp dir used for installation
     # also deploys to build dir so silex can be run from build
+    # Remove compiler-runtime from being deployed, it installs vc_redist
+    # executable instead of the vcruntime dlls.
     add_custom_command(TARGET silex
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_CURRENT_BINARY_DIR}/windeployqt"
         COMMAND set PATH=%PATH%$<SEMICOLON>${qt5_install_prefix}/bin
-        COMMAND Qt6::windeployqt --dir "${CMAKE_CURRENT_BINARY_DIR}/windeployqt" "$<TARGET_FILE:silex>"
-        COMMAND Qt6::windeployqt --verbose 0 --dir "${Silo_BINARY_DIR}/bin/$<CONFIG>" "$<TARGET_FILE:silex>"
+        COMMAND Qt6::windeployqt --verbose 0 --no-compiler-runtime --no-system-d3d-compiler --dir "${CMAKE_CURRENT_BINARY_DIR}/windeployqt" "$<TARGET_FILE:silex>"
+        COMMAND Qt6::windeployqt --verbose 0 --no-compiler-runtime --no-system-d3d-compiler --dir "${Silo_BINARY_DIR}/bin/$<CONFIG>" "$<TARGET_FILE:silex>"
     )
 
     # copy deployment directory during installation
