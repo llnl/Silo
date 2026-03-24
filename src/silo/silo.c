@@ -2837,8 +2837,6 @@ const int* db_get_used_file_options_sets_ids()
     used_slots[n++] = DB_FILE_OPTS_H5_DEFAULT_SPLIT;
     used_slots[n++] = DB_FILE_OPTS_H5_DEFAULT_DIRECT;
     used_slots[n++] = DB_FILE_OPTS_H5_DEFAULT_FAMILY;
-    used_slots[n++] = DB_FILE_OPTS_H5_DEFAULT_MPIO;
-    used_slots[n++] = DB_FILE_OPTS_H5_DEFAULT_MPIP;
     for (i = n; i < MAX_FILE_OPTIONS_SETS+NUM_DEFAULT_FILE_OPTIONS_SETS+1; i++)
         used_slots[i] = -1;
 
