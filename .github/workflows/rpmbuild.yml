@@ -27,7 +27,7 @@ jobs:
       - name: Install fedpkg
         run: dnf -y install fedpkg
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: Silo
       - name: Prepare rpmbuild
