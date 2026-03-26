@@ -238,8 +238,6 @@ PRIVATE int hdf2silo_type(hid_t type);
 PRIVATE int db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
               int const *dims, int ndims, int datatype, int nofilters);
 PRIVATE int db_hdf5_getslink(hid_t cwg, char const *in_candidate_link, char *out_target);
-PRIVATE int db_hdf5_put_cmemb(hid_t compound_type, char const *name, size_t offset,
-              int ndims, hsize_t const *dim, hid_t type);
 
 /* callbacks prototypes for file image ops */
 #if HDF5_VERSION_GE(1,8,9)
