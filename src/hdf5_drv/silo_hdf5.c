@@ -238,6 +238,8 @@ PRIVATE int hdf2silo_type(hid_t type);
 PRIVATE int db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
               int const *dims, int ndims, int datatype, int nofilters);
 PRIVATE int db_hdf5_getslink(hid_t cwg, char const *in_candidate_link, char *out_target);
+PRIVATE int db_hdf5_put_cmemb(hid_t compound_type, char const *name, size_t offset,
+              int ndims, hsize_t const *dim, hid_t type);
 
 /* callbacks prototypes for file image ops */
 #if HDF5_VERSION_GE(1,8,9)
@@ -930,17 +932,18 @@ static hid_t    P_ckrdprops = -1;
     }                                                                         \
 }
 
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
 #define MEMBER_3(TYPE,NAME) {                                                 \
     _tmp_m = T_##TYPE; /*possible function call*/                             \
     if (_tmp_m>=0) {                                                          \
+        hsize_t _ary_dims[1];                                                 \
         hid_t _m_ary;                                                         \
-        _size = 3;                                                            \
-        _m_ary = H5Tarray_create(_tmp_m, 1, &_size);                          \
+        _ary_dims[0] = 3;                                                     \
+        _m_ary = H5Tarray_create(_tmp_m, 1, _ary_dims);                       \
         db_hdf5_put_cmemb(_mt, #NAME, OFFSET(_m, NAME), 0, NULL, _m_ary);     \
         H5Tclose(_m_ary);                                                     \
         if (_f && (_tmp_f=_f->T_##TYPE)>=0) {                                 \
-            hid_t _f_ary = H5Tarray_create(_tmp_f, 1, &_size);                \
+            hid_t _f_ary = H5Tarray_create(_tmp_f, 1, _ary_dims);             \
             db_hdf5_put_cmemb(_ft, #NAME, _f_off, 0, NULL, _f_ary);           \
             _f_off += H5Tget_size(_f_ary);                                    \
             H5Tclose(_f_ary);                                                 \
@@ -7408,7 +7411,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hsize_t _size = 3;
                             hid_t _f_ary;
                             msize = ALIGN(msize, sizeof(dummy)) + sizeof(dummy);
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _f_ary = H5Tarray_create(dbfile->T_int, 1, &_size);
                             fsize += H5Tget_size(_f_ary);
                             H5Tclose(_f_ary);
@@ -7423,7 +7426,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hsize_t _size = 3;
                             hid_t _f_ary;
                             msize = ALIGN(msize, sizeof(dummy)) + sizeof(dummy);
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _f_ary = H5Tarray_create(dbfile->T_float, 1, &_size);
                             fsize += H5Tget_size(_f_ary);
                             H5Tclose(_f_ary);
@@ -7438,7 +7441,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hsize_t _size = 3;
                             hid_t _f_ary;
                             msize = ALIGN(msize, sizeof(dummy)) + sizeof(dummy);
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _f_ary = H5Tarray_create(dbfile->T_double, 1, &_size);
                             fsize += H5Tget_size(_f_ary);
                             H5Tclose(_f_ary);
@@ -7573,7 +7576,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hid_t _m_ary, _f_ary;
                             hsize_t _size = 3;
                             moffset = ALIGN(moffset, sizeof(dummy));
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _m_ary = H5Tarray_create(H5T_NATIVE_INT, 1, &_size);
                             _f_ary = H5Tarray_create(dbfile->T_int, 1, &_size);
                             if (H5Tinsert(mtype, obj->comp_names[i], moffset, _m_ary)<0 ||
@@ -7602,7 +7605,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hid_t _m_ary, _f_ary;
                             hsize_t _size = 3;
                             moffset = ALIGN(moffset, sizeof(dummy));
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _m_ary = H5Tarray_create(H5T_NATIVE_FLOAT, 1, &_size);
                             _f_ary = H5Tarray_create(dbfile->T_float, 1, &_size);
                             if (H5Tinsert(mtype, obj->comp_names[i], moffset, _m_ary)<0 ||
@@ -7631,7 +7634,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                             hid_t _m_ary, _f_ary;
                             hsize_t _size = 3;
                             moffset = ALIGN(moffset, sizeof(dummy));
-#if H5_VERS_MAJOR>=1 && H5_VERS_MINOR>=4
+#if (H5_VERS_MAJOR==1 && H5_VERS_MINOR>=4) || H5_VERS_MAJOR>1
                             _m_ary = H5Tarray_create(H5T_NATIVE_DOUBLE, 1, &_size);
                             _f_ary = H5Tarray_create(dbfile->T_double, 1, &_size);
                             if (H5Tinsert(mtype, obj->comp_names[i], moffset, _m_ary)<0 ||
