@@ -878,7 +878,6 @@ static hid_t    P_ckrdprops = -1;
  */
 #define STRUCT(S) {                                                           \
     int         _i, _j=0;       /*counters*/                                  \
-    hsize_t     _size;          /*number of repeated components*/             \
     size_t      _f_off=0;       /*offset into file data type*/                \
     DBfile_hdf5 *_f=NULL;       /*file for target types*/                     \
     S##_mt      _m;             /*temp to calculate offsets*/                 \
@@ -894,7 +893,6 @@ static hid_t    P_ckrdprops = -1;
              * variables so compiler doesn't complain about them not being    \
              * used.                                                          \
              */                                                               \
-            _size = sprintf(_fullname, "%d", _j);                             \
             break;                                                            \
                                                                               \
         case 2:                                                               \
@@ -935,7 +933,7 @@ static hid_t    P_ckrdprops = -1;
     _tmp_m = T_##TYPE; /*possible function call*/                             \
     if (_tmp_m>=0) {                                                          \
         hid_t _m_ary;                                                         \
-        _size = 3;                                                            \
+        hsize_t _size = 3;                                                    \
         _m_ary = H5Tarray_create(_tmp_m, 1, &_size);                          \
         db_hdf5_put_cmemb(_mt, #NAME, OFFSET(_m, NAME), 0, NULL, _m_ary);     \
         H5Tclose(_m_ary);                                                     \
@@ -951,7 +949,7 @@ static hid_t    P_ckrdprops = -1;
 #define MEMBER_3(TYPE,NAME) {                                                 \
     _tmp_m = T_##TYPE; /*possible function call*/                             \
     if (_tmp_m>=0) {                                                          \
-        _size = 3;                                                            \
+        hsize_t _size = 3;                                                    \
         db_hdf5_put_cmemb(_mt, #NAME, OFFSET(_m, NAME), 1, &_size, _tmp_m);   \
         if (_f && (_tmp_f=_f->T_##TYPE)>=0) {                                 \
             db_hdf5_put_cmemb(_ft, #NAME, _f_off, 1, &_size, _tmp_f);         \
@@ -987,20 +985,13 @@ static hid_t    P_ckrdprops = -1;
     db_hdf5_hdrwr(DBFILE, (char*)NAME, _mt, _ft, MEM, DBTYPE);                \
     H5Tclose(_mt);                                                            \
     H5Tclose(_ft);                                                            \
-    suppress_set_but_not_used_warning(&_size);                                \
 }
 
 #define DEFINE                                                                \
             break;                                                            \
         }                                                                     \
     }                                                                         \
-    suppress_set_but_not_used_warning(&_size);                                \
 }
-
-/*ARGSUSED*/
-INTERNAL void
-suppress_set_but_not_used_warning(void const *ptr)
-{}
 
 #ifdef HAVE_FPZIP /* { */
 
