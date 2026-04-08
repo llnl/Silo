@@ -52,7 +52,7 @@
 #define PY_DBFILE_H
 
 #include <Python.h>
-#include <silo_private.h>
+#include <silo.h>
 
 // ****************************************************************************
 //  Struct:  DBfileObject
