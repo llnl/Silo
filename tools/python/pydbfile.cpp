@@ -47,6 +47,7 @@
 // reflect those  of the United  States Government or  Lawrence Livermore
 // National  Security, LLC,  and shall  not  be used  for advertising  or
 // product endorsement purposes.
+#include "stdlib.h"
 
 #include "pydbfile.h"
 #include "pydbtoc.h"
@@ -55,6 +56,8 @@
 #include <string>
 
 using std::string;
+
+#define FREE(M)         if(M){free(M);(M)=NULL;}
 
 // ****************************************************************************
 //  Method:  DBfile_DBGetToc
@@ -156,7 +159,7 @@ static PyObject *DBfile_DBGetVar(PyObject *self, PyObject *args)
     int len = DBGetVarLength(db,str);
     if (len < 0)
     {
-        sprintf(&msg[13], "DBGetVarLength");
+        snprintf(&msg[13], sizeof(msg)-13, "DBGetVarLength");
         if (!dontErrInSanityChecks)
             SiloErrorFunc(msg);
         return NULL;
@@ -164,7 +167,7 @@ static PyObject *DBfile_DBGetVar(PyObject *self, PyObject *args)
     int type = DBGetVarType(db,str);
     if (type < 0)
     {
-        sprintf(&msg[13], "DBGetVarType");
+        snprintf(&msg[13], sizeof(msg)-13, "DBGetVarType");
         if (!dontErrInSanityChecks)
             SiloErrorFunc(msg);
         return NULL;
@@ -172,7 +175,7 @@ static PyObject *DBfile_DBGetVar(PyObject *self, PyObject *args)
     void *var = DBGetVar(db,str);
     if (!var)
     {
-        sprintf(&msg[13], "DBGetVar");
+        snprintf(&msg[13], sizeof(msg)-13, "DBGetVar");
         if (!dontErrInSanityChecks)
             SiloErrorFunc(msg);
         return NULL;
@@ -1164,13 +1167,14 @@ static void DBfile_dealloc(PyObject *self)
 //  Creation:    July 12, 2005
 //
 // ****************************************************************************
+#define FSTRSIZE 1000
 static void DBfile_as_string(PyObject *self, char *s)
 {
     DBfileObject *obj = (DBfileObject*)self;
     if (obj->db)
-        sprintf(s, "<DBfile object, filename='%s'>", obj->db->pub.name);
+        snprintf(s, FSTRSIZE, "<DBfile object, filename='%s'>", obj->db->pub.name);
     else
-        sprintf(s, "<closed DBfile object>");
+        snprintf(s, FSTRSIZE, "<closed DBfile object>");
 }
 
 // ****************************************************************************
@@ -1188,7 +1192,7 @@ static void DBfile_as_string(PyObject *self, char *s)
 // ****************************************************************************
 static PyObject *DBfile_str(PyObject *self)
 {
-    char str[1000];
+    char str[FSTRSIZE];
     DBfile_as_string(self, str);
     return PyString_FromString(str);
 }
@@ -1209,7 +1213,7 @@ static PyObject *DBfile_str(PyObject *self)
 // ****************************************************************************
 static int DBfile_print(PyObject *self, FILE *fp, int flags)
 {
-    char str[1000];
+    char str[FSTRSIZE];
     DBfile_as_string(self, str);
     fprintf(fp, "%s\n", str);
     return 0;
