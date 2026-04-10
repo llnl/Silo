@@ -7321,6 +7321,9 @@ db_hdf5_GetComponentNames(DBfile *_dbfile, char const *objname, char ***comp_nam
  *   Added condition of flags!=OVERWRITE before erroring on non-user
  *   defined objects. A user could be using browser to OVERWRITE a
  *   standard Silo object.
+ *
+ *   Mark C. Miller, Fri Apr 10 15:00:03 PDT 2026
+ *   Limit loops looking for tiny array cases to DB_MAX_H5_OBJ_VALS.
  *-------------------------------------------------------------------------
  */
 static int count_commas(char const *str)
@@ -7380,7 +7383,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                  * So, first, search for it in obj->h5_names and if found, handle
                  * it as such */
                 int j, off=0, found=0;
-                for (j = 0; obj->h5_names[j]; j++)
+                for (j = 0; obj->h5_names[j] && j < DB_MAX_H5_OBJ_VALS; j++)
                 {
                     off += obj->h5_sizes[j] * db_GetMachDataSize(obj->h5_types[j]);
                     if (!strcmp(obj->comp_names[i], obj->h5_names[j]))
@@ -7546,7 +7549,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                  * So, first, search for it in obj->h5_names and if found, handle
                  * it as such */
                 int j, found=0;
-                for (j = 0; obj->h5_names[j]; j++)
+                for (j = 0; obj->h5_names[j] && j < DB_MAX_H5_OBJ_VALS; j++)
                 {
                     if (!strcmp(obj->comp_names[i], obj->h5_names[j]))
                     {
@@ -7703,6 +7706,10 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
  * Modifications:
  *   Mark C. Miller, Thu Apr 19 19:16:11 PDT 2007
  *   Modifed db_hdf5_compwr interface for friendly hdf5 dataset names
+ *
+ *   Mark C. Miller, Fri Apr 10 14:59:06 PDT 2026
+ *   Fix bug in tiny array handling where offsets into temp. buffer were
+ *   being computed incorrectly.
  *-------------------------------------------------------------------------
  */
 SILO_CALLBACK int
@@ -7731,7 +7738,7 @@ db_hdf5_WriteComponent(DBfile *_dbfile, DBobject *obj, char const *compname,
         totsize *= size[i];
     }
 
-    if (totsize <= 3)
+    if (rank == 1 && totsize <= 3)
     {
         int add_it = 0;
         DBObjectType objtype = (DBObjectType) DBGetObjtypeTag(obj->type);
@@ -7795,7 +7802,7 @@ db_hdf5_WriteComponent(DBfile *_dbfile, DBobject *obj, char const *compname,
             obj->h5_names[i] = strdup(compname);
             obj->h5_types[i] = datatype;
             obj->h5_sizes[i] = totsize;
-            obj->h5_offs[i] = i==0?0:obj->h5_offs[i-1]+totsize*db_GetMachDataSize(datatype);
+            obj->h5_offs[i] = i==0?0:obj->h5_offs[i-1]+obj->h5_sizes[i-1]*db_GetMachDataSize(obj->h5_types[i-1]);
             if (obj->h5_offs[i] + totsize * db_GetMachDataSize(datatype) > sizeof(obj->h5_vals))
                 return db_perror(compname, E_OBJBUFFULL, "db_hdf5_WriteComponent");
             memcpy(&obj->h5_vals[obj->h5_offs[i]], data, totsize * db_GetMachDataSize(datatype));
