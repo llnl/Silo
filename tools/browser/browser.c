@@ -1612,6 +1612,7 @@ main(int argc, char *argv[])
      * terminate the command and the browser. If there were expressions
     * then don't enter interactive mode. */
     for (i=0; i<eval_list.nused; i++) {
+        db_errno = 0;
         input_stack = lex_stack();
         lex_push(input_stack, lex_string(eval_list.value[i]));
         for (;;) {
@@ -1639,6 +1640,7 @@ main(int argc, char *argv[])
             rep_update();
         }
         input_stack = lex_close(input_stack);
+        browserErrno = DBErrno();
     }
     if (eval_list.nused) {
         if (sym_bi_true("properec"))
@@ -1656,6 +1658,7 @@ main(int argc, char *argv[])
 
     ary_footnotes_reset();
     for (;;) {
+        db_errno = 0;
         in = parse_stmt(input_stack, true);
         if (in && C_SYM==in->pub.cls && !strcmp(obj_name(in), "__END__")) {
             obj_dest(in);
@@ -1683,6 +1686,7 @@ main(int argc, char *argv[])
         out = obj_dest(out);
         rep_update(); /*handle changes to state from eval */
         if (Verbosity>=2) out_info("Objects allocated: %d", obj_usage());
+        browserErrno = DBErrno();
     }
 
     lex_close(input_stack);
