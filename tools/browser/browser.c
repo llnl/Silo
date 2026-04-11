@@ -1640,7 +1640,8 @@ main(int argc, char *argv[])
             rep_update();
         }
         input_stack = lex_close(input_stack);
-        browserErrno = DBErrno();
+        if (browserErrno == 0)
+            browserErrno = DBErrno();
     }
     if (eval_list.nused) {
         if (sym_bi_true("properec"))
@@ -1686,7 +1687,8 @@ main(int argc, char *argv[])
         out = obj_dest(out);
         rep_update(); /*handle changes to state from eval */
         if (Verbosity>=2) out_info("Objects allocated: %d", obj_usage());
-        browserErrno = DBErrno();
+        if (browserErrno == 0)
+            browserErrno = DBErrno();
     }
 
     lex_close(input_stack);

@@ -97,6 +97,12 @@ scale_quadvar_py=$(find_file -r tests/bin/scale_quadvar.py tests/scale_quadvar.p
 [ $? -eq 0 ] || exit 1
 
 #
+# Ensure we have scale_quadvar.py python script
+#
+scale_quadvar_py=$(find_file -r tests/bin/scale_quadvar.py tests/scale_quadvar.py)
+[ $? -eq 0 ] || exit 1
+
+#
 # Ensure we have the python interpreter in PATH
 #
 pycmd=$(command -v python3)

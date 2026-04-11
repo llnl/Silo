@@ -230,6 +230,10 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         ${silo_test_output_dir})
     add_custom_command(TARGET copy_test_data POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/box_in_a_box.silo
+        ${silo_test_output_dir})
+    add_custom_command(TARGET copy_test_data POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/scale_quadvar.py
         ${silo_test_output_dir})
     add_custom_command(TARGET copy_test_data POST_BUILD

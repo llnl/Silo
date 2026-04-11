@@ -3,7 +3,10 @@
 import Silo
 
 # read box-in-a-box data
-f = Silo.Open("box_in_a_box.silo", Silo.DB_READ)
+try:
+    f = Silo.Open("box_in_a_box.silo", Silo.DB_READ)
+except:
+    f = Silo.Open("bin/box_in_a_box.silo", Silo.DB_READ)
 
 msName = f.GetToc().qmesh_names[0]
 msInfo = f.GetVarInfo(msName,1)
