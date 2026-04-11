@@ -226,6 +226,18 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/testonehex
         ${silo_test_output_dir})
+    add_custom_command(TARGET copy_test_data POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/box_in_a_box.silo
+        ${silo_test_output_dir})
+    add_custom_command(TARGET copy_test_data POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/scale_quadvar.py
+        ${silo_test_output_dir})
+    add_custom_command(TARGET copy_test_data POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_scale_quadvar
+        ${silo_test_output_dir})
 endif()
 
 set(SILO_TESTS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -417,11 +429,13 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
     # Add default tests for HDF5 or PDB drivers or BOTH 
     #
     if(srcFile IN_LIST HDF5_ONLY_SOURCES)
-        add_test(NAME ${base}-hdf5 COMMAND $<TARGET_FILE:${base}> DB_HDF5)
-        set_tests_properties(${base}-hdf5 PROPERTIES LABELS "hdf5")
-        set_tests_properties(${base}-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval})
-        if(src IN_LIST F_TEST_SOURCES)
-            set_tests_properties(${base}-hdf5 PROPERTIES LABELS "fortran")
+        if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+            add_test(NAME ${base}-hdf5 COMMAND $<TARGET_FILE:${base}> DB_HDF5)
+            set_tests_properties(${base}-hdf5 PROPERTIES LABELS "hdf5")
+            set_tests_properties(${base}-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval})
+            if(src IN_LIST F_TEST_SOURCES)
+                set_tests_properties(${base}-hdf5 PROPERTIES LABELS "fortran")
+            endif()
         endif()
     elseif(srcFile IN_LIST PDB_ONLY_SOURCES)
         add_test(NAME ${base} COMMAND $<TARGET_FILE:${base}>)
@@ -718,6 +732,9 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         set_tests_properties(test-write-py-hdf5 PROPERTIES DEPENDS sami-hdf5 REQUIRED_FILES sami.silo)
         set_tests_properties(test-write-py-hdf5 PROPERTIES RESOURCE_LOCK "sami.silo")
         set_tests_properties(test-write-py-hdf5 PROPERTIES LABELS "python;hdf5")
+        add_test(NAME test-scale-quadvar-hdf5 COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/test_scale_quadvar")
+        set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0")
+        set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES LABELS "python;hdf5")
     endif()
 
     add_test(NAME multi_file-reset COMMAND $<TARGET_FILE:multi_test>)

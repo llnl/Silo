@@ -418,6 +418,7 @@ file_new (va_list ap)
     * permission then try opening it for read-only
     */
 #define DEFAULT_DB_TYPE DB_UNKNOWN 
+   db_errno = 0;
    f = DBOpen (fname, DEFAULT_DB_TYPE, writeable ? DB_APPEND : DB_READ);
    if (!f && E_FILENOWRITE==db_errno && writeable) {
       f = DBOpen (fname, DEFAULT_DB_TYPE, DB_READ);

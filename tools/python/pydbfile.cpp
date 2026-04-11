@@ -812,6 +812,10 @@ fail_exit:
 //  Python Arguments:
 //    form 1: object name, python dictionary (with problem sized arrays as
 //    members)
+//
+//    Mark C. Miller, Fri Apr 10 15:01:01 PDT 2026
+//    Remove special handling of "align" as a single float. Its really an
+//    array.
 // ****************************************************************************
 static PyObject *DBfile_DBWriteObject(PyObject *self, PyObject *args)
 {
@@ -846,8 +850,7 @@ static PyObject *DBfile_DBWriteObject(PyObject *self, PyObject *args)
             continue;
 
         // handle some special cases Silo treats as either float or double explicitly
-        if (!strncmp(PyString_AsString(key), "time", 4) ||
-            !strncmp(PyString_AsString(key), "align", 5))
+        if (!strncmp(PyString_AsString(key), "time", 4))
         {
             DBAddFltComponent(siloobj, PyString_AsString(key), (float) PyFloat_AS_DOUBLE(value));
             continue;
