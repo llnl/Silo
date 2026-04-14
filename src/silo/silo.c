@@ -14399,7 +14399,33 @@ char *db_unsplit_path ( const db_Pathname *p )
    {  db_PathnameComponent *c;
       int          first;
       int          slashed;
-      static char  tmp[4096];
+      size_t       needed = 1;
+      char         *tmp;
+
+      first   = TRUE;
+      slashed = FALSE;
+      c       = p->firstComponent;
+      while (c != 0)
+      {
+         if ((c->name == 0) || (strlen(c->name) == 0))
+         {  needed += 1;
+            slashed = TRUE;
+         }
+         else
+         {  if ((!slashed) && (!first))
+            {  needed += 1;
+               slashed = TRUE;
+            }
+            needed += strlen(c->name);
+            slashed = FALSE;
+         }
+         first = FALSE;
+         c     = c->nextComponent;
+      }
+
+      tmp = ALLOC_N(char, needed);
+      if (tmp == 0)
+         return 0;
 
       tmp[0] = '\0';
       first   = TRUE;
@@ -14423,10 +14449,10 @@ char *db_unsplit_path ( const db_Pathname *p )
          c     = c->nextComponent;
       }
       result = STRDUP(tmp);
+      FREE(tmp);
    }
    return result;
 }
-
 /*
  * END CODE FROM JIM REUS' DSL }
  */
