@@ -122,7 +122,11 @@ fi
 #
 # Use executable to create original onehex.silo file
 #
-$onehex $1
+"$onehex" "$1"
+result=$?
+if [ $result -ne 0 ]; then
+    exit $result
+fi
 
 #
 # Use python module to create data with no special features 
