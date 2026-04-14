@@ -3272,6 +3272,94 @@ DBAddVarComponent(DBobject *object, const char *compname, const char *pdbname)
  *    Sean Ahern, Tue Sep 28 11:00:13 PDT 1999
  *    Made the error messages a little better.
  *--------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------
+ * Build string representation of literal component arrays safely.
+ *----------------------------------------------------------------------*/
+PRIVATE char *
+db_mk_int_literal_str(int n, int const *ii)
+{
+    int i;
+    size_t need = 0;
+    size_t used = 0;
+    char *buf;
+
+    if (n < 1 || !ii)
+        return NULL;
+
+    need += (size_t) snprintf(NULL, 0, "'<i>%d", ii[0]);
+    for (i = 1; i < n; i++)
+        need += (size_t) snprintf(NULL, 0, ",%d", ii[i]);
+    need += 2; /* trailing quote + NUL */
+
+    buf = (char *) malloc(need);
+    if (!buf)
+        return NULL;
+
+    used += (size_t) snprintf(buf + used, need - used, "'<i>%d", ii[0]);
+    for (i = 1; i < n; i++)
+        used += (size_t) snprintf(buf + used, need - used, ",%d", ii[i]);
+    snprintf(buf + used, need - used, "'");
+
+    return buf;
+}
+
+PRIVATE char *
+db_mk_flt_literal_str(int n, double const *ff)
+{
+    int i;
+    size_t need = 0;
+    size_t used = 0;
+    char *buf;
+
+    if (n < 1 || !ff)
+        return NULL;
+
+    need += (size_t) snprintf(NULL, 0, "'<f>%g", ff[0]);
+    for (i = 1; i < n; i++)
+        need += (size_t) snprintf(NULL, 0, ",%g", ff[i]);
+    need += 2; /* trailing quote + NUL */
+
+    buf = (char *) malloc(need);
+    if (!buf)
+        return NULL;
+
+    used += (size_t) snprintf(buf + used, need - used, "'<f>%g", ff[0]);
+    for (i = 1; i < n; i++)
+        used += (size_t) snprintf(buf + used, need - used, ",%g", ff[i]);
+    snprintf(buf + used, need - used, "'");
+
+    return buf;
+}
+
+PRIVATE char *
+db_mk_dbl_literal_str(int n, double const *dd)
+{
+    int i;
+    size_t need = 0;
+    size_t used = 0;
+    char *buf;
+
+    if (n < 1 || !dd)
+        return NULL;
+
+    need += (size_t) snprintf(NULL, 0, "'<d>%.30g", dd[0]);
+    for (i = 1; i < n; i++)
+        need += (size_t) snprintf(NULL, 0, ",%.30g", dd[i]);
+    need += 2; /* trailing quote + NUL */
+
+    buf = (char *) malloc(need);
+    if (!buf)
+        return NULL;
+
+    used += (size_t) snprintf(buf + used, need - used, "'<d>%.30g", dd[0]);
+    for (i = 1; i < n; i++)
+        used += (size_t) snprintf(buf + used, need - used, ",%.30g", dd[i]);
+    snprintf(buf + used, need - used, "'");
+
+    return buf;
+}
+
 PUBLIC int
 DBAddIntComponent(DBobject *object, const char *compname, int ii)
 {
@@ -3281,8 +3369,7 @@ DBAddIntComponent(DBobject *object, const char *compname, int ii)
 PUBLIC int
 DBAddIntNComponent(DBobject *object, const char *compname, int n, int const *ii)
 {
-    int            i;
-    char           tmp[256];
+    char           *tmp = NULL;
 
     API_BEGIN("DBAddIntNComponent", int, -1) {
         if (!object)
@@ -3298,22 +3385,20 @@ DBAddIntNComponent(DBobject *object, const char *compname, int n, int const *ii)
         if (object->ncomponents >= object->maxcomponents)
             API_ERROR("object ncomponents", E_BADARGS);
 
-        sprintf(tmp, "'<i>%d", ii[0]);
-        for (i = 1; i < n; i++)
-        {
-            char tmp2[32];
-            snprintf(tmp2, sizeof(tmp2), ",%d", ii[i]);
-            strcat(tmp, tmp2);
-        }
-        strcat(tmp, "'");
+        tmp = db_mk_int_literal_str(n, ii);
+        if (!tmp)
+            API_ERROR(NULL, E_NOMEM);
 
         if (NULL == (object->comp_names[object->ncomponents] =
                      STRDUP(compname)) ||
             NULL == (object->pdb_names[object->ncomponents] =
                      STRDUP(tmp))) {
             FREE(object->comp_names[object->ncomponents]);
+            FREE(tmp);
             API_ERROR(NULL, E_NOMEM);
         }
+        FREE(tmp);
+        tmp = NULL;
 
         if (!db_IncObjectComponentCount(object))
             API_ERROR(NULL, E_NOMEM);
@@ -3365,8 +3450,7 @@ DBAddFltComponent(DBobject *object, const char *compname, double ff)
 PUBLIC int
 DBAddFltNComponent(DBobject *object, const char *compname, int n, double const *ff)
 {
-    int            i;
-    char           tmp[256];
+    char           *tmp = NULL;
 
     API_BEGIN("DBAddFltNComponent", int, -1) {
         if (!object)
@@ -3383,22 +3467,20 @@ DBAddFltNComponent(DBobject *object, const char *compname, int n, double const *
             API_ERROR("object ncomponents", E_BADARGS);
         }
 
-        sprintf(tmp, "'<f>%g", ff[0]);
-        for (i = 1; i < n; i++)
-        {
-            char tmp2[32];
-            snprintf(tmp2, sizeof(tmp2), ",%g", ff[i]);
-            strcat(tmp, tmp2);
-        }
-        strcat(tmp, "'");
+        tmp = db_mk_flt_literal_str(n, ff);
+        if (!tmp)
+            API_ERROR(NULL, E_NOMEM);
 
         if (NULL == (object->comp_names[object->ncomponents] =
                      STRDUP(compname)) ||
             NULL == (object->pdb_names[object->ncomponents] =
                      STRDUP(tmp))) {
             FREE(object->comp_names[object->ncomponents]);
+            FREE(tmp);
             API_ERROR(NULL, E_NOMEM);
         }
+        FREE(tmp);
+        tmp = NULL;
         if (!db_IncObjectComponentCount(object))
             API_ERROR(NULL, E_NOMEM);
     }
@@ -3435,8 +3517,7 @@ DBAddDblComponent(DBobject *object, const char *compname, double dd)
 PUBLIC int
 DBAddDblNComponent(DBobject *object, const char *compname, int n, double const *dd)
 {
-    int            i;
-    char           tmp[256];
+    char           *tmp = NULL;
 
     API_BEGIN("DBAddDblNComponent", int, -1) {
         if (!object)
@@ -3453,22 +3534,20 @@ DBAddDblNComponent(DBobject *object, const char *compname, int n, double const *
             API_ERROR("object ncomponents", E_BADARGS);
         }
 
-        sprintf(tmp, "'<d>%.30g", dd[0]);
-        for (i = 1; i < n; i++)
-        {
-            char tmp2[64];
-            snprintf(tmp2, sizeof(tmp2), ",%.30g", dd[i]);
-            strcat(tmp,tmp2);
-        }
-        strcat(tmp, "'");
+        tmp = db_mk_dbl_literal_str(n, dd);
+        if (!tmp)
+            API_ERROR(NULL, E_NOMEM);
 
         if (NULL == (object->comp_names[object->ncomponents] =
                      STRDUP(compname)) ||
             NULL == (object->pdb_names[object->ncomponents] =
                      STRDUP(tmp))) {
             FREE(object->comp_names[object->ncomponents]);
+            FREE(tmp);
             API_ERROR(NULL, E_NOMEM);
         }
+        FREE(tmp);
+        tmp = NULL;
         if (!db_IncObjectComponentCount(object))
             API_ERROR(NULL, E_NOMEM);
     }
