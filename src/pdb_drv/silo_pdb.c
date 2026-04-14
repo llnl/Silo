@@ -4069,7 +4069,7 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
    PJcomplist     tmp_obj;
    static char   *me = "db_pdb_GetMultimeshadj";
    char           tmpn[256];
-   int           *offsetmap, *offsetmapn=0, *offsetmapz=0, lneighbors, tmpoff;
+   int           *offsetmap = 0, *offsetmapn=0, *offsetmapz=0, lneighbors = 0, tmpoff = 0;
    PJcomplist    *_tcl;
 
    db_pdb_getobjinfo(dbfile->pdb, (char*)objname, tmp, &ncomps);
@@ -4100,110 +4100,188 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
          return NULL;
       *mmadj = tmpmmadj;
 
-       offsetmap = ALLOC_N(int, mmadj->nblocks);
-       lneighbors = 0;
-       for (i = 0; i < mmadj->nblocks; i++)
-       {
-           offsetmap[i] = lneighbors;
-           lneighbors += mmadj->nneighbors[i];
-       }
+      if (mmadj->nblocks < 0)
+         goto fail;
+      if (mmadj->nblocks > 0 && (!mmadj->nneighbors || !mmadj->meshtypes))
+         goto fail;
 
-       if (mmadj->lnodelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
-       {
-          mmadj->nodelists = ALLOC_N(int *, lneighbors); 
-          offsetmapn = ALLOC_N(int, mmadj->nblocks);
-          tmpoff = 0;
-          for (i = 0; i < mmadj->nblocks; i++)
-          {
-              offsetmapn[i] = tmpoff;
-              for (j = 0; j < mmadj->nneighbors[i]; j++)
-                 tmpoff += mmadj->lnodelists[offsetmap[i]+j];
-          }
-       }
+      if (mmadj->nblocks > 0)
+      {
+         offsetmap = ALLOC_N(int, mmadj->nblocks);
+         if (!offsetmap)
+            goto fail;
+      }
 
-       if (mmadj->lzonelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
-       {
-          mmadj->zonelists = ALLOC_N(int *, lneighbors); 
-          offsetmapz = ALLOC_N(int, mmadj->nblocks);
-          tmpoff = 0;
-          for (i = 0; i < mmadj->nblocks; i++)
-          {
-              offsetmapz[i] = tmpoff;
-              for (j = 0; j < mmadj->nneighbors[i]; j++)
-                 tmpoff += mmadj->lzonelists[offsetmap[i]+j];
-          }
-       }
-       
-       tmpnmesh = nmesh;
-       if (nmesh <= 0 || !block_map)
-           tmpnmesh = mmadj->nblocks;
+      for (i = 0; i < mmadj->nblocks; i++)
+      {
+         if (mmadj->nneighbors[i] < 0)
+            goto fail;
+         if (lneighbors > INT_MAX - mmadj->nneighbors[i])
+            goto fail;
+         offsetmap[i] = lneighbors;
+         lneighbors += mmadj->nneighbors[i];
+      }
 
-       /* This loop could be optimized w.r.t. number of I/O requests
-          it makes. The nodelists and/or zonelists could be read in
-          a single call. But then we'd have to split it into separate
-          arrays duplicating memory */
-       for (i = 0; (i < tmpnmesh) &&
-                   (DBGetDataReadMask2File(_dbfile) & (DBMMADJNodelists|DBMMADJZonelists)); i++)
-       {
-          int blockno = block_map ? block_map[i] : i;
+      if (mmadj->lnodelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
+      {
+         if (lneighbors > 0)
+         {
+            mmadj->nodelists = ALLOC_N(int *, lneighbors);
+            if (!mmadj->nodelists)
+               goto fail;
+         }
+         if (mmadj->nblocks > 0)
+         {
+            offsetmapn = ALLOC_N(int, mmadj->nblocks);
+            if (!offsetmapn)
+               goto fail;
+         }
+         tmpoff = 0;
+         for (i = 0; i < mmadj->nblocks; i++)
+         {
+            offsetmapn[i] = tmpoff;
+            for (j = 0; j < mmadj->nneighbors[i]; j++)
+            {
+               int len = mmadj->lnodelists[offsetmap[i]+j];
+               if (len < 0)
+                  goto fail;
+               if (tmpoff > INT_MAX - len)
+                  goto fail;
+               tmpoff += len;
+            }
+         }
+      }
 
-          if (mmadj->lnodelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
-          {
-             tmpoff = offsetmapn[blockno];
-             for (j = 0; j < mmadj->nneighbors[blockno]; j++)
-             {
-                long ind[3];
-                int len = mmadj->lnodelists[offsetmap[blockno]+j];
-                int *nlist = ALLOC_N(int, len);
+      if (mmadj->lzonelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
+      {
+         if (lneighbors > 0)
+         {
+            mmadj->zonelists = ALLOC_N(int *, lneighbors);
+            if (!mmadj->zonelists)
+               goto fail;
+         }
+         if (mmadj->nblocks > 0)
+         {
+            offsetmapz = ALLOC_N(int, mmadj->nblocks);
+            if (!offsetmapz)
+               goto fail;
+         }
+         tmpoff = 0;
+         for (i = 0; i < mmadj->nblocks; i++)
+         {
+            offsetmapz[i] = tmpoff;
+            for (j = 0; j < mmadj->nneighbors[i]; j++)
+            {
+               int len = mmadj->lzonelists[offsetmap[i]+j];
+               if (len < 0)
+                  goto fail;
+               if (tmpoff > INT_MAX - len)
+                  goto fail;
+               tmpoff += len;
+            }
+         }
+      }
 
-                ind[0] = tmpoff;
-                ind[1] = tmpoff + len - 1;
-                ind[2] = 1;
-                db_mkname(dbfile->pdb, (char*)objname, "nodelists", tmpn);
-                if (!PJ_read_alt(dbfile->pdb, tmpn, nlist, ind)) {
-                   FREE(offsetmap);
-                   FREE(offsetmapn);
-                   FREE(offsetmapz);
-                   db_perror("PJ_read_alt", E_CALLFAIL, me);
-                }
+      tmpnmesh = nmesh;
+      if (nmesh <= 0 || !block_map)
+          tmpnmesh = mmadj->nblocks;
+      else if (nmesh < 0)
+          goto fail;
 
-                mmadj->nodelists[offsetmap[blockno]+j] = nlist;
-                tmpoff += len;
-             }
-          }
+      /* This loop could be optimized w.r.t. number of I/O requests
+         it makes. The nodelists and/or zonelists could be read in
+         a single call. But then we'd have to split it into separate
+         arrays duplicating memory */
+      for (i = 0; (i < tmpnmesh) &&
+                  (DBGetDataReadMask2File(_dbfile) & (DBMMADJNodelists|DBMMADJZonelists)); i++)
+      {
+         int blockno = block_map ? block_map[i] : i;
 
-          if (mmadj->lzonelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
-          {
-             tmpoff = offsetmapz[blockno];
-             for (j = 0; j < mmadj->nneighbors[blockno]; j++)
-             {
-                long ind[3];
-                int len = mmadj->lzonelists[offsetmap[blockno]+j];
-                int *zlist = ALLOC_N(int, len);
+         if (blockno < 0 || blockno >= mmadj->nblocks)
+            goto fail;
 
-                ind[0] = tmpoff;
-                ind[1] = tmpoff + len - 1;
-                ind[2] = 1;
-                db_mkname(dbfile->pdb, (char*)objname, "zonelists", tmpn);
-                if (!PJ_read_alt(dbfile->pdb, tmpn, zlist, ind)) {
-                   FREE(offsetmap);
-                   FREE(offsetmapn);
-                   FREE(offsetmapz);
-                   db_perror("PJ_read_alt", E_CALLFAIL, me);
-                }
+         if (mmadj->lnodelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
+         {
+            tmpoff = offsetmapn[blockno];
+            for (j = 0; j < mmadj->nneighbors[blockno]; j++)
+            {
+               long ind[3];
+               int len = mmadj->lnodelists[offsetmap[blockno]+j];
+               int *nlist = 0;
 
-                mmadj->zonelists[offsetmap[blockno]+j] = zlist;
-                tmpoff += len;
-             }
-          }
-       }
+               if (len < 0)
+                  goto fail;
+               if (len > 0)
+               {
+                  nlist = ALLOC_N(int, len);
+                  if (!nlist)
+                     goto fail;
+               }
 
-       FREE(offsetmap);
-       FREE(offsetmapn);
-       FREE(offsetmapz);
-   }
+               ind[0] = tmpoff;
+               ind[1] = tmpoff + len - 1;
+               ind[2] = 1;
+               db_mkname(dbfile->pdb, (char*)objname, "nodelists", tmpn);
+               if (!PJ_read_alt(dbfile->pdb, tmpn, nlist, ind)) {
+                  FREE(nlist);
+                  goto fail;
+               }
+
+               mmadj->nodelists[offsetmap[blockno]+j] = nlist;
+               if (tmpoff > INT_MAX - len)
+                  goto fail;
+               tmpoff += len;
+            }
+         }
+
+         if (mmadj->lzonelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
+         {
+            tmpoff = offsetmapz[blockno];
+            for (j = 0; j < mmadj->nneighbors[blockno]; j++)
+            {
+               long ind[3];
+               int len = mmadj->lzonelists[offsetmap[blockno]+j];
+               int *zlist = 0;
+
+               if (len < 0)
+                  goto fail;
+               if (len > 0)
+               {
+                  zlist = ALLOC_N(int, len);
+                  if (!zlist)
+                     goto fail;
+               }
+
+               ind[0] = tmpoff;
+               ind[1] = tmpoff + len - 1;
+               ind[2] = 1;
+               db_mkname(dbfile->pdb, (char*)objname, "zonelists", tmpn);
+               if (!PJ_read_alt(dbfile->pdb, tmpn, zlist, ind)) {
+                  FREE(zlist);
+                  goto fail;
+               }
+
+               mmadj->zonelists[offsetmap[blockno]+j] = zlist;
+               if (tmpoff > INT_MAX - len)
+                  goto fail;
+               tmpoff += len;
+            }
+         }
+      }
+
+      FREE(offsetmap);
+      FREE(offsetmapn);
+      FREE(offsetmapz);   }
 
    return (mmadj);
+
+fail:
+   FREE(offsetmap);
+   FREE(offsetmapn);
+   FREE(offsetmapz);
+   DBFreeMultimeshadj(mmadj);
+   db_perror("malformed multimeshadj object", E_CALLFAIL, me);
+   return NULL;
 }
 
 /*-------------------------------------------------------------------------
