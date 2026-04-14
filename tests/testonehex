@@ -138,8 +138,11 @@ fi
 #
 $browser --proper-exit-code -R 0.00001 -q -e diff onehex.silo onehexpy.silo 1>testonehex.out 2>&1
 result=$?
-if [ $result -ne 0 ] || [ `grep -v 'appears only in' testonehex.out | grep '=' | wc -l | tr -s ' ' | cut -d' ' -f2` -gt 5 ]; then
-    exit $result 
+if [ $result -ne 0 ]; then
+    exit $result
+fi
+if [ `grep -v 'appears only in' testonehex.out | grep '=' | wc -l | tr -s ' ' | cut -d' ' -f2` -gt 5 ]; then
+    exit 1
 fi
 exit 0
 
