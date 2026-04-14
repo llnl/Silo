@@ -784,3 +784,23 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
     endif()
 
 endif()
+
+#
+# test_mat_compression tests
+#
+add_test(NAME test_mat_compression-basic COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.pdb:Material out=tmc-basic.pdb:Material)
+set_tests_properties(test_mat_compression-basic PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.pdb" LABELS "pdb")
+add_test(NAME test_mat_compression-dense COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.pdb:Material out=tmc-dense.pdb:Material dense=1)
+set_tests_properties(test_mat_compression-dense PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.pdb" LABELS "pdb")
+if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+    add_test(NAME test_mat_compression-basic-hdf5 COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.h5:Material out=tmc-basic.h5:Material)
+    set_tests_properties(test_mat_compression-basic-hdf5 PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.h5" LABELS "hdf5")
+    add_test(NAME test_mat_compression-dense-hdf5 COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.h5:Material out=tmc-dense.h5:Material dense=1)
+    set_tests_properties(test_mat_compression-dense-hdf5 PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.h5" LABELS "hdf5")
+    add_test(NAME test_mat_compression-gzip-hdf5 COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.h5:Material out=tmc-gzip.h5:Material dense=1 compress="METHOD=GZIP LEVEL=3")
+    set_tests_properties(test_mat_compression-gzip-hdf5 PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.h5" LABELS "hdf5;compression")
+    if(SILO_ENABLE_ZFP)
+        add_test(NAME test_mat_compression-zfp-hdf5 COMMAND $<TARGET_FILE:test_mat_compression> in=specmix_quad.h5:Material out=tmc-zfp.h5:Material dense=1 compress="METHOD=ZFP ACCURACY=0.001")
+        set_tests_properties(test_mat_compression-zfp-hdf5 PROPERTIES DEPENDS specmix RESOURCE_LOCK "specmix_quad.h5" LABELS "hdf5;compression")
+    endif()
+endif()
