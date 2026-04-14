@@ -13863,6 +13863,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
     char                *typestring = NULL;
     int                 i, j, tmpnmesh, _objtype;
     int                 *offsetmap=0, *offsetmapn=0, *offsetmapz=0, lneighbors, tmpoff;
+    int                 blockno;
 
     PROTECT {
         /* Open object and make sure it's a multimesh */
@@ -13891,6 +13892,10 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         }
 
         /* Create object and initialize meta data */
+        if (m.nblocks < 0 || m.lneighbors < 0) {
+            db_perror((char*)name, E_CALLFAIL, me);
+            UNWIND();
+        }
         if (NULL==(mmadj=DBAllocMultimeshadj(0))) return NULL;
         mmadj->nblocks = m.nblocks;
         mmadj->blockorigin = m.blockorigin;
@@ -13909,6 +13914,13 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
             lneighbors = 0;
             for (i = 0; (i < mmadj->nblocks) && mmadj->nneighbors; i++)
             {
+                if (mmadj->nneighbors[i] < 0 ||
+                    lneighbors > INT_MAX - mmadj->nneighbors[i]) {
+                    FREE(offsetmap);
+                    DBFreeMultimeshadj(mmadj);
+                    db_perror((char*)name, E_CALLFAIL, me);
+                    UNWIND();
+                }
                 offsetmap[i] = lneighbors;
                 lneighbors += mmadj->nneighbors[i];
             }
@@ -13926,8 +13938,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                for (i = 0; i < mmadj->nblocks; i++)
                {
                    offsetmapn[i] = tmpoff;
-                   for (j = 0; j < mmadj->nneighbors[i]; j++)
-                      tmpoff += mmadj->lnodelists[offsetmap[i]+j];
+                   for (j = 0; j < mmadj->nneighbors[i]; j++) {
+                      int len = mmadj->lnodelists[offsetmap[i]+j];
+                      if (len < 0 || tmpoff > INT_MAX - len) {
+                          FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                          DBFreeMultimeshadj(mmadj);
+                          db_perror((char*)name, E_CALLFAIL, me);
+                          UNWIND();
+                      }
+                      tmpoff += len;
+                   }
                }
                mmadj->totlnodelists = m.totlnodelists;
            }
@@ -13945,8 +13965,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                for (i = 0; i < mmadj->nblocks; i++)
                {
                    offsetmapz[i] = tmpoff;
-                   for (j = 0; j < mmadj->nneighbors[i]; j++)
-                      tmpoff += mmadj->lzonelists[offsetmap[i]+j];
+                   for (j = 0; j < mmadj->nneighbors[i]; j++) {
+                      int len = mmadj->lzonelists[offsetmap[i]+j];
+                      if (len < 0 || tmpoff > INT_MAX - len) {
+                          FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                          DBFreeMultimeshadj(mmadj);
+                          db_perror((char*)name, E_CALLFAIL, me);
+                          UNWIND();
+                      }
+                      tmpoff += len;
+                   }
                }
                mmadj->totlzonelists = m.totlzonelists;
             }
@@ -13983,7 +14011,14 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                     (DBGetDataReadMask2File(_dbfile) & (DBMMADJNodelists|DBMMADJZonelists)); i++)
         {
            hsize_t ds_size[H5S_MAX_RANK];
-           int blockno = block_map ? block_map[i] : i;
+           blockno = block_map ? block_map[i] : i;
+
+           if (blockno < 0 || blockno >= mmadj->nblocks) {
+               FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+               DBFreeMultimeshadj(mmadj);
+               db_perror((char*)name, E_CALLFAIL, me);
+               UNWIND();
+           }
  
            if (offsetmapn && mmadj->lnodelists && mmadj->nodelists &&
                mmadj->nneighbors && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
@@ -13993,7 +14028,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
               {
                  int stride = 1;
                  int len = mmadj->lnodelists[offsetmap[blockno]+j];
-                 int *nlist = ALLOC_N(int, len);
+                 int *nlist;
+
+                 if (len < 0) {
+                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                     DBFreeMultimeshadj(mmadj);
+                     db_perror((char*)name, E_CALLFAIL, me);
+                     UNWIND();
+                 }
+
+                 nlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
                  if ((fspace=build_fspace(nldset, 1, &tmpoff, &len, &stride,
@@ -14041,7 +14085,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
               {
                  int stride = 1;
                  int len = mmadj->lzonelists[offsetmap[blockno]+j];
-                 int *zlist = ALLOC_N(int, len);
+                 int *zlist;
+
+                 if (len < 0) {
+                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                     DBFreeMultimeshadj(mmadj);
+                     db_perror((char*)name, E_CALLFAIL, me);
+                     UNWIND();
+                 }
+
+                 zlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
                  if ((fspace=build_fspace(zldset, 1, &tmpoff, &len, &stride,
