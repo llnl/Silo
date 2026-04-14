@@ -91,6 +91,16 @@ be used for advertising or product endorsement purposes.
 
 static char   *pj_fixname(PDBfile *, char const *);
 
+/* Bounded name construction helper to avoid overflowing stack/static
+ * buffers at call sites. Most call sites pass fixed-size arrays, so
+ * sizeof(out) in the macro below resolves to the destination capacity. */
+#ifdef PDB_WRITE
+PRIVATE void db_mkname_sized(PDBfile *pdb, char const *name, char const *suffix,
+    char *out, size_t outsz);
+#define db_mkname(pdb, name, suffix, out) \
+    db_mkname_sized((pdb), (name), (suffix), (out), sizeof(out))
+#endif
+
 /*-------------------------------------------------------------------------
  * Function:    PJ_read
  *
@@ -12854,9 +12864,15 @@ db_build_shared_names_ucdmesh (DBfile *_dbfile, char const *meshname) {
  *--------------------------------------------------------------------*/
 #ifdef PDB_WRITE
 PRIVATE void
-db_mkname (PDBfile *pdb, char const *name, char const *suffix, char *out)
+db_mkname_sized(PDBfile *pdb, char const *name, char const *suffix,
+    char *out, size_t outsz)
 {
     char   *cwd;
+    int     n;
+    size_t  used = 0;
+
+    if (!out || outsz == 0)
+        return;
 
     out[0] = '\0';
 
@@ -12867,23 +12883,32 @@ db_mkname (PDBfile *pdb, char const *name, char const *suffix, char *out)
         /* Get the directory name. */
         if ((cwd = lite_PD_pwd(pdb)))
         {
-            strcat(out, cwd);
-            if (!STR_EQUAL("/", cwd))
-                strcat(out, "/");
+            n = snprintf(out + used, outsz - used, "%s%s", cwd,
+                STR_EQUAL("/", cwd) ? "" : "/");
         } else
         {
-            strcat(out, "/");
+            n = snprintf(out + used, outsz - used, "/");
         }
+
+        if (n < 0 || (size_t)n >= outsz - used)
+            return;
+        used += (size_t)n;
     }
 
-    /* And tack on the file name and extension is supplied. */
+    /* And tack on the file name and extension if supplied. */
     if (name)
-        strcat(out, name);
+    {
+        n = snprintf(out + used, outsz - used, "%s", name);
+        if (n < 0 || (size_t)n >= outsz - used)
+            return;
+        used += (size_t)n;
+    }
     if (suffix)
     {
-        if (name)
-            strcat(out, "_");
-        strcat(out, suffix);
+        n = snprintf(out + used, outsz - used, "%s%s",
+            name ? "_" : "", suffix);
+        if (n < 0 || (size_t)n >= outsz - used)
+            return;
     }
 }
 #endif /* PDB_WRITE */
