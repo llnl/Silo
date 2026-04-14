@@ -307,6 +307,10 @@ set(SKIP_TEST_SOURCES
     testlib.c
 )
 
+if(NOT SILO_ENABLE_SHARED)
+    list(APPEND SKIP_TEST_SOURCES rocket.cxx)
+endif()
+
 #
 # This test has problems with ASAN.
 # There are a handful of others that trigger leaks that we
@@ -344,19 +348,21 @@ if(NOT SILO_ENABLE_JSON)
 endif()
 
 
-add_library(rocket_silo MODULE rocket_silo.cxx)
-add_dependencies(rocket_silo silo)
-target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
-target_link_libraries(rocket_silo dl m)
-if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
-    target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
-endif()
-target_include_directories(rocket_silo PRIVATE
+if(SILO_ENABLE_SHARED)
+    add_library(rocket_silo MODULE rocket_silo.cxx)
+    add_dependencies(rocket_silo silo)
+    target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
+    target_link_libraries(rocket_silo dl m)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
+        target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
+    endif()
+    target_include_directories(rocket_silo PRIVATE
         ${silo_build_include_dir}
         ${Silo_SOURCE_DIR}/src/silo
         ${SILO_TESTS_SOURCE_DIR})
-set_target_properties(rocket_silo PROPERTIES PREFIX "")
+    set_target_properties(rocket_silo PROPERTIES PREFIX "")
+endif()
 
 add_library(testlib_obj OBJECT testlib.c)
 target_include_directories(testlib_obj PRIVATE
@@ -473,8 +479,10 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 endforeach()
 
-add_dependencies(rocket rocket_silo)
-set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+if(SILO_ENABLE_SHARED)
+    add_dependencies(rocket rocket_silo)
+    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+endif()
 
 target_sources(listtypes PRIVATE listtypes_main.c listtypes.c)
 set_tests_properties(listtypes PROPERTIES DEPENDS ucd REQUIRED_FILES ucd.pdb)
