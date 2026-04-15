@@ -326,7 +326,7 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     if (datatype == DB_DOUBLE)
         typesz = (int) sizeof(double);
 
-    if (mat->nmat < 0)
+    if (mat->nmat <= 0)
     {
         etag = E_BADARGS;
         goto cleanup;
