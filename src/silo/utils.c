@@ -54,6 +54,7 @@ be used for advertising or product endorsement purposes.
 
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 
 #include "silo_private.h"
 
