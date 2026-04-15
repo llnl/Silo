@@ -52,9 +52,9 @@ import sys, Silo
 if len(sys.argv) == 1:
     db = Silo.Create("onehexpy.silo", "This is a test to see how well this string displays in Qt widget in Silex\nThis is a test to see how well this string displays in Qt widget in Silex\nThis is a test to see how well this string displays in Qt widget in Silex\nThis is a test to see how well this string displays in Qt widget in Silex\n")
 elif 'DB_HDF5' in sys.argv[1]:
-    db = Silo.Create("onehexpy.silo", "onehex from python to DB_HDF5", Silo.DB_HDF5, Silo.DB_CLOBBER);
+    db = Silo.Create("onehexpy.silo", "onehex from python to DB_HDF5", Silo.DB_HDF5, Silo.DB_CLOBBER)
 else:
-    db = Silo.Create("onehexpy.silo", "onehex from python to DB_PDB", Silo.DB_PDB, Silo.DB_CLOBBER);
+    db = Silo.Create("onehexpy.silo", "onehex from python to DB_PDB", Silo.DB_PDB, Silo.DB_CLOBBER)
 
 # coordinate arrays for the mesh
 coord0 = (0, 0.707107, 0, -0.707107, 0, 0.707107, 0, -0.707107)
