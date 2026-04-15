@@ -4209,14 +4209,14 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
                int len = mmadj->lnodelists[offsetmap[blockno]+j];
                int *nlist = 0;
 
-               if (len < 0)
-                  goto fail;
-               if (len > 0)
+               if (len < 0) goto fail;
+               if (len == 0)
                {
-                  nlist = ALLOC_N(int, len);
-                  if (!nlist)
-                     goto fail;
+                   mmadj->nodelists[offsetmap[blockno]+j] = NULL;
+                   continue;
                }
+               nlist = ALLOC_N(int, len);
+               if (!nlist) goto fail;
 
                ind[0] = tmpoff;
                ind[1] = tmpoff + len - 1;
@@ -4228,8 +4228,7 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
                }
 
                mmadj->nodelists[offsetmap[blockno]+j] = nlist;
-               if (tmpoff > INT_MAX - len)
-                  goto fail;
+               if (tmpoff > INT_MAX - len) goto fail;
                tmpoff += len;
             }
          }
@@ -4243,14 +4242,14 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
                int len = mmadj->lzonelists[offsetmap[blockno]+j];
                int *zlist = 0;
 
-               if (len < 0)
-                  goto fail;
-               if (len > 0)
+               if (len < 0) goto fail;
+               if (len == 0)
                {
-                  zlist = ALLOC_N(int, len);
-                  if (!zlist)
-                     goto fail;
+                   mmadj->zonelists[offsetmap[blockno]+j] = NULL;
+                   continue;
                }
+               zlist = ALLOC_N(int, len);
+               if (!zlist) goto fail;
 
                ind[0] = tmpoff;
                ind[1] = tmpoff + len - 1;
@@ -4262,8 +4261,7 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
                }
 
                mmadj->zonelists[offsetmap[blockno]+j] = zlist;
-               if (tmpoff > INT_MAX - len)
-                  goto fail;
+               if (tmpoff > INT_MAX - len) goto fail;
                tmpoff += len;
             }
          }
