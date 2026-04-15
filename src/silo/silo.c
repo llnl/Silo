@@ -3279,7 +3279,7 @@ DBAddVarComponent(DBobject *object, const char *compname, const char *pdbname)
 PRIVATE char *
 db_mk_int_literal_str(int n, int const *ii)
 {
-    int i;
+    int i,k;
     size_t need = 0;
     size_t used = 0;
     char *buf;
@@ -3287,9 +3287,15 @@ db_mk_int_literal_str(int n, int const *ii)
     if (n < 1 || !ii)
         return NULL;
 
-    need += (size_t) snprintf(NULL, 0, "'<i>%d", ii[0]);
+    k = snprintf(NULL, 0, "'<i>%d", ii[0]);
+    if (k < 0) return NULL;
+    need += k;
     for (i = 1; i < n; i++)
-        need += (size_t) snprintf(NULL, 0, ",%d", ii[i]);
+    {
+        k = snprintf(NULL, 0, ",%d", ii[i]);
+        if (k < 0) return NULL;
+        need += k;
+    }
     need += 2; /* trailing quote + NUL */
 
     buf = (char *) malloc(need);
