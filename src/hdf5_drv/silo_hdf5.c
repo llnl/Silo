@@ -14006,7 +14006,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                    for (j = 0; j < mmadj->nneighbors[i]; j++) {
                       int len = mmadj->lnodelists[offsetmap[i]+j];
                       if (len < 0 || tmpoff > INT_MAX - len) {
-                          FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                          FREE(offsetmap);
+                          FREE(offsetmapn);
+                          FREE(offsetmapz);
                           DBFreeMultimeshadj(mmadj);
                           db_perror((char*)name, E_CALLFAIL, me);
                           UNWIND();
@@ -14033,7 +14035,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                    for (j = 0; j < mmadj->nneighbors[i]; j++) {
                       int len = mmadj->lzonelists[offsetmap[i]+j];
                       if (len < 0 || tmpoff > INT_MAX - len) {
-                          FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                          FREE(offsetmap);
+                          FREE(offsetmapn);
+                          FREE(offsetmapz);
                           DBFreeMultimeshadj(mmadj);
                           db_perror((char*)name, E_CALLFAIL, me);
                           UNWIND();
@@ -14079,7 +14083,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
            blockno = block_map ? block_map[i] : i;
 
            if (blockno < 0 || blockno >= mmadj->nblocks) {
-               FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+               FREE(offsetmap);
+               FREE(offsetmapn);
+               FREE(offsetmapz);
                DBFreeMultimeshadj(mmadj);
                db_perror((char*)name, E_CALLFAIL, me);
                UNWIND();
@@ -14096,7 +14102,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  int *nlist;
 
                  if (len < 0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                     FREE(offsetmap);
+                     FREE(offsetmapn);
+                     FREE(offsetmapz);
                      DBFreeMultimeshadj(mmadj);
                      db_perror((char*)name, E_CALLFAIL, me);
                      UNWIND();
@@ -14157,7 +14165,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  int *zlist;
 
                  if (len < 0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                     FREE(offsetmap);
+                     FREE(offsetmapn);
+                     FREE(offsetmapz);
                      DBFreeMultimeshadj(mmadj);
                      db_perror((char*)name, E_CALLFAIL, me);
                      UNWIND();
