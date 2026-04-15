@@ -14163,6 +14163,10 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                      UNWIND();
                  }
 
+                 if (len == 0) {
+                     mmadj->zonelists[offsetmap[blockno]+j] = NULL;
+                     continue;
+                 }
                  zlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
