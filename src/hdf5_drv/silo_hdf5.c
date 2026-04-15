@@ -14096,7 +14096,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  int *nlist;
 
                  if (len < 0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
+                     FREE(offsetmap);
+                     FREE(offsetmapn);
+                     FREE(offsetmapz);
                      DBFreeMultimeshadj(mmadj);
                      db_perror((char*)name, E_CALLFAIL, me);
                      UNWIND();
