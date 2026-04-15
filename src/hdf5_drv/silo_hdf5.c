@@ -14102,6 +14102,10 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                      UNWIND();
                  }
 
+                 if (len == 0) {
+                     mmadj->nodelists[offsetmap[blockno]+j] = NULL;
+                     continue;
+                 }
                  nlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
