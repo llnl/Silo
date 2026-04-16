@@ -108,7 +108,7 @@ jobs:
 
     - name: Upload Artifact CMake
       if: ${{ steps.makecheck-cmake.outcome == 'failure' }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: silo-cmake-artifacts
         path: |
@@ -118,7 +118,7 @@ jobs:
 
     - name: Upload Artifact CMake-Asan
       if: ${{ steps.makecheck-cmake-asan.outcome == 'failure' }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: silo-cmake-asan-artifacts
         path: |
