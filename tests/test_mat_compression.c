@@ -408,6 +408,7 @@ main(int argc, char *argv[])
     FREE(vfrac_varnames);
     FREE(vfracs);
 
+    DBFreeMaterial(mat);
     DBFreeOptlist(mat_opts);
     CleanupDriverStuff();
 
