@@ -55,6 +55,7 @@ be used for advertising or product endorsement purposes.
 
 #include <errno.h>
 #include <assert.h>
+#include <limits.h>
 #if HAVE_STRING_H
 #include <string.h>
 #endif
@@ -1012,6 +1013,15 @@ typedef struct db_hdf5_fpzip_params_t {
 } db_hdf5_fpzip_params_t;
 static db_hdf5_fpzip_params_t db_hdf5_fpzip_params;
 
+static int
+db_hdf5_safe_mul_size(size_t a, size_t b, size_t *out)
+{
+    if (a != 0 && b > SIZE_MAX / a)
+        return -1;
+    *out = a * b;
+    return 0;
+}
+
 static htri_t 
 db_hdf5_fpzip_can_apply(hid_t dcpl_id, hid_t type_id, hid_t space_id)
 {
@@ -1053,13 +1063,18 @@ db_hdf5_fpzip_filter_op(unsigned int flags, size_t cd_nelmts,
     {
         int prec, dp;
         unsigned nx, ny, nz, nf;
-        int new_buf_size;
+        size_t new_buf_size, tmp_size;
+        size_t elemsz;
         void *uncbuf;
 
         /* first, decode fpzip's header */
         fpzip_memory_read(*buf, 0, &prec, &dp, &nx, &ny, &nz, &nf); 
-        new_buf_size = nx * ny * nz * nf * (dp ? sizeof(double) : sizeof(float));
-        if (new_buf_size <= 0)
+        elemsz = dp ? sizeof(double) : sizeof(float);
+        if (db_hdf5_safe_mul_size((size_t) nx, (size_t) ny, &tmp_size) < 0 ||
+            db_hdf5_safe_mul_size(tmp_size, (size_t) nz, &tmp_size) < 0 ||
+            db_hdf5_safe_mul_size(tmp_size, (size_t) nf, &tmp_size) < 0 ||
+            db_hdf5_safe_mul_size(tmp_size, elemsz, &new_buf_size) < 0 ||
+            new_buf_size == 0)
            return early_retval;
 
         /* allocate space and do the decompression */
@@ -1078,7 +1093,8 @@ db_hdf5_fpzip_filter_op(unsigned int flags, size_t cd_nelmts,
     else /* write case */
     {
         unsigned char *cbuf;
-        int max_outbytes, outbytes, prec;
+        size_t max_outbytes, outbytes;
+        int prec;
 
         /* We'll only compress floating point data here, not integer data */
         if (!db_hdf5_fpzip_params.isfp)
@@ -1093,8 +1109,16 @@ db_hdf5_fpzip_filter_op(unsigned int flags, size_t cd_nelmts,
          * try to compress into it. If it fails, we return the right
          * stuff to HDF5 and do not compress */
         
+        if (SILO_Globals.compressionMinratio <= 0)
+            return early_retval;
+
         max_outbytes = nbytes / SILO_Globals.compressionMinratio;
-        cbuf = (unsigned char *) malloc(max_outbytes);        
+        if (max_outbytes == 0)
+            return early_retval;
+
+        cbuf = (unsigned char *) malloc(max_outbytes);
+        if (cbuf == 0)
+            return early_retval;
 
         /* full precision */
         prec = 8 * (db_hdf5_fpzip_params.dp ? sizeof(double) : sizeof(float));
@@ -1441,7 +1465,7 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
             HZMstream *stream;
             int ndims = 0, nzones = 0, nread;
             int *nodelist = 0;
-            int new_buf_size;
+            size_t new_buf_size, tmp_size;
 
             /* To query stream for ndims, we need to specify a permutation
                which may be wrong. So, we open, query, close and re-open. */
@@ -1462,7 +1486,11 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
             nzones = hzip_mesh_cells(stream);
             if (nzones < 0) {hzip_mesh_close(stream); return early_retval;}
 
-            new_buf_size = (1<<ndims) * nzones * sizeof(int);
+            if (db_hdf5_safe_mul_size((size_t) (1u<<ndims), (size_t) nzones, &tmp_size) < 0 ||
+                db_hdf5_safe_mul_size(tmp_size, sizeof(int), &new_buf_size) < 0 ||
+                new_buf_size == 0)
+            {hzip_mesh_close(stream); return early_retval;}
+
             nodelist = (int *) malloc(new_buf_size);
             if (nodelist == 0) {hzip_mesh_close(stream); return early_retval;}
 
@@ -1486,9 +1514,10 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
         else /* ucd or quad mesh node-centered (not zone-centered) variables */
         {
             HZNstream *stream;
-            int i, ndims, nnodes, nread, nzones;
+            int i, ndims, nread, nzones;
+            unsigned nnodes;
             void *var = 0;
-            int new_buf_size;
+            size_t new_buf_size, tmp_size;
             HZtype hztype;
             int *nodelist;
             int perm, origin;
@@ -1504,11 +1533,22 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
 
             if (db_hdf5_hzip_params.isquad)
             {
-                nzones = 1;
+                size_t nzones_sz = 1;
                 for (i = 0; i < db_hdf5_hzip_params.ndims; i++)
-                    nzones *= (db_hdf5_hzip_params.dims[i]-1);
+                {
+                    if (db_hdf5_hzip_params.dims[i] < 1 ||
+                        db_hdf5_safe_mul_size(nzones_sz, (size_t) (db_hdf5_hzip_params.dims[i]-1), &nzones_sz) < 0 ||
+                        nzones_sz > INT_MAX)
+                        return early_retval;
+                }
+                nzones = (int) nzones_sz;
 
-                nodelist = (int *) malloc((1<<ndims) * nzones * sizeof(int));
+                if (db_hdf5_safe_mul_size((size_t) (1u<<ndims), nzones_sz, &tmp_size) < 0 ||
+                    db_hdf5_safe_mul_size(tmp_size, sizeof(int), &tmp_size) < 0 ||
+                    tmp_size == 0)
+                    return early_retval;
+
+                nodelist = (int *) malloc(tmp_size);
                 if (nodelist == 0) return early_retval;
                 perm = hzip_mesh_construct(nodelist, (unsigned) ndims,
                     (const unsigned *) db_hdf5_hzip_params.dims, 0);
@@ -1535,16 +1575,19 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
             if (ndims < 2 || ndims > 3) {hzip_node_close(stream); return early_retval;}
 
             nnodes = hzip_node_count(stream);
-            if (nnodes < 0) {hzip_node_close(stream); return early_retval;}
+            if (nnodes > INT_MAX) {hzip_node_close(stream); return early_retval;}
 
             hztype = hzip_node_type(stream);
-            new_buf_size = nnodes * sizeof_hztype(hztype);
+            if (db_hdf5_safe_mul_size((size_t) nnodes, sizeof_hztype(hztype), &new_buf_size) < 0 ||
+                new_buf_size == 0)
+            {hzip_node_close(stream); return early_retval;}
+
             var = malloc(new_buf_size);
             if (var == 0) {hzip_node_close(stream); return early_retval;}
 
             nread = hzip_node_read(stream, var, nodelist, nzones);
             hzip_node_close(stream);
-            if (nread != nnodes)
+            if (nread != (int) nnodes)
             {
                 if (db_hdf5_hzip_params.isquad)
                     free(nodelist);
@@ -1575,7 +1618,13 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
             ntopo = zl->ndims;
             nzones = zl->nzones;
 
-            max_outbytes = ((1<<ntopo) * nzones * sizeof(int)) / SILO_Globals.compressionMinratio;
+            size_t tmp_size;
+            if (SILO_Globals.compressionMinratio <= 0) return early_retval;
+            if (db_hdf5_safe_mul_size((size_t) (1u<<ntopo), (size_t) nzones, &tmp_size) < 0 ||
+                db_hdf5_safe_mul_size(tmp_size, sizeof(int), &tmp_size) < 0)
+                return early_retval;
+            max_outbytes = tmp_size / SILO_Globals.compressionMinratio;
+            if (max_outbytes == 0) return early_retval;
             buffer = (unsigned char *) malloc(max_outbytes);
             if (buffer == 0) return early_retval;
 
@@ -1620,10 +1669,20 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
             {
                 ndims = db_hdf5_hzip_params.ndims;
                 origin = 0;
-                nzones = 1;
+                size_t nzones_sz = 1, nodelist_sz;
                 for (i = 0; i < ndims; i++)
-                    nzones *= (db_hdf5_hzip_params.dims[i]-1);
-                nodelist = (int *) malloc((1<<ndims) * nzones * sizeof(int));
+                {
+                    if (db_hdf5_hzip_params.dims[i] < 1 ||
+                        db_hdf5_safe_mul_size(nzones_sz, (size_t) (db_hdf5_hzip_params.dims[i]-1), &nzones_sz) < 0 ||
+                        nzones_sz > INT_MAX)
+                        return early_retval;
+                }
+                nzones = (int) nzones_sz;
+                if (db_hdf5_safe_mul_size((size_t) (1u<<ndims), nzones_sz, &nodelist_sz) < 0 ||
+                    db_hdf5_safe_mul_size(nodelist_sz, sizeof(int), &nodelist_sz) < 0 ||
+                    nodelist_sz == 0)
+                    return early_retval;
+                nodelist = (int *) malloc(nodelist_sz);
                 if (nodelist == 0) return early_retval;
                 perm = hzip_mesh_construct(nodelist, (unsigned) ndims,
                     (const unsigned int *) db_hdf5_hzip_params.dims, 0);
@@ -1641,8 +1700,14 @@ db_hdf5_hzip_filter_op(unsigned int flags, size_t cd_nelmts,
                 perm = SILO_HZIP_PERMUTATION[ndims];
             }
 
-            max_outbytes = (db_hdf5_hzip_params.totsize1d *
-                           sizeof_hztype(db_hdf5_hzip_params.hztype)) / SILO_Globals.compressionMinratio;
+            if (SILO_Globals.compressionMinratio <= 0) return early_retval;
+            if (db_hdf5_hzip_params.totsize1d < 0 ||
+                db_hdf5_safe_mul_size((size_t) db_hdf5_hzip_params.totsize1d,
+                                      sizeof_hztype(db_hdf5_hzip_params.hztype),
+                                      &max_outbytes) < 0)
+                return early_retval;
+            max_outbytes /= SILO_Globals.compressionMinratio;
+            if (max_outbytes == 0) return early_retval;
             buffer = (unsigned char *) malloc(max_outbytes);
             if (buffer == 0) return early_retval;
 
@@ -13863,6 +13928,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
     char                *typestring = NULL;
     int                 i, j, tmpnmesh, _objtype;
     int                 *offsetmap=0, *offsetmapn=0, *offsetmapz=0, lneighbors, tmpoff;
+    int                 blockno;
 
     PROTECT {
         /* Open object and make sure it's a multimesh */
@@ -13891,6 +13957,10 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         }
 
         /* Create object and initialize meta data */
+        if (m.nblocks < 0 || m.lneighbors < 0) {
+            db_perror((char*)name, E_CALLFAIL, me);
+            UNWIND();
+        }
         if (NULL==(mmadj=DBAllocMultimeshadj(0))) return NULL;
         mmadj->nblocks = m.nblocks;
         mmadj->blockorigin = m.blockorigin;
@@ -13909,6 +13979,13 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
             lneighbors = 0;
             for (i = 0; (i < mmadj->nblocks) && mmadj->nneighbors; i++)
             {
+                if (mmadj->nneighbors[i] < 0 ||
+                    lneighbors > INT_MAX - mmadj->nneighbors[i]) {
+                    FREE(offsetmap);
+                    DBFreeMultimeshadj(mmadj);
+                    db_perror((char*)name, E_CALLFAIL, me);
+                    UNWIND();
+                }
                 offsetmap[i] = lneighbors;
                 lneighbors += mmadj->nneighbors[i];
             }
@@ -13926,8 +14003,18 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                for (i = 0; i < mmadj->nblocks; i++)
                {
                    offsetmapn[i] = tmpoff;
-                   for (j = 0; j < mmadj->nneighbors[i]; j++)
-                      tmpoff += mmadj->lnodelists[offsetmap[i]+j];
+                   for (j = 0; j < mmadj->nneighbors[i]; j++) {
+                      int len = mmadj->lnodelists[offsetmap[i]+j];
+                      if (len < 0 || tmpoff > INT_MAX - len) {
+                          FREE(offsetmap);
+                          FREE(offsetmapn);
+                          FREE(offsetmapz);
+                          DBFreeMultimeshadj(mmadj);
+                          db_perror((char*)name, E_CALLFAIL, me);
+                          UNWIND();
+                      }
+                      tmpoff += len;
+                   }
                }
                mmadj->totlnodelists = m.totlnodelists;
            }
@@ -13945,8 +14032,18 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                for (i = 0; i < mmadj->nblocks; i++)
                {
                    offsetmapz[i] = tmpoff;
-                   for (j = 0; j < mmadj->nneighbors[i]; j++)
-                      tmpoff += mmadj->lzonelists[offsetmap[i]+j];
+                   for (j = 0; j < mmadj->nneighbors[i]; j++) {
+                      int len = mmadj->lzonelists[offsetmap[i]+j];
+                      if (len < 0 || tmpoff > INT_MAX - len) {
+                          FREE(offsetmap);
+                          FREE(offsetmapn);
+                          FREE(offsetmapz);
+                          DBFreeMultimeshadj(mmadj);
+                          db_perror((char*)name, E_CALLFAIL, me);
+                          UNWIND();
+                      }
+                      tmpoff += len;
+                   }
                }
                mmadj->totlzonelists = m.totlzonelists;
             }
@@ -13983,7 +14080,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                     (DBGetDataReadMask2File(_dbfile) & (DBMMADJNodelists|DBMMADJZonelists)); i++)
         {
            hsize_t ds_size[H5S_MAX_RANK];
-           int blockno = block_map ? block_map[i] : i;
+           blockno = block_map ? block_map[i] : i;
+
+           if (blockno < 0 || blockno >= mmadj->nblocks) {
+               FREE(offsetmap);
+               FREE(offsetmapn);
+               FREE(offsetmapz);
+               DBFreeMultimeshadj(mmadj);
+               db_perror((char*)name, E_CALLFAIL, me);
+               UNWIND();
+           }
  
            if (offsetmapn && mmadj->lnodelists && mmadj->nodelists &&
                mmadj->nneighbors && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
@@ -13993,7 +14099,22 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
               {
                  int stride = 1;
                  int len = mmadj->lnodelists[offsetmap[blockno]+j];
-                 int *nlist = ALLOC_N(int, len);
+                 int *nlist;
+
+                 if (len < 0) {
+                     FREE(offsetmap);
+                     FREE(offsetmapn);
+                     FREE(offsetmapz);
+                     DBFreeMultimeshadj(mmadj);
+                     db_perror((char*)name, E_CALLFAIL, me);
+                     UNWIND();
+                 }
+
+                 if (len == 0) {
+                     mmadj->nodelists[offsetmap[blockno]+j] = NULL;
+                     continue;
+                 }
+                 nlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
                  if ((fspace=build_fspace(nldset, 1, &tmpoff, &len, &stride,
@@ -14041,7 +14162,22 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
               {
                  int stride = 1;
                  int len = mmadj->lzonelists[offsetmap[blockno]+j];
-                 int *zlist = ALLOC_N(int, len);
+                 int *zlist;
+
+                 if (len < 0) {
+                     FREE(offsetmap);
+                     FREE(offsetmapn);
+                     FREE(offsetmapz);
+                     DBFreeMultimeshadj(mmadj);
+                     db_perror((char*)name, E_CALLFAIL, me);
+                     UNWIND();
+                 }
+
+                 if (len == 0) {
+                     mmadj->zonelists[offsetmap[blockno]+j] = NULL;
+                     continue;
+                 }
+                 zlist = ALLOC_N(int, len);
 
                  /* Build the file space selection */
                  if ((fspace=build_fspace(zldset, 1, &tmpoff, &len, &stride,

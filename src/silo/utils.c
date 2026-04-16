@@ -54,6 +54,7 @@ be used for advertising or product endorsement purposes.
 
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 
 #include "silo_private.h"
 
@@ -312,6 +313,7 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     static char const *me = "db_CalcDenseArraysFromMaterial";
     int i;
     int nzones = 1;
+    size_t nzones_sz = 1;
     int etag = E_NOMEM;
     int typesz = (int) sizeof(float);
     int *matnos_sorted=0;
@@ -319,11 +321,17 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     float *pflt;
     double *pdbl;
 #ifndef NDEBUG
-    float *check_fracs;
+    float *check_fracs = 0;
 #endif
 
     if (datatype == DB_DOUBLE)
         typesz = (int) sizeof(double);
+
+    if (mat->nmat <= 0)
+    {
+        etag = E_BADARGS;
+        goto cleanup;
+    }
 
     matarrs = (void **) calloc(mat->nmat,sizeof(void *));
     if (!matarrs) goto cleanup;
@@ -331,7 +339,20 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     if (!matarrs_fixed) goto cleanup;
 
     for (i = 0; i < mat->ndims; i++)
-        nzones *= mat->dims[i];
+    {
+        if (mat->dims[i] < 0)
+        {
+            etag = E_BADARGS;
+            goto cleanup;
+        }
+        if ((size_t) mat->dims[i] != 0 && nzones_sz > ((size_t) INT_MAX) / (size_t) mat->dims[i])
+        {
+            etag = E_BADARGS;
+            goto cleanup;
+        }
+        nzones_sz *= (size_t) mat->dims[i];
+    }
+    nzones = (int) nzones_sz;
 
     /* use calloc so vfrac arrays are initialized with zeros */
     for (i = 0; i < mat->nmat; i++)
@@ -341,11 +362,18 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     }
 #ifndef NDEBUG
     check_fracs = (float *) calloc(nzones, sizeof(float));
+    if (!check_fracs) goto cleanup;
 #endif
 
     /* make a copy of matnos and sort it for binary search */
-    matnos_sorted = (int *) malloc(mat->nmat * sizeof(int));
-    memcpy(matnos_sorted, mat->matnos, mat->nmat * sizeof(int));
+    if ((size_t) mat->nmat > SIZE_MAX / sizeof(int))
+    {
+        etag = E_BADARGS;
+        goto cleanup;
+    }
+    matnos_sorted = (int *) malloc((size_t) mat->nmat * sizeof(int));
+    if (!matnos_sorted) goto cleanup;
+    memcpy(matnos_sorted, mat->matnos, (size_t) mat->nmat * sizeof(int));
     qsort(matnos_sorted, mat->nmat, sizeof(int), compar_ints);
 
     /* reset binary searcher last num/idx state */
@@ -396,7 +424,7 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     /* sanity check */
     for (i = 0; i < nzones; i++)
         assert(0.999 <= check_fracs[i] && check_fracs[i] < 1.001);
-    free(check_fracs);
+    FREE(check_fracs);
 #endif
 
     /* The matarr arrays are in the wrong order because
@@ -423,6 +451,9 @@ cleanup:
     }
     FREE(matarrs_fixed);
     FREE(matnos_sorted);
+#ifndef NDEBUG
+    FREE(check_fracs);
+#endif
     db_perror(NULL, etag, me);
 
     return -1;

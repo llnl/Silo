@@ -108,16 +108,24 @@ jobs:
         cd cmake_asan_build
         tar -cJf ctest.tar.xz Testing/Temporary ctest.log
 
-    - name: Upload artifacts
-      if: ${{ steps.makecheck-cmake.outcome == 'failure' || steps.makecheck-cmake-asan.outcome == 'failure' }}
-      uses: actions/upload-artifact@v4
+    - name: Upload Artifact CMake
+      if: ${{ steps.makecheck-cmake.outcome == 'failure' }}
+      uses: actions/upload-artifact@v6
       with:
         name: silo-test-artifacts
         path: |
-          build/tests/testsuite.dir.tar.xz
-          cmake_build/tests/ctest.tar.xz
-          cmake_asan_build/tests/ctest.tar.xz
-        if-no-files-found: error
+          cmake_build/ctest.tar.xz
+        if-no-files-found: ignore
+        retention-days: 14
+
+    - name: Upload Artifact CMake-Asan
+      if: ${{ steps.makecheck-cmake-asan.outcome == 'failure' }}
+      uses: actions/upload-artifact@v6
+      with:
+        name: silo-cmake-asan-artifacts
+        path: |
+          cmake_asan_build/ctest.tar.xz
+        if-no-files-found: ignore
         retention-days: 14
 
     # Re-signal the failure so the job ends red.

@@ -93,6 +93,12 @@ browser=$(find_file -x bin/browser tools/browser/browser tools/browser/.libs/bro
 [ $? -eq 0 ] || exit 1
 
 #
+# Ensure we have onehex executable
+#
+onehex=$(find_file -x tests/onehex tests/bin/onehex)
+[ $? -eq 0 ] || exit 1
+
+#
 # Ensure we have onehex.py python script
 #
 onehexpy=$(find_file -r tests/bin/onehex.py tests/onehex.py)
@@ -114,17 +120,33 @@ if [ -z "$pycmd" ]; then
 fi
 
 #
+# Use executable to create original onehex.silo file
+#
+"$onehex" "$1"
+result=$?
+if [ $result -ne 0 ]; then
+    exit $result
+fi
+
+#
 # Use python module to create data with no special features 
 #
-env PYTHONPATH=$(dirname $silo_pyso) $pycmd $onehexpy 1>/dev/null 2>&1
+env PYTHONPATH=$(dirname $silo_pyso) $pycmd $onehexpy $1 1>/dev/null 2>&1
+result=$?
+if [ $result -ne 0 ]; then
+    exit $result
+fi
 
 #
 # Now, run browser and make sure we don't get any errors in the diff
 #
-result=0
 $browser --proper-exit-code -R 0.00001 -q -e diff onehex.silo onehexpy.silo 1>testonehex.out 2>&1
-if [ $? -ne 0 ] || [ `grep -v 'appears only in' testonehex.out | grep '=' | wc -l | tr -s ' ' | cut -d' ' -f2` -gt 5 ]; then
-    result=1
+result=$?
+if [ $result -ne 0 ]; then
+    exit $result
 fi
+if [ `grep -v 'appears only in' testonehex.out | grep '=' | wc -l | tr -s ' ' | cut -d' ' -f2` -gt 5 ]; then
+    exit 1
+fi
+exit 0
 
-exit $result 
