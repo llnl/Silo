@@ -2,18 +2,18 @@
 </style>
 ### File-based, scientific data exchange and software interoperability
 
-&#9883;&nbsp;[C] / [Fortran] / [Python] APIs<br>
-&#9883;&nbsp;[X/Y curves], [points], [structured], [unstructured], [arbitrary], [AMR], and [CSG] mesh types<br>
-&#9883;&nbsp;Constant, linear and quadratic fields ([v][][a][][r][][i][][ab][]les) over node, edge, face and volume elements<br>
-&#9883;&nbsp;[Mixing materials], [species], part assembilies and other [subset hierarchies]<br>
-&#9883;&nbsp;[Easy parallelism] with [MIF Parallel I/O] (see [examples])<br>
-&#9883;&nbsp;Data [browsing], [differencing] and [visualization] including seamless integration with [VisIt]<br>
-&#9883;&nbsp;In-situ via [memory-files], [compression], [JSON], [HDF5] and more...
+&#9883;&nbsp;**APIs**: [C] / [Python] / [Fortran (write-only)].<br>
+&#9883;&nbsp;**Mesh types**: [X/Y curves], [points], [structured], [unstructured], [arbitrary], [AMR], and [CSG].<br>
+&#9883;&nbsp;**Field types**: Constant, linear, quadratic [v][][a][][r][][i][][ab][]les over nodes, edges, faces, volumes.<br>
+&#9883;&nbsp;**Subsetting**: [Mixing materials], [species], part assembilies and other [hierarchies].<br>
+&#9883;&nbsp;**[Easy parallelism]**: [MIF Parallel I/O] (see [examples]).<br>
+&#9883;&nbsp;**Tools**: [browsing], [differencing] and [visualization] with [VisIt].<br>
+&#9883;&nbsp;**Advanced Features**: In-situ via [memory-files], [compression], [JSON], [HDF5] and more...
 
 <img src="ghpages/images/silo_objects_roll.gif" alt="Silo Objects Roll" style="display: block; margin: auto;">
 
 [C]: https://silo.readthedocs.io/intro.html
-[Fortran]: https://silo.readthedocs.io/fortran.html
+[Fortran (write-only)]: https://silo.readthedocs.io/fortran.html
 [Python]: https://silo.readthedocs.io/python.html
 [X/Y Curves]: https://silo.readthedocs.io/objects.html#dbputcurve
 [points]: https://silo.readthedocs.io/objects.html#dbputpointmesh
@@ -24,7 +24,7 @@
 [CSG]: https://silo.readthedocs.io/objects.html#dbputcsgmesh
 [Mixing materials]: https://silo.readthedocs.io/objects.html#dbputmaterial
 [species]: https://silo.readthedocs.io/objects.html#dbputmatspecies
-[subset hierarchies]: https://silo.readthedocs.io/subsets.html
+[hierarchies]: https://silo.readthedocs.io/subsets.html
 [memory-files]: https://support.hdfgroup.org/documentation/hdf5/latest/_h5_f_i_m__u_g.html
 [MIF Parallel I/O]: https://www.hdfgroup.org/2017/03/mif-parallel-io-with-hdf5/
 [VisIt]: https://visit.llnl.gov
