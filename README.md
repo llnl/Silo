@@ -12,19 +12,19 @@
 
 <img src="ghpages/images/silo_objects_roll.gif" alt="Silo Objects Roll" style="display: block; margin: auto;">
 
-[C]: https://silo.readthedocs.io/intro.html
-[Fortran (write-only)]: https://silo.readthedocs.io/fortran.html
-[Python]: https://silo.readthedocs.io/python.html
-[X/Y Curves]: https://silo.readthedocs.io/objects.html#dbputcurve
-[points]: https://silo.readthedocs.io/objects.html#dbputpointmesh
-[structured]: https://silo.readthedocs.io/objects.html#dbputquadmesh
-[unstructured]: https://silo.readthedocs.io/objects.html#dbputucdmesh
-[arbitrary]: https://silo.readthedocs.io/objects.html#dbputphzonelist
-[AMR]: https://silo.readthedocs.io/subsets.html#dbmakemrgtree
-[CSG]: https://silo.readthedocs.io/objects.html#dbputcsgmesh
-[Mixing materials]: https://silo.readthedocs.io/objects.html#dbputmaterial
-[species]: https://silo.readthedocs.io/objects.html#dbputmatspecies
-[hierarchies]: https://silo.readthedocs.io/subsets.html
+[C]: https://silo.readthedocs.io/latest/intro.html
+[Fortran (write-only)]: https://silo.readthedocs.io/latest/fortran.html
+[Python]: https://silo.readthedocs.io/latest/python.html
+[X/Y Curves]: https://silo.readthedocs.io/latest/objects.html#dbputcurve
+[points]: https://silo.readthedocs.io/latest/objects.html#dbputpointmesh
+[structured]: https://silo.readthedocs.io/latest/objects.html#dbputquadmesh
+[unstructured]: https://silo.readthedocs.io/latest/objects.html#dbputucdmesh
+[arbitrary]: https://silo.readthedocs.io/latest/objects.html#dbputphzonelist
+[AMR]: https://silo.readthedocs.io/latest/subsets.html#dbmakemrgtree
+[CSG]: https://silo.readthedocs.io/latest/objects.html#dbputcsgmesh
+[Mixing materials]: https://silo.readthedocs.io/latest/objects.html#dbputmaterial
+[species]: https://silo.readthedocs.io/latest/objects.html#dbputmatspecies
+[hierarchies]: https://silo.readthedocs.io/latest/subsets.html
 [memory-files]: https://support.hdfgroup.org/documentation/hdf5/latest/_h5_f_i_m__u_g.html
 [MIF Parallel I/O]: https://www.hdfgroup.org/2017/03/mif-parallel-io-with-hdf5/
 [VisIt]: https://visit.llnl.gov
@@ -37,7 +37,7 @@
 [r]: https://silo.readthedocs.io/latest/objects.html#dbputucdvar
 [i]: https://silo.readthedocs.io/latest/objects.html#dbputcsgvar
 [ab]: https://silo.readthedocs.io/latest/subsets.html#dbmakemrgtree
-[Easily scalable]: https://github.com/LLNL/Silo/blob/ab0e316442e4dd340f04af81f8cd5868b337bb97/src/silo/pmpio.h#L55
-[examples]: https://github.com/LLNL/Silo/blob/ab0e316442e4dd340f04af81f8cd5868b337bb97/tests/pmpio_silo_test_mesh.c#L374
-[browsing]: https://github.com/LLNL/Silo/blob/ab0e316442e4dd340f04af81f8cd5868b337bb97/tools/browser/browser.texi#L217
-[differencing]: https://github.com/LLNL/Silo/blob/ab0e316442e4dd340f04af81f8cd5868b337bb97/tools/browser/browser.texi#L496
+[Easily scalable]: https://github.com/LLNL/Silo/blob/main/src/silo/pmpio.h#L55
+[examples]: https://github.com/LLNL/Silo/blob/main/tests/pmpio_silo_test_mesh.c#L374
+[browsing]: https://github.com/LLNL/Silo/blob/main/tools/browser/browser.texi#L217
+[differencing]: https://github.com/LLNL/Silo/blob/main/tools/browser/browser.texi#L496
