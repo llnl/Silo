@@ -15,37 +15,16 @@ concurrency:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
-    outputs:
-      run_rpmbuild: ${{ steps.filter.outputs.rpmbuild }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Detect source changes
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            rpmbuild:
-              - '**'
-              - '!.github/**'
-              - '.github/workflows/**'
-              - '!**/*.md'
-              - '!docs/**'
-              - '!ghpages/**'
-              - '!README*'
-              - '!LICENSE*'
-              - '!COPYING*'
+    uses: ./.github/workflows/detect-source-changes.yml
 
   rpmbuild:
     needs: changes
     if: >-
       ${{
-        (github.event_name == 'workflow_dispatch') ||
+        github.event_name == 'workflow_dispatch' ||
         (
           (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
-          needs.changes.outputs.run_rpmbuild == 'true'
+          needs.changes.outputs.run_build == 'true'
         )
       }}
     continue-on-error: ${{ matrix.config.continue-on-error == 'true' }}
