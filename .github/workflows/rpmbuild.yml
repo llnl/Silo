@@ -1,4 +1,5 @@
 name: rpmbuild
+
 on:
   workflow_dispatch:
   pull_request:
@@ -9,12 +10,23 @@ on:
       - '[0-9].[0-9][0-9]RC'
 
 concurrency:
-  group: ${ {github.event_name }}-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true 
+  group: ${{ github.event_name }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/detect-source-changes.yml
+
   rpmbuild:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: changes
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+          needs.changes.outputs.run_build == 'true'
+        )
+      }}
     continue-on-error: ${{ matrix.config.continue-on-error == 'true' }}
     strategy:
       matrix:
@@ -23,24 +35,28 @@ jobs:
           - {arch: 'amd64'}
     runs-on: ${{ matrix.config.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container: fedora:latest
+
     steps:
       - name: Install fedpkg
         run: dnf -y install fedpkg
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           path: Silo
+
       - name: Prepare rpmbuild
         run: |
           mkdir Silo.rpm
           tar -cvzf Silo-9999.tar.gz Silo/
           cp Silo-9999.tar.gz Silo/.github/workflows/Silo.spec Silo.rpm
+
       - name: Install build deps
         working-directory: Silo.rpm
         run: |
           dnf -y builddep Silo.spec
+
       - name: Build rpm
         working-directory: Silo.rpm
         run: |
           fedpkg --verbose --debug local
-
