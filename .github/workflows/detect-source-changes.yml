@@ -1,0 +1,38 @@
+name: Detect source changes
+
+on:
+  workflow_call:
+    outputs:
+      run_build:
+        description: "Whether non-doc/source-relevant files changed"
+        value: ${{ jobs.changes.outputs.run_build }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_build: ${{ steps.filter.outputs.build }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect source changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            build:
+              - '**'
+              - '!.github/**'
+              - '.github/workflows/**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!ghpages/**'
+              - '!svn_bin/**'
+              - '!README.md'
+              - '!LICENSE'
+              - '!COPYRIGHT'
+              - '!SILO_VERSION'
+              - '!INSTALL'
+              - '!_config.yml'
+              - '!.readthedocs.yaml'
+              - '!examples.gif'
