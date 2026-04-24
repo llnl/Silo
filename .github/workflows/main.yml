@@ -10,12 +10,23 @@ on:
       - '[0-9].[0-9][0-9]RC'
 
 concurrency:
-  group: ${ {github.event_name }}-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.event_name }}-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/detect-source-changes.yml
+
   build:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: changes
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+          needs.changes.outputs.run_build == 'true'
+        )
+      }}
     runs-on: ubuntu-latest
 
     steps:
@@ -128,7 +139,6 @@ jobs:
         if-no-files-found: ignore
         retention-days: 14
 
-    # Re-signal the failure so the job ends red.
     - name: Fail job if make check failed
       if: ${{ steps.makecheck-cmake.outcome == 'failure' || steps.makecheck-cmake-asan.outcome == 'failure' }}
       run: exit 1
