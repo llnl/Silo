@@ -70,3 +70,5 @@ urllib3>=2.5.0
 zipp>=3.19.1
     # via importlib-metadata
 sphinx-rtd-theme==2.0.0
+beautifulsoup4
+pagefind[extended]

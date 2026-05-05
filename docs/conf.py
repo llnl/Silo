@@ -5,7 +5,10 @@ copyright = u'1996-2023, LLNL, LLNL-SM-654357'
 author = u'LLNL'
 release = u'4.11.1'
 
-extensions = ['sphinx.ext.mathjax']
+extensions = [
+    'sphinx.ext.mathjax',
+    'copy_pagefind_anchors'
+]
 
 if os.environ.get('READTHEDOCS'):
     from subprocess import call
@@ -60,3 +63,5 @@ html_theme_options = {
     # Toc options
     'navigation_depth': 4
 }
+
+html_js_files = ["redirect-rtd-search-to-pagefind.js"]

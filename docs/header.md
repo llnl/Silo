@@ -224,7 +224,7 @@ We include the contents of the Silo header file here including a description of 
 ## Open/Create flags
 
    ```{literalinclude} ../src/silo/silo.h.in
-   :start-at: "/* Flags for DBCreate */"
+   :start-at: "/* Flags for DBCreate (used only in DBCreate) */"
    :end-before: "/* Options */"
    ```
 
