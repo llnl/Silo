@@ -24,9 +24,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    console.log("GOT HERE");
     const form = findSearchForm();
     if (!form) return;
 
+    console.log("I think I found it");
     form.addEventListener("submit", function (event) {
       const input =
         form.querySelector("input[name='q']") ||

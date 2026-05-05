@@ -1,4 +1,4 @@
-## Search
+# Search
 
 Silo uses Pagefind search, a client-side search solution for static pages.
 If you are encountering issues with search, please reach out to the Silo team.
