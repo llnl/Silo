@@ -10,6 +10,11 @@ extensions = [
     'copy_pagefind_anchors'
 ]
 
+#
+# Add directory containin python extensions for Sphinx
+#
+sys.path.insert(0, os.path.abspath("_ext"))
+
 if os.environ.get('READTHEDOCS'):
     from subprocess import call
     call(['pip', 'install', 'myst_parser'])
