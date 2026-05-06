@@ -8,6 +8,12 @@
   }
 
   function siteRootFromPath() {
+
+    if (typeof DOCUMENTATION_OPTIONS !== "undefined" &&
+        DOCUMENTATION_OPTIONS.URL_ROOT) {
+      return DOCUMENTATION_OPTIONS.URL_ROOT;
+    }
+
     const path = window.location.pathname;
 
     const buildIndex = path.indexOf("/_build/");
@@ -24,11 +30,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    console.log("GOT HERE");
     const form = findSearchForm();
     if (!form) return;
 
-    console.log("I think I found it");
     form.addEventListener("submit", function (event) {
       const input =
         form.querySelector("input[name='q']") ||
