@@ -6,6 +6,7 @@ author = u'LLNL'
 release = u'4.11.1'
 
 extensions = [
+    'myst_parser',
     'sphinx.ext.mathjax',
     'copy_pagefind_anchors'
 ]

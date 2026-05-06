@@ -1,3 +1,5 @@
+
+(multi-block-objects-and-parallel-i-o)=
 # Multi-Block Objects and Parallel I/O
 
 Individual pieces of mesh created with a number of `DBPutXxxmesh()` calls can be assembled together into larger, multi-block objects.
@@ -172,7 +174,7 @@ The functions described in this section of the manual include...
 
   Three options, `DBOPT_GROUPINGS_SIZE`, `DBOPT_GROUPINGS` are deprecated.
   Instead, use MRG trees to handle grouping.
-  Also, see notes regarding [`_visit_domain_groups`](conventions.md#visit-domain-groups) variable convention.
+  Also, see notes regarding [`_visit_domain_groups`](#visit-domain-groups) variable convention.
 
 {{ EndFunc }}
 
@@ -387,7 +389,7 @@ The functions described in this section of the manual include...
   `DBOPT_EXTENTS`|`double*`|Pointer to an array of length `nvar` * `DBOPT_EXTENTS_SIZE` doubles where each group of `DBOPT_EXTENTS_SIZE` doubles is an extent tuple (see below). `DBOPT_EXTENTS_SIZE` must be set for this option to work correctly.|`NULL`
   `DBOPT_MMESH_NAME`|`char*`|Name of the multimesh this variable is associated with. Note, this option is very important as down-stream post processing tools are otherwise required to guess as to the mesh a given variable is associated with. Sometimes, the tools can guess wrong.|`NULL`
   `DBOPT_TENSOR_RANK`|`int`|Specify the variable type; one of either `DB_VARTYPE_SCALAR`, `DB_VARTYPE_VECTOR` `DB_VARTYPE_TENSOR`, `DB_VARTYPE_SYMTENSOR`,<br>`DB_VARTYPE_ARRAY`<br>`DB_VARTYPE_LABEL`|DB_VARTYPE_SCALAR
-  `DBOPT_REGION_PNAMES`|`char**`|A null-pointer terminated array of pointers to strings specifying the pathnames of regions in the mrg tree for the associated mesh where the variable is defined. If there is no mrg tree associated with the mesh, the names specified here will be assumed to be material names of the material object associated with the mesh. The last pointer in the array must be null and is used to indicate the end of the list of names. See [`DBOPT_REGION_PNAMES`](subsets.md#dbopt-region-pnames).|`NULL`
+  `DBOPT_REGION_PNAMES`|`char**`|A null-pointer terminated array of pointers to strings specifying the pathnames of regions in the mrg tree for the associated mesh where the variable is defined. If there is no mrg tree associated with the mesh, the names specified here will be assumed to be material names of the material object associated with the mesh. The last pointer in the array must be null and is used to indicate the end of the list of names. See [`DBOPT_REGION_PNAMES`](#dbopt-region-pnames).|`NULL`
   `DBOPT_CONSERVED`|`int`|Indicates if the variable represents a physical quantity that must be conserved under various operations such as interpolation.|0
   `DBOPT_EXTENSIVE`|`int`|Indicates if the variable represents a physical quantity that is extensive (as opposed to intensive). Note, while it is true that any conserved quantity is extensive, the converse is not true. By default and historically, all Silo variables are treated as intensive.|0
   `DBOPT_MB_BLOCK_TYPE`|`int`|Constant block type for all blocks|(not specified)
@@ -1057,6 +1059,7 @@ The functions described in this section of the manual include...
 
 {{ EndFunc }}
 
+(pmpio-grouprank)=
 ## `PMPIO_GroupRank()`
 
 * **Summary:** Obtain group rank (e.g. which `PMPIO` group) of a processor
@@ -1091,6 +1094,7 @@ The functions described in this section of the manual include...
 
 {{ EndFunc }}
 
+(pmpio-rankingroup)=
 ## `PMPIO_RankInGroup()`
 
 * **Summary:** Obtain the rank of a processor *within* its `PMPIO` group
