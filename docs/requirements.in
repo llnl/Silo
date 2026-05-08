@@ -1,5 +1,5 @@
 sphinx>=7,<9
 myst-parser>=2,<5
 sphinx-rtd-theme>=2
-pagefind
+pagefind[bin]
 pyyaml>=6.0.2

@@ -39,8 +39,10 @@ myst-parser==4.0.1
     # via -r requirements.in
 packaging==26.2
     # via sphinx
-pagefind==1.5.2
+pagefind[bin]==1.5.2
     # via -r requirements.in
+pagefind-bin==1.5.2
+    # via pagefind
 pygments==2.20.0
     # via sphinx
 pyyaml==6.0.3
