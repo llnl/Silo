@@ -1,7 +1,7 @@
 # Search
 
 Silo uses Pagefind search, a client-side search solution for static pages.
-If you are encountering issues with search, please reach out to the Silo team.
+If you are encountering issues with search, please [reach out](https://software.llnl.gov/Silo/help/) to the Silo team.
 
 ```{raw} html
 

@@ -1,2 +1,5 @@
-sphinx==5.3.0
-myst==1.0.1
+sphinx>=7,<9
+myst-parser>=2,<5
+sphinx-rtd-theme>=2
+pagefind
+pyyaml>=6.0.2
