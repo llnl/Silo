@@ -1,11 +1,19 @@
+import os, sys
+
 project = "Silo User Manual"
 copyright = "1996-2026, LLNL, LLNL-SM-654357"
 author = "LLNL"
 release = "4.12.0"
 
+#
+# Add directory containin python extensions for Sphinx
+#
+sys.path.insert(0, os.path.abspath("_ext"))
+
 extensions = [
     "sphinx.ext.mathjax",
     "myst_parser",
+    "copy_pagefind_anchors",
 ]
 
 source_suffix = {
