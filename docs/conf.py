@@ -53,6 +53,4 @@ html_theme_options = {
 }
 
 html_css_files = ["custom.css"]
-html_js_files = [
-    "pagefind-rtd-search-redirect.js",
-]
+html_js_files = ["redirect-rtd-search-to-pagefind.js"]
