@@ -27,6 +27,10 @@ myst_enable_extensions = [
 
 myst_heading_anchors = 6
 
+myst_substitutions = {
+  "EndFunc": "<hr class=\"docutils\" />"+"<br>"*40
+}
+
 exclude_patterns = [
     "func-template.md",
     "_build",
