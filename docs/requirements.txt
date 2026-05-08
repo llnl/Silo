@@ -8,6 +8,8 @@ alabaster==1.0.0
     # via sphinx
 babel==2.18.0
     # via sphinx
+beautifulsoup4==4.14.3
+    # via -r requirements.in
 certifi==2026.4.22
     # via requests
 charset-normalizer==3.4.7
@@ -57,6 +59,8 @@ roman-numerals-py==4.1.0
     # via sphinx
 snowballstemmer==3.0.1
     # via sphinx
+soupsieve==2.8.3
+    # via beautifulsoup4
 sphinx==8.2.3
     # via
     #   -r requirements.in
@@ -79,5 +83,7 @@ sphinxcontrib-qthelp==2.0.0
     # via sphinx
 sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
+typing-extensions==4.15.0
+    # via beautifulsoup4
 urllib3==2.7.0
     # via requests
