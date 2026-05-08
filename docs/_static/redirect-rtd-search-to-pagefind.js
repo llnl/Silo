@@ -8,7 +8,6 @@
   }
 
   function siteRootFromPath() {
-
     if (typeof DOCUMENTATION_OPTIONS !== "undefined" &&
         DOCUMENTATION_OPTIONS.URL_ROOT) {
       return DOCUMENTATION_OPTIONS.URL_ROOT;
@@ -22,6 +21,10 @@
     }
 
     const parts = path.split("/").filter(Boolean);
+    if (parts.length >= 1 && /^\d+$/.test(parts[0])) {
+      return "/" + parts[0] + "/";
+    }
+
     if (parts.length >= 2 && parts[0] === "en") {
       return "/en/" + parts[1] + "/";
     }
@@ -44,9 +47,13 @@
       event.preventDefault();
 
       const root = siteRootFromPath();
-      const q = encodeURIComponent(input.value.trim());
+      const searchUrl = new URL(
+        "pagefind-search.html",
+        new URL(root, window.location.href)
+      );
 
-      window.location.href = root + "pagefind-search.html?q=" + q;
+      searchUrl.searchParams.set("q", input.value.trim());
+      window.location.href = searchUrl.toString();
     });
   });
 })();
