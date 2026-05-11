@@ -490,6 +490,7 @@ set(silo_library_sources
 
 if(SILO_ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
     list(APPEND silo_library_sources ${Silo_SOURCE_DIR}/src/silo/silo_f.c)
+    list(APPEND silo_library_sources ${Silo_SOURCE_DIR}/src/silo/silo_f_read.c)
 endif()
 
 if(SILO_ENABLE_JSON)
