@@ -79,7 +79,7 @@ project(Silo VERSION ${SILO_VERSION} LANGUAGES CXX C)
 ###-----------------------------------------------------------------------------
 # location for Silo CMake includes
 ###-----------------------------------------------------------------------------
-set(CMAKE_MODULE_PATH ${Silo_SOURCE_DIR}/CMake)
+list(APPEND CMAKE_MODULE_PATH "${Silo_SOURCE_DIR}/CMake")
 
 ###-----------------------------------------------------------------------------
 # If not already set, use a default build type of Release
@@ -934,4 +934,3 @@ install(FILES ${Silo_BINARY_DIR}/cmake/SiloConfig.cmake
         PERMISSIONS OWNER_READ OWNER_WRITE
                     GROUP_READ GROUP_WRITE
                     WORLD_READ)
-
