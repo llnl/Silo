@@ -23,14 +23,15 @@ jobs:
   rpmbuild:
     needs: [changes, edits]
     if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        needs.edits.outputs.run_build == 'true' ||
-        (
-          (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
-          needs.changes.outputs.run_build == 'true'
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'pull_request' &&
+        !github.event.pull_request.draft &&
+        ( 
+          needs.changes.outputs.run_build == 'true' ||
+          needs.edits.outputs.run_build == 'true'
         )
-      }}
+      ) 
     continue-on-error: ${{ matrix.config.continue-on-error == 'true' }}
     strategy:
       matrix:

@@ -4,6 +4,13 @@
 # edits such as to title or to initial comment/description will not trigger
 # more CI. But, a change in the pull request target will.
 #
+# The workflow outputs `run_build='true'` or `run_build=''`. When the PR has
+# been edited AND the edit involves a change of the PR's base (e.g. merge
+# target has changed) the output is `run_build=='true'`. Otherwise, the output
+# is `run_build=''`. These outputs are then captured in other workflow's
+# `${{ needs.xxx.outputs.run_build }}` which evalutes to either `'true'` or
+# `''` (empty) which is treated as false.
+#
 name: Detect merge target edits
 
 on:
@@ -21,5 +28,8 @@ jobs:
     steps:
       - name: Detect merge target edits
         id: target_edited
-        if: github.event.action == 'edited' && github.event.changes.base
+        if: >
+          github.event_name == 'pull_request' && 
+          github.event.action == 'edited' && 
+          github.event.changes.base
         run: echo "build=true" >> "$GITHUB_OUTPUT"
