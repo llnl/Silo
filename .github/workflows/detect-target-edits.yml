@@ -22,3 +22,4 @@ jobs:
       - name: Detect merge target edits
         id: target_edited
         if: github.event.action == 'edited' && github.event.changes.base
+        run: echo "build=true" >> "$GITHUB_OUTPUT"
