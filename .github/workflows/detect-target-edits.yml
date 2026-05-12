@@ -1,0 +1,24 @@
+#
+# The purpose of this short job is to filter pull request `edited` events to 
+# only those that represent changes in the pull request merge target. Other
+# edits such as to title or to initial comment/description will not trigger
+# more CI. But, a change in the pull request target will.
+#
+name: Detect merge target edits
+
+on:
+  workflow_call:
+    outputs:
+      run_build:
+        description: "Decide whether merge target was edited"
+        value: ${{ jobs.merge_target_edited.outputs.run_build }}
+
+jobs:
+  merge_target_edited:
+    runs-on: ubuntu-latest
+    outputs:
+      run_build: ${{ steps.target_edited.outputs.build }}
+    steps:
+      - name: Detect merge target edits
+        id: target_edited
+        if: github.event.action == 'edited' && github.event.changes.base

@@ -3,7 +3,8 @@ name: Basic
 on:
   workflow_dispatch:  # Allows manual triggering from GitHub UI
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
     branches:
       - main
       - '[0-9]*.[0-9]*RC'
@@ -16,12 +17,15 @@ concurrency:
 jobs:
   changes:
     uses: ./.github/workflows/detect-source-changes.yml
+  edits:
+    uses: ./.github/workflows/detect-target-edits.yml
 
   build:
-    needs: changes
+    needs: [changes, edits]
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
+        needs.edits.outputs.run_build == 'true' ||
         (
           (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
           needs.changes.outputs.run_build == 'true'
