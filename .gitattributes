@@ -1,0 +1,4 @@
+# Don’t ship these in GitHub-generated source archives
+/ghpages/releases/    export-ignore
+/ghpages/assets/      export-ignore
+/ghpages/examples/    export-ignore

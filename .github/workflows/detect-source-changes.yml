@@ -36,3 +36,5 @@ jobs:
               - '!_config.yml'
               - '!.readthedocs.yaml'
               - '!examples.gif'
+              - '!.gitattributes'
+              - '!.gitignore'
