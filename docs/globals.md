@@ -1138,6 +1138,7 @@ Longer than normal component strings can result in creating objects in Silo file
 
 {{ EndFunc }}
 
+(db-version-ge)=
 ## `DB_VERSION_GE()`
 
 * **Summary:** Compile time macro to test silo version number

@@ -71,6 +71,7 @@ Since everything documented in this section of the Silo API is a convention on t
 
 {{ EndFunc }}
 
+(visit-domain-groups)=
 ## `_visit_domain_groups`
 
 * **Summary:** method for grouping blocks in a multi-block mesh
@@ -136,6 +137,7 @@ Since everything documented in this section of the Silo API is a convention on t
 
 {{ EndFunc }}
 
+(multivartomultimeshmap-vars)=
 ## `MultivarToMultimeshMap_vars`
 
 * **Summary:** list of multivars to be associated with multimeshes
@@ -163,6 +165,7 @@ Since everything documented in this section of the Silo API is a convention on t
 
 {{ EndFunc }}
 
+(multivartomultimeshmap-meshes)=
 ## `MultivarToMultimeshMap_meshes`
 
 * **Summary:** list of multimeshes to be associated with multivars
