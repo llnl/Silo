@@ -604,6 +604,7 @@ typedef enum {
 #define     E_EMPTYOBJECT 34    /*Empty object not currently permitted*/
 #define     E_OBJBUFFULL  35    /*No more temp. buffer space for object */
 #define     E_NOSILOHDF5 36     /*Not HDF5 file produced by silo */
+#define     E_FILELOCKING 37    /*File locking prevented operation */
 #define     E_NERRORS   50
 
 /* Definitions for MAJOR_ORDER */

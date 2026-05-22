@@ -252,6 +252,7 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         partial_io.c
         readstuff.c
         testhdf5.c
+        locking.c
     )
 endif()
 
