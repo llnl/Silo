@@ -1,5 +1,5 @@
 /*
-Copyright (C) 1994-2016 Lawrence Livermore National Security, LLC.
+Copyright (C) 1994-2026 Lawrence Livermore National Security, LLC.
 LLNL-CODE-425250.
 All rights reserved.
 
