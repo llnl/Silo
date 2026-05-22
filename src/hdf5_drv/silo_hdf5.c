@@ -2057,15 +2057,18 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
 {
     int *silo_error_code_p = (int *) client_data;
 
-    /* Note that error code can be overwritten by later strstr
-       comparisons. Where both checksum and compression errors
-       occur, we declare it a compression error. */
-    if (strstr(err_desc->desc, "letcher32") != 0)
+    if (*silo_error_code_p != E_NOERROR)
+        return 0;
+
+    if      (strstr(err_desc->desc, "letcher32") != 0)
         *silo_error_code_p = E_CHECKSUM;
-    if (strstr(err_desc->desc, "zip") != 0)
+    else if (strstr(err_desc->desc, "zip") != 0)
         *silo_error_code_p = E_COMPRESSION;
-    if (strstr(err_desc->desc, "Lindstrom-") != 0)
+    else if (strstr(err_desc->desc, "Lindstrom-") != 0)
         *silo_error_code_p = E_COMPRESSION;
+    else if (err_desc->min_num == H5E_CANTLOCKFILE ||
+            (strstr(err_desc->desc, "lock") != 0))
+        *silo_error_code_p = E_FILELOCKING;
 
     return 0;
 }
@@ -2084,14 +2087,14 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
  *-------------------------------------------------------------------------
  */
 PRIVATE void
-hdf5_to_silo_error(char const *vname, char const *fname)
+hdf5_to_silo_error(char const *vname, char const *fname, int generic_error_code)
 {
     int silo_error_code = E_NOERROR;
 
     H5Ewalk(H5E_DEFAULT, H5E_WALK_UPWARD, silo_walk_cb, &silo_error_code);
 
     if (silo_error_code == E_NOERROR)
-        silo_error_code = E_CALLFAIL;
+        silo_error_code = generic_error_code;
 
     db_perror((char*)vname, silo_error_code, (char*)fname);
 }
@@ -3935,7 +3938,7 @@ db_hdf5_get_comp_var(DBfile *_dbfile, char const *name, hsize_t *nelmts,
                         P_rdprops = P_ckrdprops;
 
                     if (H5Dread(d, mtype, H5S_ALL, H5S_ALL, P_rdprops, *buf)<0) {
-                        hdf5_to_silo_error(name, "db_hdf5_get_comp_var");
+                        hdf5_to_silo_error(name, "db_hdf5_get_comp_var", E_CALLFAIL);
                         if (buf_was_allocated)
                         {
                             free(*buf);
@@ -4518,7 +4521,7 @@ db_hdf5_compwrz(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
         }
 
         if (buf && H5Dwrite(dset, mtype, space, space, H5P_DEFAULT, buf)<0) {
-            hdf5_to_silo_error(name, "db_hdf5_compwrz");
+            hdf5_to_silo_error(name, "db_hdf5_compwrz", E_CALLFAIL);
             UNWIND();
         }
 
@@ -4688,7 +4691,7 @@ db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single)
                 P_rdprops = P_ckrdprops;
 
             if (H5Dread(d, mtype, H5S_ALL, H5S_ALL, P_rdprops, buf)<0) {
-                hdf5_to_silo_error(name, me);
+                hdf5_to_silo_error(name, me, E_CALLFAIL);
                 UNWIND();
             }
 
@@ -5008,6 +5011,9 @@ db_hdf5_ForceSingle(int status)
  *  Mark C. Miller, Wed Aug  4 16:06:41 PDT 2010
  *  Added conditional compilation logic for silo fapl for HDF5 1.8.4 or
  *  greater.
+ *
+ *  Mark C. Miller, Thu May 21 20:39:57 PDT 2026
+ *  Disable file locking.
  *-------------------------------------------------------------------------
  */
 PRIVATE hid_t
@@ -5029,6 +5035,7 @@ db_hdf5_process_file_options(int opts_set_id, int mode, hid_t *fcpl)
 
 #if HDF5_VERSION_GE(1,10,1)
     H5Pset_evict_on_close(retval, (hbool_t)1);
+    H5Pset_file_locking(retval, FALSE, FALSE); /* disable file locking */
 #endif
 
     /* First, initialize our copy of h5mdc_config */
@@ -6000,8 +6007,8 @@ db_hdf5_Open(char const *name, int mode, int opts_set_id)
 
     /* Open existing hdf5 file */
     if ((fid=H5Fopen(name, hmode, faprops))<0) {
+        hdf5_to_silo_error(name, me, E_DRVRCANTOPEN);
         H5Pclose(faprops);
-        db_perror(name, E_DRVRCANTOPEN, me);
         return NULL;
     }
 
@@ -6129,8 +6136,8 @@ db_hdf5_Create(char const *name, int mode, int target, int opts_set_id, char con
         return NULL;
     }
     if (fid<0) {
+        hdf5_to_silo_error(name, me, E_NOFILE);
         H5Pclose(faprops);
-        db_perror(name, E_NOFILE, me);
         return NULL;
     }
 
@@ -8246,7 +8253,7 @@ db_hdf5_GetVar(DBfile *_dbfile, char const *name)
 
                 /* Read entire variable */
                 if (H5Dread(dset, mtype, H5S_ALL, H5S_ALL, P_rdprops, result)<0) {
-                    hdf5_to_silo_error(name, me);
+                    hdf5_to_silo_error(name, me, E_CALLFAIL);
                     UNWIND();
                 }
             }
@@ -8324,7 +8331,7 @@ db_hdf5_ReadVar(DBfile *_dbfile, char const *vname, void *result)
 
            /* Read entire variable */
            if (H5Dread(dset, mtype, H5S_ALL, H5S_ALL, P_rdprops, result)<0) {
-               hdf5_to_silo_error(vname, me);
+               hdf5_to_silo_error(vname, me, E_CALLFAIL);
                UNWIND();
            }
 
@@ -8414,7 +8421,7 @@ db_hdf5_ReadVarSlice(DBfile *_dbfile, char const *vname, int const *offset, int 
 
        /* Read the data */
        if (H5Dread(dset, mtype, mspace, fspace, P_rdprops, result)<0) {
-           hdf5_to_silo_error(vname, me);
+           hdf5_to_silo_error(vname, me, E_CALLFAIL);
            UNWIND();
        }
    
@@ -8535,7 +8542,7 @@ db_hdf5_ReadVarVals(DBfile *_dbfile, char const *vname, int mode,
 
            /* Read the data */
            if (H5Dread(dset, mtype, mspace, fspace, P_rdprops, p)<0) {
-               hdf5_to_silo_error(vname, me);
+               hdf5_to_silo_error(vname, me, E_CALLFAIL);
                UNWIND();
            }
 
@@ -14141,7 +14148,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  if (H5Dread(nldset, mtype, mspace, fspace, P_rdprops, nlist)<0) {
                      FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
                      DBFreeMultimeshadj(mmadj);
-                     hdf5_to_silo_error(name, me);
+                     hdf5_to_silo_error(name, me, E_CALLFAIL);
                      UNWIND();
                  }
 
@@ -14204,7 +14211,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  if (H5Dread(zldset, mtype, mspace, fspace, P_rdprops, zlist)<0) {
                      FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
                      DBFreeMultimeshadj(mmadj);
-                     hdf5_to_silo_error(name, me);
+                     hdf5_to_silo_error(name, me, E_CALLFAIL);
                      UNWIND();
                  }
 

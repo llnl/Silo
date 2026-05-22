@@ -253,6 +253,7 @@ set(HDF5_ONLY_SOURCES
     partial_io.c
     readstuff.c
     testhdf5.c
+    locking.c
 )
 
 set(PDB_ONLY_SOURCES
