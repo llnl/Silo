@@ -78,12 +78,16 @@ int main(int argc, char **argv)
         /* try opening a file already opened by another process in previous phase */
         DBShowErrors(DB_ALL_AND_DRVR,NULL);
         db = DBOpen("locktest.silo", DB_HDF5, DB_APPEND);
-        if (!db) return 5;
+        if (!db)
+        {
+            if (DBErrno() == E_FILELOCKING) return 5;
+            return 6;
+        }
         DBClose(db);
         return 0;
     }
 
-    /* if we're here, we in the create phase*/
+    /* if we're here, we're in the create phase */
     db = DBCreate("locktest.silo", DB_CLOBBER, DB_LOCAL, "file locking test", DB_HDF5);
     DBFlush(db);
 
@@ -103,18 +107,23 @@ int main(int argc, char **argv)
 
     if (WIFEXITED(status))
     {
+        if (WEXITSTATUS(status) == 6)
+        {
+            printf("second DBOpen failed for some reason unrelated to locking\n");
+            return 1;
+        }
         if (WEXITSTATUS(status) == 5)
         {
-            printf("second DBOpen failed: HDF5 locking appears enabled\n");
+            printf("second DBOpen failed: HDF5 locking incorrectly appears enabled\n");
             return 1;
         }
         if (WEXITSTATUS(status) == 0)
         {
-            printf("second DBOpen succeeded: HDF5 locking appears disabled\n");
+            printf("second DBOpen succeeded: HDF5 locking correctly appears disabled\n");
             return 0;
         }
     }
 
-    printf("There was some kind of failure testing file locking is disabled\n");
+    printf("There was some kind of failure testing whether file locking is disabled\n");
     return 1;
 }
