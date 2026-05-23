@@ -195,7 +195,8 @@ PUBLIC char   *_db_err_list[] =
     "No more tiny array buffer space for custom object.", /* 35 */
     "Although this appears to be an HDF5 file,\n"
     "it does not appear to be one produced by Silo\n"
-    "and so cannot be open and read by Silo." /* 36 */
+    "and so cannot be open and read by Silo.", /* 36 */
+    "File locking has prevented an operation." /* 37 */
 };
 
 /* Table of contents object count */
