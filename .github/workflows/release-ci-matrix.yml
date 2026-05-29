@@ -144,15 +144,15 @@ jobs:
             silo_szip_args+=(-DSILO_HDF5_SZIP_DIR:PATH=/usr)
           fi
 
-          silo_link_flags=()
+          silo_ld_flags=()
           silo_shared_args=()
           silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=ON)
           if [ "${{ matrix.linkage }}" = "static" ]; then
             silo_shared_args+=(-DSILO_ENABLE_SHARED:BOOL=OFF)
             silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=OFF)
-            silo_link_flags=(-DCMAKE_EXE_LINKER_FLAGS="-lz -ldl -lm")
+            silo_ld_flags=(-lz -ldl -lm)
             if [ "${{ matrix.szip }}" = "szip" ]; then
-              silo_link_flags=(-DCMAKE_EXE_LINKER_FLAGS="-lsz -laec -lz -ldl -lm")
+              silo_ld_flags=(-lsz -laec -lz -ldl -lm)
             fi
           fi
 
@@ -163,9 +163,8 @@ jobs:
             silo_zlib_args+=(-DZLIB_LIBRARY:FILEPATH="/usr/lib/aarch64-linux-gnu/libz.so")
           fi
 
-          cmake -S . -B build -G Ninja \
+          env LDFLAGS="${silo_ld_flags[@]}" cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE:STRING=Release \
-            "${silo_link_flags[@]}" \
             -DCMAKE_INSTALL_PREFIX:PATH="$RUNNER_TEMP/silo-install" \
             -DBUILD_TESTING:BOOL=ON \
             -DSILO_ENABLE_HDF5:BOOL=ON \
