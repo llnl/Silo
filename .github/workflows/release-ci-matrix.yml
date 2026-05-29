@@ -144,6 +144,13 @@ jobs:
             silo_szip_args+=(-DSILO_HDF5_SZIP_DIR:PATH=/usr)
           fi
 
+          silo_shared_args=()
+          silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=ON)
+          if [ "${{ matrix.linkage }}" = "static" ]; then
+            silo_shared_args+=(-DSILO_ENABLE_SHARED:BOOL=OFF)
+            silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=OFF)
+          fi
+
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE:STRING=Release \
             -DCMAKE_INSTALL_PREFIX:PATH="$RUNNER_TEMP/silo-install" \
@@ -152,11 +159,13 @@ jobs:
             -DSILO_HDF5_DIR:PATH="$HDF5_ROOT" \
             -DSILO_ZLIB_DIR:PATH=/usr \
             "${silo_szip_args[@]}" \
+            "${silo_shared_args[@]}" \
             -DSILO_ENABLE_FORTRAN:BOOL=ON \
             -DSILO_ENABLE_BROWSER:BOOL=ON \
             -DSILO_ENABLE_SILOCK:BOOL=ON \
             -DSILO_ENABLE_SILEX:BOOL=OFF \
-            -DSILO_ENABLE_PYTHON_MODULE:BOOL=ON
+            -DSILO_ENABLE_ZFP:BOOL=ON \
+            "${silo_pymod_args[@]}"
 
       - name: Build Silo
         run: |
