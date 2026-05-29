@@ -98,7 +98,7 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/hdf5-download" "$RUNNER_TEMP/hdf5-install"
 
-          asset="hdf5-${{ matrix.hdf5 }}-gcc${{ matrix.gcc }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}.tar.gz"
+          asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.gz"
 
           gh release download "${{ inputs.hdf5_assets_tag }}" \
             --repo "${{ inputs.hdf5_assets_repo }}" \
