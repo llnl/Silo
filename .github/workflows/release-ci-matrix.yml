@@ -2,7 +2,6 @@ name: Release CI Testing Matrix
 
 on:
   workflow_dispatch:
-  pull_request:
     inputs:
       hdf5_assets_repo:
         description: "Repo containing HDF5 install tarballs"
@@ -12,6 +11,11 @@ on:
         description: "Release tag containing HDF5 tarballs"
         required: true
         default: "silo-3.5-ubuntu-24.04-ci-matrix"
+  pull_request:
+
+env:
+  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'markcmiller86/silo-testing-matrix' }}
+  HDF5_ASSETS_TAG:  ${{ inputs.hdf5_assets_tag  || 'silo-3.5-ubuntu-24.04-ci-matrix' }}
 
 jobs:
   test-silo:
@@ -100,8 +104,8 @@ jobs:
 
           asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.gz"
 
-          gh release download "${{ inputs.hdf5_assets_tag }}" \
-            --repo "${{ inputs.hdf5_assets_repo }}" \
+          gh release download "$HDF5_ASSETS_TAG" \
+            --repo "$HDF5_ASSETS_REPO" \
             --pattern "$asset" \
             --dir "$RUNNER_TEMP/hdf5-download"
 
