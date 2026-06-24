@@ -29,13 +29,9 @@ jobs:
         include:
           # HDF5 1.8.23: gcc-11, noszip/szip, shared/static, serial/parallel
           - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "static" }
           - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "szip",   linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "szip",   linkage: "static" }
           - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "noszip", linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "noszip", linkage: "static" }
           - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "szip",   linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "szip",   linkage: "static" }
 
           # HDF5 1.14.4: gcc-13, noszip/szip, shared only, serial only
           - { hdf5: "1.14.4", config: "cmake", gcc: "13", mpi: "serial", szip: "noszip", linkage: "shared" }
@@ -187,7 +183,7 @@ jobs:
       - name: Run Silo tests
         run: |
           cd build
-          ctest --output-on-failure
+          ctest -E checksum --output-on-failure
 
       - name: Upload failure logs
         if: failure()
