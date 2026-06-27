@@ -161,6 +161,7 @@ jobs:
 
           cmake -S . -B build -G Ninja \
             -DCMAKE_C_STANDARD_LIBRARIES="${silo_ld_flags[*]}" \
+            -DCMAKE_Fortran_STANDARD_LIBRARIES="${silo_ld_flags[*]}" \
             -DCMAKE_BUILD_TYPE:STRING=Release \
             -DCMAKE_INSTALL_PREFIX:PATH="$RUNNER_TEMP/silo-install" \
             -DBUILD_TESTING:BOOL=ON \
