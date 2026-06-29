@@ -10,12 +10,12 @@ on:
       hdf5_assets_tag:
         description: "Release tag containing HDF5 tarballs"
         required: true
-        default: "silo-3.5-ubuntu-24.04-ci-matrix"
+        default: "silo-3.5-ubuntu-24.04-ci-matrix-2"
   pull_request:
 
 env:
   HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'markcmiller86/silo-testing-matrix' }}
-  HDF5_ASSETS_TAG:  ${{ inputs.hdf5_assets_tag  || 'silo-3.5-ubuntu-24.04-ci-matrix' }}
+  HDF5_ASSETS_TAG:  ${{ inputs.hdf5_assets_tag  || 'silo-3.5-ubuntu-24.04-ci-matrix-2' }}
 
 jobs:
   test-silo:
