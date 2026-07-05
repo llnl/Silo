@@ -7396,17 +7396,21 @@ db_hdf5_GetComponentNames(DBfile *_dbfile, char const *objname, char ***comp_nam
  *
  *   Mark C. Miller, Fri Apr 10 15:00:03 PDT 2026
  *   Limit loops looking for tiny array cases to DB_MAX_H5_OBJ_VALS.
+ *
+ *   Mark C. Miller, Sat Jul  4 23:00:22 PDT 2026
+ *   Handle immediate mode arrays where small arrays are embedded directly
+ *   in pdb_names member as in "'<d>5,7,13". Also fix handling time/dtime
+ *   when the are paths to raw variable objects.
  *-------------------------------------------------------------------------
  */
 static int count_commas(char const *str)
 {
     int n = 0;
-    char const *p = strchr(str, ',');
-    while (p)
-    {
-        n++;
-        p = strchr(p, ',');
-    }
+
+    while (*str)
+        if (*str++ == ',')
+            n++;
+
     return n;
 }
 
@@ -7545,48 +7549,58 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
         }
         for (i=0, moffset=foffset=0; i<obj->ncomponents; i++) {
             int nvals = count_commas(obj->pdb_names[i]) + 1;
+            hsize_t hsnvals = (hsize_t) nvals;
             if (!strncmp(obj->pdb_names[i], "'<i>", 4)) {
+                int *mi = (int *)(object+moffset);
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_INT : H5Tarray_create(H5T_NATIVE_INT, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_int : H5Tarray_create( dbfile->T_int, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(int));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_INT)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_int)<0) {
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(int*)(object+moffset) = strtol(obj->pdb_names[i]+4, NULL, 0);
-                moffset += sizeof(int);
-                foffset += H5Tget_size(dbfile->T_int);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                sscanf(obj->pdb_names[i]+4, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                    mi+0,mi+1,mi+2,mi+3,mi+4,mi+5,mi+6,mi+7,mi+8,mi+9);
+                moffset += (nvals * sizeof(int));
+                foffset += (nvals * H5Tget_size(dbfile->T_int));
             } else if (!strncmp(obj->pdb_names[i], "'<f>", 4)) {
+                float *mf = (float *)(object+moffset);
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_FLOAT : H5Tarray_create(H5T_NATIVE_FLOAT, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_float : H5Tarray_create( dbfile->T_float, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(float));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_FLOAT)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_float)<0) {
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(float*)(object+moffset) = strtod(obj->pdb_names[i]+4, NULL);
-                moffset += sizeof(float);
-                foffset += H5Tget_size(dbfile->T_float);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                sscanf(obj->pdb_names[i]+4, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g",
+                    mf+0,mf+1,mf+2,mf+3,mf+4,mf+5,mf+6,mf+7,mf+8,mf+9);
+                moffset += (nvals * sizeof(float));
+                foffset += (nvals * H5Tget_size(dbfile->T_float));
             } else if (!strncmp(obj->pdb_names[i], "'<d>", 4)) {
+                double *md = (double*)(object+moffset);
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_DOUBLE : H5Tarray_create(H5T_NATIVE_DOUBLE, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_double : H5Tarray_create( dbfile->T_double, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(double));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_DOUBLE)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_double)<0) {
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(double*)(object+moffset) = strtod(obj->pdb_names[i]+4, NULL);
-                moffset += sizeof(double);
-                foffset += H5Tget_size(dbfile->T_double);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                sscanf(obj->pdb_names[i]+4, "%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg",
+                    md+0,md+1,md+2,md+3,md+4,md+5,md+6,md+7,md+8,md+9);
+                moffset += (nvals * sizeof(double));
+                foffset += (nvals * H5Tget_size(dbfile->T_double));
             } else if (!strncmp(obj->pdb_names[i], "'<s>", 4)) {
                 size_t len = strlen(obj->pdb_names[i]+4); /* inc. trailing ' for '\0' */
 #ifndef _WIN32

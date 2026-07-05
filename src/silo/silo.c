@@ -6129,6 +6129,18 @@ done:
     return retval;
 }
 
+static int
+str_ends_with(char const *str, char const *suffix)
+{
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+
+    return str_len >= suffix_len &&
+           memcmp(str + str_len - suffix_len,
+                  suffix,
+                  suffix_len) == 0;
+}
+
 /*-------------------------------------------------------------------------
  * Function:   db_copy_single_object_abspath
  *
@@ -6144,6 +6156,9 @@ done:
  *
  * Programmer:  Mark C. Miller, Wed Apr 18 09:23:55  PDT 2018
  *
+ * Mark C. Miller, Sat Jul  4 23:03:09 PDT 2026
+ * Fix bug with destination object path in copying sub-objects.
+ * Fix handling of immediate mode (small) arrays.
  *-------------------------------------------------------------------------*/
 static int
 db_copy_single_object_abspath(char const *opts,
@@ -6233,6 +6248,12 @@ db_copy_single_object_abspath(char const *opts,
         int isser = 0, nser = 0;
         char *sernm = 0, *sertstr = 0;
         void *serd = 0;
+        char typeflag = '\0';
+        double imvals[10] = {0,0,0,0,0,0,0,0,0,0}; /* immediate mode values...embedded in actual name string */
+        int nimvals = sscanf(srcObj->pdb_names[q], "'<%c>%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg", &typeflag,
+            imvals+0, imvals+1, imvals+2, imvals+3, imvals+4,
+            imvals+5, imvals+6, imvals+7, imvals+8, imvals+9);
+        if (nimvals > 0) nimvals--; /* don't count the typeflag */
         CheckForComponentSeries(srcObj, q, &isser, &nser, &sernm, &sertstr, &serd);
         if (isser)
         {
@@ -6244,21 +6265,53 @@ db_copy_single_object_abspath(char const *opts,
             free(serd);
             q += (nser-1);
         }
-        else if (!strncmp(srcObj->pdb_names[q], "'<i>", 4))
-            DBAddIntComponent(dstObj, srcObj->comp_names[q],
-                (int) strtol(srcObj->pdb_names[q]+4, NULL, 0));
-        else if (!strncmp(srcObj->pdb_names[q], "'<f>", 4))
-            DBAddFltComponent(dstObj, srcObj->comp_names[q],
-                (float) strtod(srcObj->pdb_names[q]+4, NULL));
-        else if (!strncmp(srcObj->pdb_names[q], "'<d>", 4))
-            DBAddDblComponent(dstObj, srcObj->comp_names[q],
-                strtod(srcObj->pdb_names[q]+4, NULL));
+        else if (!strncmp(srcObj->pdb_names[q], "'<i>", 4)) {
+            if (nimvals == 1)
+                DBAddIntComponent(dstObj, srcObj->comp_names[q],
+                    (int) strtol(srcObj->pdb_names[q]+4, NULL, 0));
+            else {
+                int imvalsi[10];
+                for (int qq = 0; qq < nimvals; qq++) imvalsi[qq] = (int) imvals[qq];
+                DBAddIntNComponent(dstObj, srcObj->comp_names[q], nimvals, imvalsi);
+            }
+        }
+        else if (!strncmp(srcObj->pdb_names[q], "'<f>", 4)) {
+            if (nimvals == 1)
+                DBAddFltComponent(dstObj, srcObj->comp_names[q],
+                    (float) strtod(srcObj->pdb_names[q]+4, NULL));
+            else {
+                float imvalsf[10];
+                for (int qq = 0; qq < nimvals; qq++) imvalsf[qq] = (float) imvals[qq];
+                DBAddFltNComponent(dstObj, srcObj->comp_names[q], nimvals, imvalsf);
+            }
+        }
+        else if (!strncmp(srcObj->pdb_names[q], "'<d>", 4)) {
+            if (nimvals == 1)
+                DBAddDblComponent(dstObj, srcObj->comp_names[q],
+                    strtod(srcObj->pdb_names[q]+4, NULL));
+            else
+                DBAddDblNComponent(dstObj, srcObj->comp_names[q], nimvals, imvals);
+        }
+        else if (!strncmp(srcObj->comp_names[q], "time", 4) &&
+                 str_ends_with(srcObj->pdb_names[q], "time")) {
+            int zero = 0, one = 1;
+            float ftime;
+            DBReadVarSlice(srcFile, srcObj->pdb_names[q], &zero, &one, &one, 1, &ftime);
+            DBAddFltComponent(dstObj, srcObj->comp_names[q], ftime);
+        }
+        else if (!strncmp(srcObj->comp_names[q], "dtime", 5) &&
+                 str_ends_with(srcObj->pdb_names[q], "dtime")) {
+            int zero = 0, one = 1;
+            double dtime;
+            DBReadVarSlice(srcFile, srcObj->pdb_names[q], &zero, &one, &one, 1, &dtime);
+            DBAddDblComponent(dstObj, srcObj->comp_names[q], dtime);
+        }
         else
         {
             DBObjectType subObjType;
             char *subObjName;
             char *srcObjDirName, *srcSubObjAbsName;
-             
+
             if (!strncmp(srcObj->pdb_names[q], "'<s>", 4))
                 subObjName = db_strndup(srcObj->pdb_names[q]+4, strlen(srcObj->pdb_names[q])-5);
             else
@@ -6287,7 +6340,7 @@ db_copy_single_object_abspath(char const *opts,
                        subObjType == DB_ZONELIST || subObjType == DB_PHZONELIST)) ||
                      (srcType == DB_CSGMESH && subObjType == DB_CSGZONELIST)) 
             {
-                char *dstObjDirName = db_dirname(dstObjAbsName);
+                char *dstObjDirName = db_dirname(_dstObjAbsName);
                 char *dstSubObjAbsName = db_join_path(dstObjDirName, subObjName);
 
                 db_copy_single_object_abspath(opts, /* recursive call */
