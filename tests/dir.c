@@ -206,6 +206,20 @@ int main(int argc, char *argv[])
     /* Try a recursive copy */
     DBCp("-r", dbfile, dbfile2, "/quad_dir/quad_subdir1", "quad_dir_copy", DB_EOA);
 
+    /* Test a complicated whole file copy from PDB to HDF5 */
+    if (driver2 != DB_PDB && access("multi_ucd3d.pdb", R_OK) == 0)
+    {
+        DBfile *fsrc = DBOpen("multi_ucd3d.pdb", DB_PDB, DB_READ);
+        DBfile *fdst = DBCreate("foo.silo", 0, DB_LOCAL, "dir copy test", DB_HDF5);
+        DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
+        DBClose(fsrc);
+        DBClose(fdst);
+    }
+    else
+    {
+        fprintf(stderr, "\n\nComplex whole file copy requires \"multi_ucd3d.silo\" and DB_HDF5 target\n\n\n");
+    }
+
     build_ucd_tri(dbfile2, "trimesh", 0x2); /* make a larger tri mesh here */
 
     /* try to copy the smaller trimesh on top of the larger one */
