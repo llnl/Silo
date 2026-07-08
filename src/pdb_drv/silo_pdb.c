@@ -1289,7 +1289,7 @@ db_pdb_ParseVDBSpec (char const *mvdbspec, char **varname, char **filename)
         (*filename)[len_filename] = '\0';
 
         len_varname = strlen(mvdbspec) - (len_filename+1);
-        if (len_varname <= 0)
+        if (len_varname == 0)
         {
             FREE (*filename);
             return (OOPS);
