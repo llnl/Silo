@@ -6278,11 +6278,9 @@ db_copy_single_object_abspath(char const *opts,
         else if (!strncmp(srcObj->pdb_names[q], "'<f>", 4)) {
             if (nimvals == 1)
                 DBAddFltComponent(dstObj, srcObj->comp_names[q],
-                    (float) strtod(srcObj->pdb_names[q]+4, NULL));
+                    strtod(srcObj->pdb_names[q]+4, NULL));
             else {
-                float imvalsf[10];
-                for (int qq = 0; qq < nimvals; qq++) imvalsf[qq] = (float) imvals[qq];
-                DBAddFltNComponent(dstObj, srcObj->comp_names[q], nimvals, imvalsf);
+                DBAddFltNComponent(dstObj, srcObj->comp_names[q], nimvals, imvals);
             }
         }
         else if (!strncmp(srcObj->pdb_names[q], "'<d>", 4)) {
@@ -6297,7 +6295,7 @@ db_copy_single_object_abspath(char const *opts,
             int zero = 0, one = 1;
             float ftime;
             DBReadVarSlice(srcFile, srcObj->pdb_names[q], &zero, &one, &one, 1, &ftime);
-            DBAddFltComponent(dstObj, srcObj->comp_names[q], ftime);
+            DBAddFltComponent(dstObj, srcObj->comp_names[q], (double) ftime);
         }
         else if (!strncmp(srcObj->comp_names[q], "dtime", 5) &&
                  str_ends_with(srcObj->pdb_names[q], "dtime")) {
