@@ -2880,6 +2880,7 @@ db_hdf5_InitCallbacks(DBfile_hdf5 *dbfile, int target)
     dbfile->pub.g_comp = db_hdf5_GetComponent;
     dbfile->pub.g_comptyp = db_hdf5_GetComponentType;
     dbfile->pub.g_compnames = db_hdf5_GetComponentNames;
+    dbfile->pub.g_compstuff = db_hdf5_GetComponentStuff;
     dbfile->pub.c_obj = db_hdf5_WriteObject; /*DBChangeObject==DBWriteObject*/
     dbfile->pub.w_obj = db_hdf5_WriteObject;
     dbfile->pub.w_comp = db_hdf5_WriteComponent;
@@ -7061,7 +7062,7 @@ SILO_CALLBACK int
 db_hdf5_GetComponentType(DBfile *_dbfile, char const *objname, char const *compname)
 {
     int datatype = DB_NOTYPE;
-    db_hdf5_GetComponentStuff(_dbfile, objname, compname, &datatype);
+    db_hdf5_GetComponentStuff(_dbfile, objname, compname, &datatype, 0);
     return datatype;
 }
 
@@ -7081,7 +7082,7 @@ db_hdf5_GetComponentType(DBfile *_dbfile, char const *objname, char const *compn
 SILO_CALLBACK void *
 db_hdf5_GetComponent(DBfile *_dbfile, char const *objname, char const *compname)
 {
-    return db_hdf5_GetComponentStuff(_dbfile, objname, compname, 0);
+    return db_hdf5_GetComponentStuff(_dbfile, objname, compname, 0, 0);
 }
 
 /*-------------------------------------------------------------------------
@@ -7133,7 +7134,7 @@ db_hdf5_GetComponent(DBfile *_dbfile, char const *objname, char const *compname)
  */
 SILO_CALLBACK void *
 db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *compname,
-    int *just_get_datatype)
+    int *just_get_datatype, int *nvals)
 {
     DBfile_hdf5 *dbfile = (DBfile_hdf5*)_dbfile;
     static char *me = "db_hdf5_GetComponent";
@@ -7250,6 +7251,7 @@ db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *comp
             }
 
             for (i=0, mult=1; i<ndims; i++) mult *= (int) dim[i];
+            if (nvals) *nvals = mult;
 
             if (just_get_datatype == 0)
             {

@@ -1872,6 +1872,7 @@ typedef struct DBfile_pub {
     int            (*cpnobjs)(int, struct DBfile *, char const * const *, struct DBfile *, char const * const *);
     int            (*mksymlink)(struct DBfile *, char const *, char const *);
     int            (*g_symlink)(struct DBfile *, char const *, char *);
+    void          *(*g_compstuff)(struct DBfile *, char const *objname, char const *compname, int *type, int *nvals);
 } DBfile_pub;
 
 typedef struct DBfile {
