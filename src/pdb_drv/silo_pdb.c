@@ -981,7 +981,7 @@ PJ_ReadVariable(PDBfile *file,
    int            act_datatype, forcing;
    int           *iptr;
    char           tname[256], *lit;
-   float         *local_f;
+   float         *local_f = NULL;
    char          *local_c;
    float         *fptr;
    double        *dptr;
@@ -1274,7 +1274,7 @@ pj_GetVarDatatypeID (PDBfile *file, char *varname) {
 PRIVATE int
 db_pdb_ParseVDBSpec (char const *mvdbspec, char **varname, char **filename)
 {
-    int len_filename, len_varname;
+    size_t len_filename, len_varname;
 
     /*
      * Split spec into SILO name and SILO directory/variable name.
@@ -1285,7 +1285,8 @@ db_pdb_ParseVDBSpec (char const *mvdbspec, char **varname, char **filename)
 
         *filename = ALLOC_N (char, len_filename+1);
 
-        strncpy (*filename, mvdbspec, len_filename);
+        memcpy(*filename, mvdbspec, len_filename);
+        (*filename)[len_filename] = '\0';
 
         len_varname = strlen(mvdbspec) - (len_filename+1);
         if (len_varname <= 0)
@@ -1301,14 +1302,16 @@ db_pdb_ParseVDBSpec (char const *mvdbspec, char **varname, char **filename)
         if (mvdbspec[len_filename+1] == '/')
         {
             *varname = ALLOC_N (char, len_varname+1);
-            strncpy (*varname, &mvdbspec[len_filename+1], len_varname);
+            memcpy(*varname, &mvdbspec[len_filename+1], len_varname);
+            (*varname)[len_varname] = '\0';
         }
         else
         {
             *varname = ALLOC_N (char, len_varname+2);
             (*varname) [0] = '/';
-            strncpy (&((*varname)[1]), &mvdbspec[len_filename+1], len_varname);
+            memcpy(&((*varname)[1]), &mvdbspec[len_filename+1], len_varname);
             len_varname++;
+            (*varname)[len_varname] = '\0';
         }
      }
      else
