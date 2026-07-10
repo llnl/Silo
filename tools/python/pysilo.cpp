@@ -280,7 +280,6 @@ void SILOMODULE_API initSilo(void)
               "Usage: ShowErrors([DB_TOP|DB_NONE|DB_ALL|DB_ABORT|DB_ALL_AND_DRVR])");
     AddMethod(NULL, NULL);
 
-
     PY_SILO_MOD_DEF(siloModule, "Silo", &SiloMethods[0]);
 
     PyObject *d;
