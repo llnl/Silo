@@ -6360,6 +6360,10 @@ db_copy_single_object_abspath(char const *opts,
                 FREE(dstObjDirName);
                 FREE(dstSubObjAbsName);
             }
+            else
+            {
+                DBAddStrComponent(dstObj, srcObj->comp_names[q], subObjName);
+            }
             free(subObjName);
             free(srcObjDirName);
             free(srcSubObjAbsName);
