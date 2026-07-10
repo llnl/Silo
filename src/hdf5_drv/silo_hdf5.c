@@ -5933,6 +5933,17 @@ db_hdf5_initiate_close(DBfile *_dbfile)
     return 0;
 }
 
+INTERNAL int
+db_hdf5_Version(int *maj, int *min, int *pat)
+{
+    unsigned _maj, _min, _rel;
+    H5get_libversion(&_maj, &_min, &_rel);
+    if (maj) *maj = (int) _maj;
+    if (min) *min = (int) _min;
+    if (pat) *pat = (int) _rel;
+    return 0;
+}
+
 /*-------------------------------------------------------------------------
  * Function:    db_hdf5_Open
  *

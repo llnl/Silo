@@ -127,14 +127,17 @@ be used for advertising or product endorsement purposes.
 #define DB_NETCDF_OPEN     db_cdf_Open
 #define DB_NETCDF_CREATE   NULL
 #define DB_NETCDF_FSINGLE  db_cdf_ForceSingle
+#define DB_NETCDF_VERSION  NULL
 
 extern DBfile *db_cdf_Open(char const *, int, int);
 extern int db_cdf_ForceSingle(int);
+extern int db_cdf_Version(int *, int *, int *);
 
 #else
 #define DB_NETCDF_OPEN     NULL
 #define DB_NETCDF_CREATE   NULL
 #define DB_NETCDF_FSINGLE  NULL
+#define DB_NETCDF_VERSION  NULL
 #endif
 
 /* Slot 1 is for PDB Proper */
@@ -144,15 +147,18 @@ extern int db_cdf_ForceSingle(int);
 #define DB_PDBP_OPEN        db_pdbp_Open
 #define DB_PDBP_CREATE      db_pdbp_Create
 #define DB_PDBP_FSINGLE     db_pdbp_ForceSingle
+#define DB_PDBP_VERSION     db_pdbp_Version
 
 extern DBfile *db_pdbp_Open(char const *, int, int);
 extern DBfile *db_pdbp_Create(char const *, int, int, int, char const *);
 extern int db_pdbp_ForceSingle(int);
+extern int db_pdbp_Version(int *, int *, int *);
 
 #else
 #define DB_PDBP_OPEN        NULL
 #define DB_PDBP_CREATE      NULL
 #define DB_PDBP_FSINGLE     NULL
+#define DB_PDBP_VERSION     NULL
 #endif
 
 /* Slot 2 is PDB Lite */
@@ -162,15 +168,18 @@ extern int db_pdbp_ForceSingle(int);
 #define DB_PDB_OPEN        db_pdb_Open
 #define DB_PDB_CREATE      db_pdb_Create
 #define DB_PDB_FSINGLE     db_pdb_ForceSingle
+#define DB_PDB_VERSION     db_pdb_Version
 
 extern DBfile *db_pdb_Open(char const *, int, int);
 extern DBfile *db_pdb_Create(char const *, int, int, int, char const *);
 extern int db_pdb_ForceSingle(int);
+extern int db_pdb_Version(int *, int *, int *);
 
 #else
 #define DB_PDB_OPEN        NULL
 #define DB_PDB_CREATE      NULL
 #define DB_PDB_FSINGLE     NULL
+#define DB_PDB_VERSION     NULL
 #endif
 
 #ifdef DB_TAURUS
@@ -179,6 +188,7 @@ extern int db_pdb_ForceSingle(int);
 #define DB_TAURUS_OPEN     db_taur_Open
 #define DB_TAURUS_CREATE   NULL
 #define DB_TAURUS_FSINGLE  NULL
+#define DB_TAURUS_VERSION  NULL
 
 extern DBfile *db_taur_Open(char const *, int, int);
 
@@ -186,6 +196,7 @@ extern DBfile *db_taur_Open(char const *, int, int);
 #define DB_TAURUS_OPEN     NULL
 #define DB_TAURUS_CREATE   NULL
 #define DB_TAURUS_FSINGLE  NULL
+#define DB_TAURUS_VERSION  NULL
 #endif
 
 #ifdef DB_UNKNOWN               /*For opening files of unknown type */
@@ -194,6 +205,7 @@ extern DBfile *db_taur_Open(char const *, int, int);
 #define DB_UNKNOWN_OPEN    db_unk_Open
 #define DB_UNKNOWN_CREATE  NULL
 #define DB_UNKNOWN_FSINGLE NULL
+#define DB_UNKNOWN_VERSION NULL
 
 extern DBfile *db_unk_Open(char const *, int, int);
 
@@ -201,6 +213,7 @@ extern DBfile *db_unk_Open(char const *, int, int);
 #define DB_UNKNOWN_OPEN    NULL
 #define DB_UNKNOWN_CREATE  NULL
 #define DB_UNKNOWN_FSINGLE NULL
+#define DB_UNKNOWN_VERSION NULL
 #endif
 
 #ifdef DB_DEBUG                 /*A Demo */
@@ -209,6 +222,7 @@ extern DBfile *db_unk_Open(char const *, int, int);
 #define DB_DEBUG_OPEN      db_debug_open
 #define DB_DEBUG_CREATE    db_debug_create
 #define DB_DEBUG_FSINGLE   NULL
+#define DB_DEBUG_VERSION   NULL
 
 extern DBfile *db_debug_open(char const *, int, int);
 extern DBfile *db_debug_create(char const *, int, int, int, char const *);
@@ -217,6 +231,7 @@ extern DBfile *db_debug_create(char const *, int, int, int, char const *);
 #define DB_DEBUG_OPEN      NULL
 #define DB_DEBUG_CREATE    NULL
 #define DB_DEBUG_FSINGLE   NULL
+#define DB_DEBUG_VERSION   NULL
 #endif
 
 #ifdef DB_HDF5X
@@ -225,15 +240,18 @@ extern DBfile *db_debug_create(char const *, int, int, int, char const *);
 #define DB_HDF5_OPEN       db_hdf5_Open
 #define DB_HDF5_CREATE     db_hdf5_Create
 #define DB_HDF5_FSINGLE    db_hdf5_ForceSingle
+#define DB_HDF5_VERSION    db_hdf5_Version
 
 extern DBfile *db_hdf5_Open(char const *, int, int);
 extern DBfile *db_hdf5_Create(char const *, int, int, int, char const *);
 extern int db_hdf5_ForceSingle(int);
+extern int db_hdf5_Version(int *, int *, int *);
 
 #else
 #define DB_HDF5_OPEN       NULL
 #define DB_HDF5_CREATE     NULL
 #define DB_HDF5_FSINGLE    NULL
+#define DB_HDF5_VERSION    NULL
 #endif
 
 /*
@@ -284,9 +302,21 @@ extern int db_hdf5_ForceSingle(int);
                          NULL,                  /*unused*/\
                          NULL}                  /*unused*/
 
+#define DBVERSIONCB     {DB_NETCDF_VERSION,     \
+                         DB_PDBP_VERSION,       \
+                         DB_PDB_VERSION,        \
+                         DB_TAURUS_VERSION,     \
+                         NULL,                  /*unused*/\
+                         DB_UNKNOWN_VERSION,    \
+                         DB_DEBUG_VERSION,      \
+                         DB_HDF5_VERSION,       \
+                         NULL,                  /*unused*/\
+                         NULL}                  /*unused*/
+
 DBfile *(*DBOpenCB[DB_NFORMATS]) (char const *, int, int) = DBOPENCB;
 DBfile *(*DBCreateCB[DB_NFORMATS]) (char const *, int, int, int, char const *) = DBCREATECB;
 int     (*DBFSingleCB[DB_NFORMATS]) (int) = DBFSINGLECB;
+int     (*DBVersionCB[DB_NFORMATS]) (int*,int*,int*) = DBVERSIONCB;
 #endif /* DB_MAIN */
 
 #endif /* !SILO_DRIVERS_H */

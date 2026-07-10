@@ -2071,6 +2071,17 @@ db_pdb_flush(DBfile *_dbfile)
    return retval;
 }
 
+INTERNAL int
+#ifdef USING_PDB_PROPER
+db_pdbp_Version(int *maj, int *min, int *pat)
+#else
+db_pdb_Version(int *maj, int *min, int *pat)
+#endif
+{
+   if (maj) *maj = PDB_SYSTEM_VERSION;
+   return 0;
+}
+
 /*-------------------------------------------------------------------------
  * Function:    db_pdb_Open
  *
@@ -2290,13 +2301,11 @@ db_pdb_Create (char const *name, int mode, int target, int opts_set_id, char con
 
         PJ_write_len(dbfile->pdb, "_fileinfo", "char", finfo, 1, &count);
     }
-#ifdef USING_PDB_PROPER
     {
         long count = 1; 
         int version_val = PDB_SYSTEM_VERSION;
         PJ_write_len(dbfile->pdb, "_pdblibinfo", "integer", &version_val, 1, &count);
     }
-#endif
     return (DBfile *) dbfile;
 }
 

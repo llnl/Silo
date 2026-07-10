@@ -4052,6 +4052,15 @@ DBFileVersionGE(const DBfile *dbfile, int Maj, int Min, int Pat)
     return retval;
 }
 
+PUBLIC int
+DBDriverVersionReal(int driver, int *drvrlib_vmaj, int *drvrlib_vmin, int *drvrlib_vpat)
+{
+    if (DBVersionCB[driver])
+        return (DBVersionCB[driver])(drvrlib_vmaj, drvrlib_vmin, drvrlib_vpat);
+    else
+        return -1;
+}
+
 /*-------------------------------------------------------------------------
  * Function:    DBFileName
  *
