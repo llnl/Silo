@@ -4692,7 +4692,7 @@ DBInqFileHasObjects(DBfile *f)
     if (f == 0)
         return -1;
 
-    if (DBInqVarExists(f, "_silolibinfo"))
+    if (DBInqVarExists(f, SILO_VSTRING_NAME))
         return 1;
     if (DBInqVarExists(f, "_hdf5libinfo"))
         return 1;
