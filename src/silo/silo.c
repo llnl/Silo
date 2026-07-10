@@ -5862,6 +5862,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
     int *isser, int *nser, char **sernm, char **sertstr, void **serd)
 {
     char *p = 0;
+    size_t np = 0;
     int pass = 0;
     int dtyp = DB_NOTYPE;
     int i0 = i;
@@ -5896,7 +5897,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
 
         if (pass == 1)
         {
-            p = (char *) malloc((size_t)p);
+            p = (char *) malloc(np);
             *serd = p;
         }
 
@@ -5906,21 +5907,21 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
             {
                 if (pass == 1)
                     *((int*)p) = (int) strtol(srcObj->pdb_names[j]+4, NULL, 0);
-                p += sizeof(int);
+                np += sizeof(int);
                 if (dtyp == DB_NOTYPE) dtyp = DB_INT;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<f>", 4))
             {
                 if (pass == 1)
                      *((float*)p) = (float) strtod(srcObj->pdb_names[j]+4, NULL);
-                p += sizeof(float);
+                np += sizeof(float);
                 if (dtyp == DB_NOTYPE) dtyp = DB_FLOAT;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<d>", 4))
             {
                 if (pass == 1)
                     *((double*)p) = strtod(srcObj->pdb_names[j]+4, NULL);
-                p += sizeof(double);
+                np += sizeof(double);
                 if (dtyp == DB_NOTYPE) dtyp = DB_DOUBLE;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<s>", 4))
@@ -5931,7 +5932,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
                      strcpy(p, srcObj->pdb_names[j]+4);
                      p[len] = '\0';
                 }
-                p += (len+1);
+                np += (len+1);
                 if (dtyp == DB_NOTYPE) dtyp = DB_CHAR;
             }
             else
@@ -5939,7 +5940,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
                 int len = (int) strlen(srcObj->pdb_names[j]);
                 if (pass == 1)
                      strcpy(p, srcObj->pdb_names[j]);
-                p += (len+1);
+                np += (len+1);
             }
         }
     }
