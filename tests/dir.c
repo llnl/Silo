@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
     DBSetDir(dbfile, "quad_subdir3");
     DBMkSymlink(dbfile, "/quad_dir/quad_subdir1", "dirlink");
     DBMkSymlink(dbfile, "dir2.h5:/gorfo", "extlink");
+    db_errno = 0;
 
     build_quad(dbfile, "quadmesh");
 
@@ -215,9 +216,10 @@ int main(int argc, char *argv[])
         result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
         DBClose(fsrc);
         DBClose(fdst);
-        if (!result)
+        if (result != 0)
         {
             fprintf(stderr, "Complex whole file, cross driver copy from PDB to HDF5 failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
             return 1;
         }
     }
@@ -226,12 +228,13 @@ int main(int argc, char *argv[])
         int result;
         DBfile *fsrc = DBOpen("multi_ucd3d.h5", DB_HDF5, DB_READ);
         DBfile *fdst = DBCreate("foo.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_PDB);
-        DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
+        result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
         DBClose(fsrc);
         DBClose(fdst);
-        if (!result)
+        if (result != 0)
         {
             fprintf(stderr, "Complex whole file, cross driver copy from HDF5 to PDB failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
             return 1;
         }
     }
@@ -318,7 +321,6 @@ int main(int argc, char *argv[])
 
     DBClose(dbfile);
     DBClose(dbfile2);
-
 
     /* test attempt to DBCreate a file without clobbering it and
        for which the path is really a dir in the host filesystem */
