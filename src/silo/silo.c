@@ -6488,6 +6488,7 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
     char const **srcPathNames = 0, **dstPathNames = 0;
     int srcPathNamesAlloc = 0, dstPathNamesAlloc = 0;
     char srcStartCwg[1024], dstStartCwg[1024];
+    int retval = 0;
 
 #ifndef _WIN32
 #warning WARN ABOUT CERTAIN OPTIONS NOT YET SUPPORTED
@@ -6580,11 +6581,11 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         }
     }
 
-    if (n_src_dir_triple && N == 0)
+    if ((n_src_dir_triple || n_src_dst_triple) && N == 0)
     {
         if (srcPathNamesAlloc) FREE(srcPathNames);
         if (dstPathNamesAlloc) FREE(dstPathNames);
-        return 0;
+        return db_perror("empty destination list or dir", E_BADARGS, me);
     }
     if (!n_src_dir_triple && N < 2)
     {
@@ -6641,7 +6642,7 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
 
         if (srcType == DB_INVALID_OBJECT)
         {
-            db_perror(DBSPrintf("\"%s\" invalid object", srcObjAbsName), E_BADARGS, me);
+            retval = db_perror(DBSPrintf("\"%s\" invalid object", srcObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
@@ -6651,7 +6652,7 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
                     srcFile, srcObjAbsName, srcType,
                     dstFile, dstObjAbsName, dstType))
             {
-                db_perror("Object copy failed", E_CALLFAIL, me);
+                retval = db_perror("Object copy failed", E_CALLFAIL, me);
                 goto endLoop;
             }
             goto endLoop;
@@ -6660,28 +6661,18 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         /* If we get this far into the loop body here, then src is a dir */
         if (!recurse_on_dirs)
         {
-            db_perror(DBSPrintf("Cannot copy dir \"%s\" without -r flag",
+            retval = db_perror(DBSPrintf("Cannot copy dir \"%s\" without -r flag",
                 srcObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
         if (dstType != DB_INVALID_OBJECT && dstType != DB_DIR)
         {
-            db_perror(DBSPrintf("Cannot copy dir \"%s\" onto pre-existing non-dir \"%s\"",
+            retval = db_perror(DBSPrintf("Cannot copy dir \"%s\" onto pre-existing non-dir \"%s\"",
                 srcObjAbsName, dstObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
-#if 0
-        /* get the contents of this dir in two lists; all the dirs, everything else */
-        DBLs(srcFile, DBSPrintf("-d %s", srcObjAbsName), 0, &dirItemCount); /* just count it first */
-        dirItems = ALLOC_N(char*, ++dirItemCount);
-        DBLs(srcFile, DBSPrintf("-d %s", srcObjAbsName), dirItems, &dirItemCount);
-
-        DBLs(srcFile, DBSPrintf("-a -d %s", srcObjAbsName), 0, &otherItemCount); /* just count it first */
-        otherItems = ALLOC_N(char*, ++otherItemCount);
-        DBLs(srcFile, DBSPrintf("-a -d %s", srcObjAbsName), otherItems, &otherItemCount);
-#endif
         /* get the contents of this dir */
         DBSetDir(srcFile, srcObjAbsName);
         DBLs(srcFile, "-a -x", 0, &dirItemCount); /* just count it first */
@@ -6696,15 +6687,17 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         else if (dstType == DB_DIR)
         {
             char *srcDirBaseName = db_basename(srcObjAbsName);
-            DBMkDir(dstFile, srcDirBaseName);
+            DBObjectType ot = DBInqVarType(dstFile, srcDirBaseName);
+            if (ot == DB_INVALID_OBJECT)
+                DBMkDir(dstFile, srcDirBaseName);
             DBSetDir(dstFile, srcDirBaseName);
             free(srcDirBaseName);
         }
 
         if (n_src_dir_triple)
-            DBCp(opts, srcFile, dstFile, dirItemCount, dirItems, ".");
+            retval = DBCp(opts, srcFile, dstFile, dirItemCount, dirItems, ".");
         else
-            DBCp(DBSPrintf("%s -4", opts), srcFile, dstFile, dirItemCount, dirItems, ".");
+            retval = DBCp(DBSPrintf("%s -4", opts), srcFile, dstFile, dirItemCount, dirItems, ".");
 
         DBSetDir(srcFile, "..");
         DBSetDir(dstFile, "..");
@@ -6726,7 +6719,7 @@ endLoop:
     DBSetDir(srcFile, srcStartCwg);
     DBSetDir(dstFile, dstStartCwg);
 
-    return 0;
+    return retval;
 }
 
 #if 1
