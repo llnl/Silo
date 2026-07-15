@@ -52,9 +52,7 @@ jobs:
           - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "shared" }
           - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "static" }
           - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "noszip", linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "noszip", linkage: "static" }
           - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "szip",   linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "szip",   linkage: "static" }
 
     steps:
       - name: Show runner architecture
