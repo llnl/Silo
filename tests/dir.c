@@ -237,6 +237,15 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
             return 1;
         }
+        fsrc = DBOpen("multi_ucd3d.h5", DB_HDF5, DB_APPEND);
+        result = DBCp("-rs", fsrc, fsrc, "/block5", "block5_copy", DB_EOA);
+        DBClose(fsrc);
+        if (result != 0)
+        {
+            fprintf(stderr, "Copying via symlinks failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
+            return 1;
+        }
     }
     else
     {
