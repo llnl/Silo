@@ -356,14 +356,14 @@ However, a file's settings can be adjusted independently from the library's glob
 
   0 on success and -1 on failure.
 
-* **Description:**
-
 * **Example:**
 
   ```
   int maj;
   DBDriverVersion(DB_PDBP, &maj, 0, 0); /* obtain PDB library version for PDB Proper driver */
   ```
+
+* **Description:**
 
   For the PDB driver, the PDB library has only a single version number, `PDB_SYSTEM_VERSION`.
   That value is returned in `*maj` if `maj` is non-NULL and the other arguments are never touched.
