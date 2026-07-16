@@ -2,14 +2,27 @@ name: Release CI Windows Testing Matrix
 
 on:
   workflow_dispatch:
+    inputs: 
+      hdf5_assets_repo:
+        description: "Repo containing HDF5 release assets for Silo testing"
+        required: true
+        default: "markcmiller86/silo-testing-matrix" 
+      hdf5_assets_tag:
+        description: "Release tag containing HDF5 tarballs"
+        required: true
+        default: "silo-3.5-ubuntu-24.04-ci-matrix-2"
   pull_request:
+
+env:
+  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'markcmiller86/silo-testing-matrix' }}
+  HDF5_ASSETS_TAG: ${{ inputs.hdf5_assets_tag || 'silo-3.5-ubuntu-24.04-ci-matrix-2' }}
 
 permissions:
   contents: read
 
 jobs:
   test-silo-windows:
-    name: windows-vs2022-hdf5-${{ matrix.hdf5 }}-${{ matrix.linkage }}
+    name: windows-vs2022-hdf5-${{ matrix.hdf5 }}
 
     runs-on: windows-2022
 
@@ -19,27 +32,20 @@ jobs:
 
       matrix:
         include:
-          - hdf5: "1.14.4-3"
-            linkage: shared
-            hdf5_asset: "hdf5-1.14.4-3-win-vs2022_intel.zip"
-            hdf5_url: "https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.4.3/hdf5-1.14.4-3-win-vs2022_intel.zip"
+          - hdf5: "1.8.23"
+            hdf5_asset: "hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_sha256: "f410d1a48524811c07ec1989b2450d5b19fb698d2f994a34459c3142da7dd025"
 
           - hdf5: "1.14.4-3"
-            linkage: static
-            hdf5_asset: "hdf5-1.14.4-3-win-vs2022_intel.zip"
-            hdf5_url: "https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.4.3/hdf5-1.14.4-3-win-vs2022_intel.zip"
+            hdf5_asset: "hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_sha256: "3ba1507bf8f546cfc45e11a0594c5eaea3476895fe8f8b5125491dcffc179bde"
 
           - hdf5: "2.1.1"
-            linkage: shared
-            hdf5_asset: "hdf5-2.1.1-win-vs2022_intel.zip"
-            hdf5_url: "https://github.com/HDFGroup/hdf5/releases/download/2.1.1/hdf5-2.1.1-win-vs2022_intel.zip"
-            hdf5_sha256: "08d79ec9a7450f820ba0679c43476a0e45a8a7b41457095042884961277caa90"
-
-          - hdf5: "2.1.1"
-            linkage: static
-            hdf5_asset: "hdf5-2.1.1-win-vs2022_intel.zip"
-            hdf5_url: "https://github.com/HDFGroup/hdf5/releases/download/2.1.1/hdf5-2.1.1-win-vs2022_intel.zip"
-            hdf5_sha256: "08d79ec9a7450f820ba0679c43476a0e45a8a7b41457095042884961277caa90"
+            hdf5_asset: "hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_sha256: "5dbcb869940cbd7aa921ff49965b00e3ded01ebc5642d6bbd4e33a52264fc100"
 
     steps:
       - name: Checkout Silo
@@ -469,12 +475,6 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          $shared = "${{ matrix.linkage }}" -eq "shared"
-          $static = -not $shared
-
-          $sharedValue = $shared.ToString().ToUpperInvariant()
-          $staticValue = $static.ToString().ToUpperInvariant()
-
           $installPrefix = Join-Path `
             $env:RUNNER_TEMP `
             "silo-install"
@@ -495,9 +495,9 @@ jobs:
             "-DHDF5_ROOT:PATH=$env:HDF5_ROOT",
             "-DHDF5_DIR:PATH=$env:HDF5_DIR",
             "-DCMAKE_PREFIX_PATH:PATH=$env:HDF5_ROOT",
-            "-DHDF5_USE_STATIC_LIBRARIES:BOOL=$staticValue",
+            "-DHDF5_USE_STATIC_LIBRARIES:BOOL=OFF",
 
-            "-DSILO_ENABLE_SHARED:BOOL=$sharedValue",
+            "-DSILO_ENABLE_SHARED:BOOL=ON",
 
             # Visual Studio does not provide a Fortran compiler. The Intel
             # HDF5 package may contain Fortran libraries, but this initial
