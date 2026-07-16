@@ -34,17 +34,17 @@ jobs:
         include:
           - hdf5: "1.8.23"
             hdf5_asset: "hdf5-1.8.23-Std-win10_64-vs17.zip"
-            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.8.23-Std-win10_64-vs17.zip"
             hdf5_sha256: "f410d1a48524811c07ec1989b2450d5b19fb698d2f994a34459c3142da7dd025"
 
           - hdf5: "1.14.4-3"
             hdf5_asset: "hdf5-1.14.4-3-win-vs2022_cl.zip"
-            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.14.4-3-win-vs2022_cl.zip"
             hdf5_sha256: "3ba1507bf8f546cfc45e11a0594c5eaea3476895fe8f8b5125491dcffc179bde"
 
           - hdf5: "2.1.1"
             hdf5_asset: "hdf5-2.1.1-win-vs2022_cl.zip"
-            hdf5_url: "https://github.com/${{ env.HDF5_ASSETS_REPO }}/releases/download/${{ env.HDF5_ASSETS_TAG }}/hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-2.1.1-win-vs2022_cl.zip"
             hdf5_sha256: "5dbcb869940cbd7aa921ff49965b00e3ded01ebc5642d6bbd4e33a52264fc100"
 
     steps:
