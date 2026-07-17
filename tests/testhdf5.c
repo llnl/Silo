@@ -52,7 +52,6 @@ product endorsement purposes.
 #include <hdf5.h>
 
 #include <errno.h>
-#include <libgen.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -781,7 +780,7 @@ int main(int argc, char **argv)
     printf("Creates a 1, 2, or 3 level dir hierarchy with datasets at the bottom\n");
     printf("Command-line...\n    ");
     for (i=0; i<argc; i++)
-        printf("%s ", i==0?basename(argv[i]):argv[i]);
+        printf("%s ", argv[i]);
     printf("\nTest parameters...\n");
     H5get_libversion(&h5majno, &h5minno, &h5patno);
     printf("    HDF5 Library version = %u.%u.%u\n", h5majno, h5minno, h5patno);
