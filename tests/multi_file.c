@@ -128,7 +128,7 @@ void build_block_ucd3d(char *, int, char *, int, int, int);
 static void mymkdir(char const *dir)
 {
     int st;
-#if !defined(_WIN32)
+#ifndef _WIN32
     st = mkdir(dir,S_IRWXU|S_IRWXG|S_IRWXU);
 #else
     st = _mkdir(dir);
@@ -161,7 +161,7 @@ main(int argc, char *argv[])
     char          *file_ext="pdb";
     int            driver=DB_PDB;
     int            show_all_errors = 0;
-#if !defined(_WIN32)
+#ifndef _WIN32
     int            windows_style_slash = 0;
 #else
     int            windows_style_slash = 1;

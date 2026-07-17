@@ -108,7 +108,9 @@ running into problems with this test, you can always re-configure to
 #include <string.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TIME_H
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 #endif
 #include <sys/types.h>
 #ifdef HAVE_UNISTD_H
@@ -204,9 +206,13 @@ static void free_strings(char **strs)
 
 static double wall_clock_time()
 {
+#indef _WIN32
     struct timeval tv;
     gettimeofday(&tv, 0);
     return (double) tv.tv_sec + (double) tv.tv_usec / 1e+6;
+#else
+    return 0;
+#endif
 }
 
 static int target_platform_n(int i) {return 1;};

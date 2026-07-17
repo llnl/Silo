@@ -57,7 +57,9 @@ product endorsement purposes.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 #include <unistd.h>
 
 /* useful macro for comparing HDF5 versions */
@@ -135,14 +137,18 @@ double GetTime()
 
     if (t0<0)
     {
+#ifndef _WIN32
         struct timeval tv0;
         gettimeofday(&tv0, 0);
         t0 = (double)tv0.tv_sec*1e+6+(double)tv0.tv_usec;
+#endif
         return 0;
     }
 
+#ifndef _WIN32
     gettimeofday(&tv1, 0);
     t1 = (double)tv1.tv_sec*1e+6+(double)tv1.tv_usec;
+#endif
 
     return (t1-t0)/1e+6;
 }

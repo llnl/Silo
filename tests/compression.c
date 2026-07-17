@@ -59,7 +59,7 @@ be used for advertising or product endorsement purposes.
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if !defined(_WIN32)
+#ifndef _WIN32
 #include <sys/time.h>
 #include <unistd.h>
 #else
@@ -109,7 +109,7 @@ main(int argc, char *argv[])
     char          *ptr;
     char           tmpname[64];
     DBfile        *dbfile;
-#if !defined(_WIN32)
+#ifndef _WIN32
     struct         timeval tim;
     double         t1, t2;
 #endif
@@ -204,7 +204,7 @@ main(int argc, char *argv[])
          printf("Creating file: `%s'\n", filename);
       dbfile = DBCreate(filename, 0, DB_LOCAL, "Compression Test", driver);
 
-#if !defined(_WIN32)
+#ifndef _WIN32
       gettimeofday(&tim, NULL);
       t1=tim.tv_sec+(tim.tv_usec/1000000.0);
 #endif
@@ -273,7 +273,7 @@ main(int argc, char *argv[])
             }
          }
       }
-#if !defined(_WIN32)
+#ifndef _WIN32
       gettimeofday(&tim, NULL);
       t2=tim.tv_sec+(tim.tv_usec/1000000.0);
       stat(filename, &buffer);
@@ -313,7 +313,7 @@ main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
     }
 
-#if !defined(_WIN32)
+#ifndef _WIN32
     gettimeofday(&tim, NULL);
     t1=tim.tv_sec+(tim.tv_usec/1000000.0);
 #endif
@@ -397,7 +397,7 @@ main(int argc, char *argv[])
           }
        }
     }
-#if !defined(_WIN32)
+#ifndef _WIN32 
     gettimeofday(&tim, NULL);
     t2=tim.tv_sec+(tim.tv_usec/1000000.0);
     printf("Read took %.6lf seconds and %.6g bytes/second\n", 

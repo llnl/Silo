@@ -143,7 +143,7 @@ main(int argc, char *argv[])
     char          *file_ext="pdb";
     int            driver=DB_PDB;
     int            show_all_errors = 0;
-#if !defined(_WIN32)
+#ifndef _WIN32
     int            windows_style_slash = 0;
 #else
     int            windows_style_slash = 1;
@@ -851,7 +851,7 @@ build_block_ucd3d(char *basename, int driver, char *file_ext,
         unlink("multi_file.dir/007/ucd3d7.h5");
         rmdir("multi_file.dir/007");
         rmdir("multi_file.dir");
-#if !defined(_WIN32)
+#ifndef _WIN32
         st = mkdir("multi_file.dir",S_IRWXU|S_IRWXG|S_IRWXU);
 #else
         st = _mkdir("multi_file.dir");
@@ -916,7 +916,7 @@ build_block_ucd3d(char *basename, int driver, char *file_ext,
                 int st;
                 char dname[60];
                 sprintf(dname, "multi_file.dir/%03d", filenum);
-#if !defined(_WIN32)
+#ifndef _WIN32
                 st = mkdir(dname, S_IRWXU|S_IRWXG|S_IRWXU);
 #else
                 st = _mkdir(dname);

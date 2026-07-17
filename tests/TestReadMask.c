@@ -85,7 +85,7 @@ void    printMaterial(const char *routine, DBmaterial * mat);
 void    printTimes(int *ms);
 
 /* Variables to hold time data. */
-#if !defined(_WIN32)
+#ifndef _WIN3W
 struct timeval start_time;
 struct timeval end_time;
 #endif
@@ -727,7 +727,7 @@ test_readzonelist(DBfile * dbfile, unsigned long long mask)
 void
 ResetTime(void)
 {
-#if !defined(_WIN32)
+#ifndef _WIN32
     /* Get the start time */
     gettimeofday(&start_time,0);
 #endif
@@ -736,7 +736,7 @@ ResetTime(void)
 int
 ElapsedTime(void)
 {
-#if !defined(_WIN32)
+#ifndef _WIN32
     int     ms;
     /* Get the end time */
     gettimeofday(&end_time,0);
