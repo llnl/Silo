@@ -36,16 +36,20 @@ jobs:
             hdf5_asset: "hdf5-1.8.23-Std-win10_64-vs17.zip"
             hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.8.23-Std-win10_64-vs17.zip"
             hdf5_sha256: "f410d1a48524811c07ec1989b2450d5b19fb698d2f994a34459c3142da7dd025"
+            package_type: "msi"
+            install_subdir: 'HDF_Group\HDF5\1.8.23'
 
           - hdf5: "1.14.4-3"
             hdf5_asset: "hdf5-1.14.4-3-win-vs2022_cl.zip"
             hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.14.4-3-win-vs2022_cl.zip"
             hdf5_sha256: "3ba1507bf8f546cfc45e11a0594c5eaea3476895fe8f8b5125491dcffc179bde"
+            package_type: "nested_zip"
 
           - hdf5: "2.1.1"
             hdf5_asset: "hdf5-2.1.1-win-vs2022_cl.zip"
             hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-2.1.1-win-vs2022_cl.zip"
             hdf5_sha256: "5dbcb869940cbd7aa921ff49965b00e3ded01ebc5642d6bbd4e33a52264fc100"
+            package_type: "nested_zip"
 
     steps:
       - name: Checkout Silo
@@ -202,273 +206,106 @@ jobs:
             -Path $extractDir |
             Format-Table Name, Length, Mode
 
-      - name: Install HDF5 package if necessary
+      - name: Prepare HDF5
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Some HDF Group ZIP distributions contain a ready-to-use
-          # installation tree. Others contain an MSI installer. First see
-          # whether the extracted package already contains HDF5Config.cmake.
+          $outerDir = $env:HDF5_EXTRACT_DIR
+          $packageType = "${{ matrix.package_type }}"
 
-          $existingConfig = Get-ChildItem `
-            -Path $env:HDF5_EXTRACT_DIR `
-            -Recurse `
-            -Filter HDF5Config.cmake `
-            -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-
-          if ($existingConfig) {
-            Write-Host "Extracted package contains HDF5Config.cmake:"
-            Write-Host $existingConfig.FullName
-            exit 0
-          }
-
-          $msi = Get-ChildItem `
-            -Path $env:HDF5_EXTRACT_DIR `
-            -Recurse `
-            -Filter *.msi `
-            -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-
-          if (-not $msi) {
-            Write-Host "Extracted package contents:"
-
-            Get-ChildItem `
-              -Path $env:HDF5_EXTRACT_DIR `
-              -Recurse |
-              Select-Object FullName
-
-            throw (
-              "The HDF5 ZIP contains neither HDF5Config.cmake " +
-              "nor an MSI installer."
-            )
-          }
-
-          Write-Host "Installing HDF5 MSI:"
-          Write-Host $msi.FullName
-
-          $msiLog = Join-Path `
-            $env:RUNNER_TEMP `
-            "hdf5-msi-install.log"
-
-          $arguments = @(
-            "/i",
-            "`"$($msi.FullName)`"",
-            "/qn",
-            "/norestart",
-            "/L*v",
-            "`"$msiLog`""
-          )
-
-          $process = Start-Process `
-            -FilePath msiexec.exe `
-            -ArgumentList $arguments `
-            -Wait `
-            -PassThru
-
-          if ($process.ExitCode -ne 0) {
-            if (Test-Path $msiLog) {
-              Write-Host "MSI installation log:"
-              Get-Content $msiLog
-            }
-
-            throw (
-              "HDF5 MSI installation failed with exit code " +
-              "$($process.ExitCode)."
-            )
-          }
-
-          Write-Host "HDF5 MSI installation completed."
-
-      - name: Locate HDF5 installation
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $searchRoots = @(
-            $env:HDF5_EXTRACT_DIR,
-            "${env:ProgramFiles}\HDF_Group",
-            "${env:ProgramFiles(x86)}\HDF_Group",
-            "${env:SystemDrive}\HDF_Group"
-          )
-
-          $configs = @()
-
-          foreach ($root in $searchRoots) {
-            if (-not $root) {
-              continue
-            }
-
-            if (-not (Test-Path $root)) {
-              continue
-            }
-
-            Write-Host "Searching $root"
-
-            $found = Get-ChildItem `
-              -Path $root `
+          if ($packageType -eq "msi") {
+            $msi = Get-ChildItem `
+              -Path $outerDir `
               -Recurse `
-              -Filter HDF5Config.cmake `
-              -ErrorAction SilentlyContinue
-
-            if ($found) {
-              $configs += $found
-            }
-          }
-
-          if ($configs.Count -eq 0) {
-            Write-Host "Could not locate HDF5Config.cmake."
-
-            Write-Host
-            Write-Host "Extracted package contents:"
-
-            Get-ChildItem `
-              -Path $env:HDF5_EXTRACT_DIR `
-              -Recurse `
-              -ErrorAction SilentlyContinue |
-              Select-Object FullName
-
-            Write-Host
-            Write-Host "HDF_Group installation contents:"
-
-            foreach ($root in @(
-              "${env:ProgramFiles}\HDF_Group",
-              "${env:ProgramFiles(x86)}\HDF_Group"
-            )) {
-              if (Test-Path $root) {
-                Get-ChildItem `
-                  -Path $root `
-                  -Recurse `
-                  -ErrorAction SilentlyContinue |
-                  Select-Object FullName
-              }
-            }
-
-            throw "HDF5Config.cmake was not found."
-          }
-
-          Write-Host
-          Write-Host "HDF5 CMake configurations found:"
-
-          $configs |
-            ForEach-Object {
-              Write-Host $_.FullName
-            }
-
-          # Prefer a config whose path contains the requested HDF5 version.
-          $config = $configs |
-            Where-Object {
-              $_.FullName -like "*${{ matrix.hdf5 }}*"
-            } |
-            Select-Object -First 1
-
-          if (-not $config) {
-            $config = $configs |
+              -Filter *.msi |
               Select-Object -First 1
-          }
 
-          $hdf5CmakeDir = $config.Directory.FullName
-
-          # Walk upward until a conventional installation prefix containing
-          # both include and lib directories is found.
-          $cursor = $config.Directory
-          $hdf5Root = $null
-
-          while ($cursor) {
-            $includeDir = Join-Path `
-              $cursor.FullName `
-              "include"
-
-            $libDir = Join-Path `
-              $cursor.FullName `
-              "lib"
-
-            if (
-              (Test-Path $includeDir) -and
-              (Test-Path $libDir)
-            ) {
-              $hdf5Root = $cursor.FullName
-              break
+            if (-not $msi) {
+              throw "No MSI found in HDF5 package."
             }
 
-            $cursor = $cursor.Parent
+            $process = Start-Process `
+              -FilePath msiexec.exe `
+              -ArgumentList @(
+                "/i",
+                "`"$($msi.FullName)`"",
+                "/qn",
+                "/norestart"
+              ) `
+              -Wait `
+              -PassThru
+
+            if ($process.ExitCode -ne 0) {
+              throw "HDF5 MSI install failed with exit code $($process.ExitCode)."
+            }
+
+            $hdf5Root = Join-Path `
+              $env:ProgramW6432 `
+              '${{ matrix.install_subdir }}'
+          }
+          elseif ($packageType -eq "nested_zip") {
+            $innerZip = Get-ChildItem `
+              -Path $outerDir `
+              -Recurse `
+              -Filter *.zip |
+              Select-Object -First 1
+
+            if (-not $innerZip) {
+              throw "No inner ZIP found in HDF5 package."
+            }
+
+            $portableDir = Join-Path `
+              $env:RUNNER_TEMP `
+              "hdf5-portable-${{ matrix.hdf5 }}"
+
+            Expand-Archive `
+              -Path $innerZip.FullName `
+              -DestinationPath $portableDir `
+              -Force
+
+            # Find the actual prefix by locating include/hdf5.h.
+            $header = Get-ChildItem `
+              -Path $portableDir `
+              -Recurse `
+              -Filter hdf5.h |
+              Select-Object -First 1
+
+            if (-not $header) {
+              throw "Could not locate hdf5.h in nested ZIP."
+            }
+
+            $cursor = $header.Directory
+            $hdf5Root = $null
+
+            while ($cursor) {
+              if (
+                (Test-Path (Join-Path $cursor.FullName "include")) -and
+                (Test-Path (Join-Path $cursor.FullName "lib"))
+              ) {
+                $hdf5Root = $cursor.FullName
+                break
+              }
+
+              $cursor = $cursor.Parent
+            }
+
+            if (-not $hdf5Root) {
+              throw "Could not infer HDF5 root from nested ZIP."
+            }
+          }
+          else {
+            throw "Unknown package_type: $packageType"
           }
 
-          if (-not $hdf5Root) {
-            throw (
-              "Found HDF5Config.cmake at " +
-              "$($config.FullName), but could not infer the " +
-              "HDF5 installation prefix."
-            )
+          if (-not (Test-Path $hdf5Root)) {
+            throw "HDF5 root does not exist: $hdf5Root"
           }
 
-          $hdf5Bin = Join-Path `
-            $hdf5Root `
-            "bin"
-
-          $hdf5Lib = Join-Path `
-            $hdf5Root `
-            "lib"
+          Write-Host "HDF5 root: $hdf5Root"
 
           "HDF5_ROOT=$hdf5Root" |
-            Out-File `
-              -FilePath $env:GITHUB_ENV `
-              -Encoding utf8 `
-              -Append
-
-          "HDF5_DIR=$hdf5CmakeDir" |
-            Out-File `
-              -FilePath $env:GITHUB_ENV `
-              -Encoding utf8 `
-              -Append
-
-          "HDF5_BIN=$hdf5Bin" |
-            Out-File `
-              -FilePath $env:GITHUB_ENV `
-              -Encoding utf8 `
-              -Append
-
-          "HDF5_LIB=$hdf5Lib" |
-            Out-File `
-              -FilePath $env:GITHUB_ENV `
-              -Encoding utf8 `
-              -Append
-
-          Write-Host
-          Write-Host "Selected HDF5 installation:"
-          Write-Host "  root:      $hdf5Root"
-          Write-Host "  cmake dir: $hdf5CmakeDir"
-          Write-Host "  bin:       $hdf5Bin"
-          Write-Host "  lib:       $hdf5Lib"
-
-          Write-Host
-          Write-Host "HDF5 include files:"
-
-          Get-ChildItem `
-            -Path (Join-Path $hdf5Root "include") `
-            -ErrorAction SilentlyContinue |
-            Select-Object Name
-
-          Write-Host
-          Write-Host "HDF5 libraries:"
-
-          Get-ChildItem `
-            -Path $hdf5Lib `
-            -Recurse `
-            -Include *.lib `
-            -ErrorAction SilentlyContinue |
-            Select-Object FullName
-
-          Write-Host
-          Write-Host "HDF5 DLLs:"
-
-          Get-ChildItem `
-            -Path $hdf5Bin `
-            -Recurse `
-            -Include *.dll `
-            -ErrorAction SilentlyContinue |
-            Select-Object FullName
+            Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Configure Silo
         shell: pwsh
