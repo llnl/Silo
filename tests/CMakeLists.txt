@@ -349,7 +349,7 @@ if(NOT SILO_ENABLE_JSON)
 endif()
 
 
-if(SILO_ENABLE_SHARED)
+if(SILO_ENABLE_SHARED AND NOT WIN32)
     add_library(rocket_silo MODULE rocket_silo.cxx)
     add_dependencies(rocket_silo silo)
     target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
@@ -490,7 +490,7 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 endforeach()
 
-if(SILO_ENABLE_SHARED)
+if(SILO_ENABLE_SHARED AND NOT WIN32)
     add_dependencies(rocket rocket_silo)
     set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
 endif()
