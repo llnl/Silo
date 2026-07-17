@@ -142,21 +142,21 @@ if(WIN32)
          $<TARGET_FILE:silo> ${silo_test_output_dir})
 
     # zlib
-    if(ZLIB_FOUND AND DEFINED ZLIB_DLL)
+    if(ZLIB_FOUND AND ZLIB_DLL)
         add_custom_command(TARGET copy_test_deps POST_BUILD
              COMMAND ${CMAKE_COMMAND} -E copy_if_different
              ${ZLIB_DLL} ${silo_test_output_dir})
     endif()
 
     # szip
-    if(SZIP_FOUND AND DEFINED SZIP_DLL)
+    if(SZIP_FOUND AND SZIP_DLL)
         add_custom_command(TARGET copy_test_deps POST_BUILD
              COMMAND ${CMAKE_COMMAND} -E copy_if_different
              ${SZIP_DLL} ${silo_test_output_dir})
     endif()
 
     # hdf5
-    if(HDF5_FOUND AND DEFINED HDF5_DLL)
+    if(HDF5_FOUND AND HDF5_DLL)
             add_custom_command(TARGET copy_test_deps POST_BUILD
                  COMMAND ${CMAKE_COMMAND} -E copy_if_different
                  ${HDF5_DLL} ${silo_test_output_dir})
