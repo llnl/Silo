@@ -920,6 +920,11 @@ main(int argc, char *argv[])
     DBSetFriendlyHDF5Names(hdfriendly);
     if (emptymb > 0) DBSetAllowEmptyObjects(1);
 
+#ifdef _WIN32
+    if (testflushread)
+        return skip_retval;
+#endif
+
     /*
      * Create the multi-block rectilinear 2d mesh.
      *
@@ -953,14 +958,23 @@ main(int argc, char *argv[])
                if (testflush)
                {
                    int qq;
+                   char *tfr = "testflushread";
                    char **newargv = (char **) calloc(argc+2,sizeof(char*));
                    for (qq = 0; qq < argc; qq++)
                        newargv[qq] = argv[qq];
-                   newargv[qq++] = strdup("testflushread");
+                   newargv[qq++] = tfr;
+                   newargv[qq++] = NULL;
+
                    DBFlush(dbfile);
-#ifdef HAVE_UNISTD_H
+
+#ifdef _WIN32
+                   _spawnv(_P_OVERLAY, argv[0], (char const * const *) newargv);
+#elif HAVE_UNISTD_H
                    execv(argv[0], newargv);
+#else
+                   exit(skip_retval);
 #endif
+
                }
                else
                {

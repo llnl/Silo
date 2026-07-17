@@ -150,7 +150,15 @@ running into problems with this test, you can always re-configure to
 #define STDOUT stdout
 #define CSTRSAVE(A) SC_strsavef(A,foo_str())
 #define CFREE SFREE
+#ifndef _WIN32
 #define REMOVE unlink
+#define CHDIR  chdir
+#define RMDIR  rmdir
+#else
+#define REMOVE _unlink
+#define CHDIR  _chdir
+#define RMDIR  _rmdir
+#endif
 #define POW pow
 #ifdef PRINT
 #undef PRINT
@@ -206,7 +214,7 @@ static void free_strings(char **strs)
 
 static double wall_clock_time()
 {
-#indef _WIN32
+#ifndef _WIN32
     struct timeval tv;
     gettimeofday(&tv, 0);
     return (double) tv.tv_sec + (double) tv.tv_usec / 1e+6;

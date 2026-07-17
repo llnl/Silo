@@ -307,8 +307,11 @@ set(SKIP_TEST_SOURCES
     std.c
     testlib.c
 )
+if(WIN32)
+    list(APPEND SKIP_TEST_SOURCES locking.c)
+endif()
 
-if(NOT SILO_ENABLE_SHARED)
+if(NOT SILO_ENABLE_SHARED OR WIN32)
     list(APPEND SKIP_TEST_SOURCES rocket.cxx)
 endif()
 
