@@ -499,8 +499,8 @@ jobs:
           name: windows-hdf5-${{ matrix.hdf5 }}-${{ matrix.linkage }}-diagnostics
           if-no-files-found: ignore
           path: |
+            cmake-trace.txt
             build/CMakeCache.txt
-            build/cmake-trace.txt
             build/CMakeFiles/CMakeConfigureLog.yaml
             build/CMakeFiles/CMakeError.log
             build/CMakeFiles/CMakeOutput.log
