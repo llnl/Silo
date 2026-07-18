@@ -100,6 +100,9 @@ if(HDF5_FOUND)
     # On Windows need to have hdf5's dll installed with browser/silex
     # in order for the executables to work
     if(WIN32)
+
+        get_target_property(HDF5_DLL ${HDF5_C_LIBRARIES} IMPORTED_LOCATION_RELEASE)
+
         # DLL may also be needed by testing infrastructure
         get_target_property(HDF5_DLL ${HDF5_C_LIBRARIES} IMPORTED_LOCATION_RELEASE )
         if(HDF5_DLL AND SILO_ENABLE_SILEX OR SILO_ENABLE_BROWSER)
