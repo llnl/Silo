@@ -105,6 +105,7 @@ running into problems with this test, you can always re-configure to
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TIME_H

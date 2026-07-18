@@ -133,7 +133,9 @@ double GetTime()
 {
     static double t0 = -1;
     double t1;
+#ifndef _WIN32
     struct timeval tv1;
+#endif
 
     if (t0<0)
     {
