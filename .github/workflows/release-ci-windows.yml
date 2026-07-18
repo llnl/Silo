@@ -319,6 +319,8 @@ jobs:
           $cmakeArgs = @(
             "-S", ".",
             "-B", "build",
+            "--trace-expand",
+            "--trace-redirect=cmake-trace.txt",
             "-G", "Visual Studio 17 2022",
             "-A", "x64",
 
@@ -498,6 +500,7 @@ jobs:
           if-no-files-found: ignore
           path: |
             build/CMakeCache.txt
+            build/cmake-trace.txt
             build/CMakeFiles/CMakeConfigureLog.yaml
             build/CMakeFiles/CMakeError.log
             build/CMakeFiles/CMakeOutput.log
