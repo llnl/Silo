@@ -113,8 +113,10 @@ running into problems with this test, you can always re-configure to
 #endif
 #endif
 #include <sys/types.h>
+#ifndef _WIN32
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 
 /* Constant and macro definitions taken from PDB proper */

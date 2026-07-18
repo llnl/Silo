@@ -60,7 +60,7 @@ product endorsement purposes.
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
-#include <unistd.h>
+/*#include <unistd.h>*/
 
 /* useful macro for comparing HDF5 versions */
 #define HDF5_VERSION_GE(Maj,Min,Rel)  \
@@ -972,6 +972,7 @@ int main(int argc, char **argv)
     th5_mem_profiler_stop();
 
     /* Output some information about the performance */
+#ifndef _WIN32
     {
     double t1 = GetTime();
     struct stat sbuf;
@@ -1034,5 +1035,6 @@ int main(int argc, char **argv)
     }
     }
     }
+#endif
     return 0;
 }

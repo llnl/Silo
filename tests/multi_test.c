@@ -65,8 +65,12 @@ product endorsement purposes.
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#else
+#include <process.h>
 #endif
 
 #include "silo.h"

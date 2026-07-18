@@ -55,7 +55,13 @@ product endorsement purposes.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef _WIN32
+#define close _close
+#define write _write
+#define read _read
+#else
 #include <unistd.h>
+#endif
 
 #include <silo.h>
 #include <std.c>
