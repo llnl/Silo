@@ -59,8 +59,11 @@ product endorsement purposes.
 #include <sys/stat.h>
 #ifndef _WIN32
 #include <sys/time.h>
+#include <unistd.h>
+#else
+#define random rand
+#define srandom srand
 #endif
-/*#include <unistd.h>*/
 
 /* useful macro for comparing HDF5 versions */
 #define HDF5_VERSION_GE(Maj,Min,Rel)  \
