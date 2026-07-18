@@ -312,7 +312,7 @@ if(WIN32)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx)
+    list(APPEND SKIP_TEST_SOURCES rocket.cxx pdbtst.c)
 endif()
 
 #
