@@ -57,6 +57,15 @@ be used for advertising or product endorsement purposes.
 #include "silo.h"
 #include <std.c>
 
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#else
+#include <unistd.h>
+#endif
+
+static char cwd[4096];
+
 static int VersionNumberGE(int aMaj, int aMin, int aPat,
                            int bMaj, int bMin, int bPat)
 {
@@ -161,6 +170,12 @@ main(int argc, char *argv[])
     printf("    DBFileVersionGE(4,6,0) returns %d\n", DBFileVersionGE(dbfile,4,6,0));
     printf("    DBFileVersionGE(90,5,2) returns %d\n", DBFileVersionGE(dbfile,90,5,2));
     DBClose(dbfile);
+
+
+if (getcwd(cwd, sizeof(cwd)))
+    printf("dbversion cwd = \"%s\"\n", cwd);
+else
+    perror("getcwd");
 
     /* The second open attempt is to allow this test to run correctly
        under autotest. Autotest runs its tests two levels down. */
