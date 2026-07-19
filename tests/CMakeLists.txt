@@ -52,6 +52,7 @@
 #
 ##############################################################################
 
+##############################################################################
 #
 # The CMake/CTest logic here is pretty ugly due to lack of familiarity with
 # CMake/CTest prior to implementing this. Cleanup and re-organization is
@@ -107,7 +108,15 @@
 # ctest --build memcheck-build -T memcheck --output-on-failure -I 122,122
 # vi Testing/Temporary/MemoryChecker.122.log 
 # cat Testing/Temporary/MemoryChecker.*
-#
+##############################################################################
+
+
+##############################################################################
+# In GitHub CI actions for windows, the dir from which the tests are actually
+# run is D:/a/Silo/Silo/build/tests and each of the tests are compiled and
+# built into D:/a/Silo/Silo/build/tests/bin/Release. The data file copies go
+# into D:/a/Silo/Silo/build/all_tests
+##############################################################################
 
 set(CMAKE_BUILD_RPATH "@loader_path/../../lib")
 
