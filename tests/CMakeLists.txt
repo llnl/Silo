@@ -693,23 +693,25 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
     set_tests_properties(partial-io-ucd3d PROPERTIES DEPENDS "partial-io-setup" RESOURCE_LOCK "partial.h5;ucd3d.h5")
 endif()
 
-add_custom_target(testdtypes ALL)
-add_custom_command(TARGET testdtypes POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_CURRENT_SOURCE_DIR}/testdtypes
-    ${silo_test_output_dir})
-add_test(NAME testdtypes
-    COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
-    "${silo_test_output_dir}/testdtypes")
-set_tests_properties(testdtypes PROPERTIES DEPENDS specmix)
-if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    add_test(NAME testdtypes-hdf5
+if(NOT WIN32)
+    add_custom_target(testdtypes ALL)
+    add_custom_command(TARGET testdtypes POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/testdtypes
+        ${silo_test_output_dir})
+    add_test(NAME testdtypes
         COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
-        "${silo_test_output_dir}/testdtypes" DB_HDF5)
-    set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
+        "${silo_test_output_dir}/testdtypes")
+    set_tests_properties(testdtypes PROPERTIES DEPENDS specmix)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME testdtypes-hdf5
+            COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
+            "${silo_test_output_dir}/testdtypes" DB_HDF5)
+        set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
+    endif()
 endif()
 
-if(SILO_ENABLE_SILOCK)
+if(SILO_ENABLE_SILOCK AND NOT WIN32)
     add_custom_target(testsilock ALL)
     add_custom_command(TARGET testsilock POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
