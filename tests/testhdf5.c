@@ -134,13 +134,13 @@ static void th5_mem_profiler_stop() {}
 /* returns time in seconds */
 double GetTime()
 {
-    static double t0 = -1;
-    double t1;
+    static double t0 = 0;
+    double t1 = 0;;
 #ifndef _WIN32
     struct timeval tv1;
 #endif
 
-    if (t0<0)
+    if (t0<=0)
     {
 #ifndef _WIN32
         struct timeval tv0;
