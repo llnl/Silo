@@ -170,6 +170,8 @@ main(int argc, char *argv[])
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
+        dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
+    if (dbfile == 0)
         dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
         dbfile = DBOpen("D:/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
@@ -217,6 +219,8 @@ main(int argc, char *argv[])
                 dbfile = DBOpen("../../pion0244.silo", DB_UNKNOWN, DB_READ);
             if (dbfile == 0)
                 dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
+            if (dbfile == 0)
+                dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
             if (dbfile == 0)
                 dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
             if (dbfile == 0)
@@ -292,6 +296,8 @@ main(int argc, char *argv[])
         dbfile = DBOpen("../../pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
+    if (dbfile == 0)
+        dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
         dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
