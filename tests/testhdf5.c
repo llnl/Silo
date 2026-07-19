@@ -708,7 +708,7 @@ int main(int argc, char **argv)
     int help = 0;
     H5AC_cache_config_t *h5_mdc_config_ptr = 0;
 
-    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "nd=", 3)) {
             char *p = argv[i], *q;
