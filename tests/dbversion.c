@@ -57,13 +57,6 @@ be used for advertising or product endorsement purposes.
 #include "silo.h"
 #include <std.c>
 
-#ifdef _WIN32
-#include <direct.h>
-#define getcwd _getcwd
-#else
-#include <unistd.h>
-#endif
-
 static char cwd[4096];
 
 static int VersionNumberGE(int aMaj, int aMin, int aPat,
@@ -171,12 +164,6 @@ main(int argc, char *argv[])
     printf("    DBFileVersionGE(90,5,2) returns %d\n", DBFileVersionGE(dbfile,90,5,2));
     DBClose(dbfile);
 
-
-if (getcwd(cwd, sizeof(cwd)))
-    printf("dbversion cwd = \"%s\"\n", cwd);
-else
-    perror("getcwd");
-
     /* The second open attempt is to allow this test to run correctly
        under autotest. Autotest runs its tests two levels down. */
     dbfile = DBOpen("pion0244.silo", DB_UNKNOWN, DB_READ);
@@ -185,15 +172,7 @@ else
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
-        dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("D:/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("D:/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
+        dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile)
     {
         printf("On old silo file handle returned from DBOpen...\n");
@@ -235,15 +214,7 @@ else
             if (dbfile == 0)
                 dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
             if (dbfile == 0)
-                dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-            if (dbfile == 0)
-                dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-            if (dbfile == 0)
-                dbfile = DBOpen("D:/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-            if (dbfile == 0)
-                dbfile = DBOpen("/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-            if (dbfile == 0)
-                dbfile = DBOpen("D:/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
+                dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
         }
         else
         {
@@ -312,15 +283,7 @@ else
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
-        dbfile = DBOpen("./all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("D:/a/Silo/Silo/build/all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
-    if (dbfile == 0)
-        dbfile = DBOpen("D:/a/Silo/Silo/tests/pion0244.silo", DB_UNKNOWN, DB_READ);
+        dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
 
     if (dbfile == 0)
     {
