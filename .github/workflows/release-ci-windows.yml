@@ -6,16 +6,16 @@ on:
       hdf5_assets_repo:
         description: "Repo containing HDF5 release assets for Silo testing"
         required: true
-        default: "markcmiller86/silo-testing-matrix" 
+        default: "llnl/Silo" 
       hdf5_assets_tag:
         description: "Release tag containing HDF5 tarballs"
         required: true
-        default: "silo-3.5-ubuntu-24.04-ci-matrix-2"
+        default: "ci-release-testing-assets"
   pull_request:
 
 env:
-  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'markcmiller86/silo-testing-matrix' }}
-  HDF5_ASSETS_TAG: ${{ inputs.hdf5_assets_tag || 'silo-3.5-ubuntu-24.04-ci-matrix-2' }}
+  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'llnl/Silo' }}
+  HDF5_ASSETS_TAG: ${{ inputs.hdf5_assets_tag || 'ci-release-testing-assets' }}
 
 permissions:
   contents: read
@@ -34,20 +34,20 @@ jobs:
         include:
           - hdf5: "1.8.23"
             hdf5_asset: "hdf5-1.8.23-Std-win10_64-vs17.zip"
-            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-1.8.23-Std-win10_64-vs17.zip"
             hdf5_sha256: "f410d1a48524811c07ec1989b2450d5b19fb698d2f994a34459c3142da7dd025"
             package_type: "msi"
             install_subdir: 'HDF_Group\HDF5\1.8.23'
 
           - hdf5: "1.14.4-3"
             hdf5_asset: "hdf5-1.14.4-3-win-vs2022_cl.zip"
-            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-1.14.4-3-win-vs2022_cl.zip"
             hdf5_sha256: "3ba1507bf8f546cfc45e11a0594c5eaea3476895fe8f8b5125491dcffc179bde"
             package_type: "nested_zip"
 
           - hdf5: "2.1.1"
             hdf5_asset: "hdf5-2.1.1-win-vs2022_cl.zip"
-            hdf5_url: "https://github.com/markcmiller86/silo-testing-matrix/releases/download/silo-3.5-ubuntu-24.04-ci-matrix-2/hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-2.1.1-win-vs2022_cl.zip"
             hdf5_sha256: "5dbcb869940cbd7aa921ff49965b00e3ded01ebc5642d6bbd4e33a52264fc100"
             package_type: "nested_zip"
 
