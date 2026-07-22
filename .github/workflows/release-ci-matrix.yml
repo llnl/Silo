@@ -19,8 +19,8 @@ env:
 
 jobs:
   test-silo:
-    name: hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}
-    runs-on: ubuntu-24.04-arm
+    name: hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}
+    runs-on: ${{ matrix.runson }}
 
     strategy:
       fail-fast: false
@@ -28,31 +28,35 @@ jobs:
       matrix:
         include:
           # HDF5 1.8.23: gcc-11, noszip/szip, shared/static, serial/parallel
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "serial",   szip: "szip",   linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "noszip", linkage: "shared" }
-          - { hdf5: "1.8.23", config: "autotools", gcc: "11", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "x86_64", runson: "ubuntu-24.04", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
 
           # HDF5 1.14.4: gcc-13, noszip/szip, shared only, serial only
-          - { hdf5: "1.14.4", config: "cmake", gcc: "13", mpi: "serial", szip: "noszip", linkage: "shared" }
-          - { hdf5: "1.14.4", config: "cmake", gcc: "13", mpi: "serial", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.14.4", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial", szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.14.4", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.14.4", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "11", mpi: "serial", szip: "noszip", linkage: "shared" }
 
           # HDF5 2.1.1: gcc-13/gcc-14, noszip/szip, shared/static, serial/parallel
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "static" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "static" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "static" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "shared" }
 
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "static" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "static" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "noszip", linkage: "shared" }
-          - { hdf5: "2.1.1", config: "cmake", gcc: "14", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "parallel", szip: "szip",   linkage: "shared" }
 
     steps:
       - name: Show runner architecture
@@ -101,7 +105,11 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/hdf5-download" "$RUNNER_TEMP/hdf5-install"
 
-          asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.xz"
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+              asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.xz"
+          else
+              asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.xz"
+          fi
 
           gh release download "$HDF5_ASSETS_TAG" \
             --repo "$HDF5_ASSETS_REPO" \
@@ -190,7 +198,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-hdf5-${{ matrix.hdf5 }}-gcc${{ matrix.gcc }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}
+          name: logs-hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-gcc${{ matrix.gcc }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}
           path: |
             build/**/*.log
             build/Testing/Temporary/*
