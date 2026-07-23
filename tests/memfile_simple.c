@@ -55,8 +55,30 @@ product endorsement purposes.
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/uio.h>
+#ifdef _WIN32
+#define _db_open  _open
+#define _db_close _close
+#define _db_write _write
+#define _db_read _read
+#define _db_RDONLY _O_RDONLY
+#define _db_WRONLY _O_WRONLY
+#define _db_BINARY _O_BINARY
+#define _db_TRUNC  _O_TRUNC
+#define _db_CREAT  _O_CREAT
+#define _db_MODE  (_S_IREAD | _S_IWRITE)
+#else
 #include <unistd.h>
+#define _db_open  open
+#define _db_close close
+#define _db_write write
+#define _db_read read
+#define _db_RDONLY O_RDONLY
+#define _db_WRONLY O_WRONLY
+#define _db_TRUNC  O_TRUNC
+#define _db_CREAT  O_CREAT
+#define _db_BINARY 0
+#define _db_MODE   0666
+#endif
 
 #include <silo.h>
 #include <std.c>
@@ -106,12 +128,12 @@ ReadWholeFileToMem(char const *filename, size_t extrasize, DBmemfile_bufinfo *bi
     ASSERT(buf = malloc(statbuf.st_size+extrasize),"");
 
     /* open and read the whole file into the buffer */
-    ASSERT((fd = open(filename, O_RDONLY)) >= 0,"");
+    ASSERT((fd = _db_open(filename, _db_RDONLY | _db_BINARY)) >= 0,"");
 
     /* read the whole file contents into memory */
-    ASSERT(read(fd, buf, statbuf.st_size) == statbuf.st_size,"");
+    ASSERT(_db_read(fd, buf, statbuf.st_size) == statbuf.st_size,"");
 
-    close(fd);
+    _db_close(fd);
 
     *bi = DBAssignbufinfo(buf, statbuf.st_size + extrasize, statbuf.st_size);
 
@@ -124,11 +146,11 @@ WriteWholeFileFromMem(char const *filename, DBmemfile_bufinfo const *bi)
     int fd;
     struct stat statbuf;
 
-    ASSERT((fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY)) >= 0,"");
+    ASSERT((fd = _db_open(filename, _db_CREAT|_db_TRUNC|_db_WRONLY, _db_MODE)) >= 0,"");
 
-    ASSERT(write(fd, bi->buf, bi->used) == bi->used,"");
+    ASSERT(_db_write(fd, bi->buf, bi->used) == bi->used,"");
 
-    close(fd);
+    _db_close(fd);
 
     ASSERT(!stat(filename, &statbuf),"");
 

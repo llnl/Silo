@@ -55,7 +55,9 @@ product endorsement purposes.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 #include <unistd.h>
 
 #include <ioperf.h>
@@ -166,8 +168,10 @@ static char* GetUniqueString(const options_t *opts)
     }
 
     /* ok, try to build a random string */
+#ifndef _WIN32
     gettimeofday(&tv0, 0);
     hval = bjhash((unsigned char *) &tv0, sizeof(tv0), 0);
+#endif
 
     hid = gethostid();
     hval = bjhash((unsigned char *) &hid, sizeof(hid), hval);
@@ -196,13 +200,17 @@ static double GetTime()
     if (t0<0)
     {
         struct timeval tv0;
+#ifndef _WIN32
         gettimeofday(&tv0, 0);
         t0 = (double)tv0.tv_sec*1e+6+(double)tv0.tv_usec;
+#endif
         return 0;
     }
 
+#ifndef _WIN32
     gettimeofday(&tv1, 0);
     t1 = (double)tv1.tv_sec*1e+6+(double)tv1.tv_usec;
+#endif
 
     return t1-t0;
 }

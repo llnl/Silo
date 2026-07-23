@@ -850,6 +850,23 @@ if(BUILD_TESTING)
 
 endif()
 
+message(STATUS "HDF5_C_LIBRARIES=${HDF5_C_LIBRARIES}")
+
+if(TARGET HDF5::HDF5)
+  get_target_property(_links HDF5::HDF5 INTERFACE_LINK_LIBRARIES)
+  message(STATUS "HDF5::HDF5 INTERFACE_LINK_LIBRARIES=${_links}")
+endif()
+
+foreach(tgt HDF5::HDF5 hdf5-shared hdf5-static hdf5::hdf5 hdf5::hdf5-shared hdf5::hdf5-static)
+  if(TARGET ${tgt})
+    message(STATUS "---- ${tgt} ----")
+    foreach(prop TYPE IMPORTED_LOCATION INTERFACE_INCLUDE_DIRECTORIES INTERFACE_LINK_LIBRARIES INTERFACE_COMPILE_OPTIONS INTERFACE_COMPILE_DEFINITIONS)
+      get_target_property(val ${tgt} ${prop})
+      message(STATUS "${tgt} ${prop} = ${val}")
+    endforeach()
+  endif()
+endforeach()
+
 #
 # Define a target for testing the installation itself
 # We do this regardless of whether BUILD_TESTING is enabled because

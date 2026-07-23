@@ -53,9 +53,6 @@ product endorsement purposes.
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
 #ifdef _WIN32
   #ifndef WINDOWS_LEAN_AND_MEAN
     #define WINDOWS_LEAN_AND_MEAN

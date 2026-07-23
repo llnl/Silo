@@ -105,14 +105,19 @@ running into problems with this test, you can always re-configure to
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TIME_H
+#ifndef _WIN32
 #include <sys/time.h>
 #endif
+#endif
 #include <sys/types.h>
+#ifndef _WIN32
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 
 /* Constant and macro definitions taken from PDB proper */
@@ -148,7 +153,17 @@ running into problems with this test, you can always re-configure to
 #define STDOUT stdout
 #define CSTRSAVE(A) SC_strsavef(A,foo_str())
 #define CFREE SFREE
+#ifndef _WIN32
 #define REMOVE unlink
+#define CHDIR  chdir
+#define RMDIR  rmdir
+#define MKDIR  mkdir
+#else
+#define REMOVE _unlink
+#define CHDIR  _chdir
+#define RMDIR  _rmdir
+#define MKDIR  _mkdir
+#endif
 #define POW pow
 #ifdef PRINT
 #undef PRINT
@@ -204,9 +219,13 @@ static void free_strings(char **strs)
 
 static double wall_clock_time()
 {
+#ifndef _WIN32
     struct timeval tv;
     gettimeofday(&tv, 0);
     return (double) tv.tv_sec + (double) tv.tv_usec / 1e+6;
+#else
+    return 0;
+#endif
 }
 
 static int target_platform_n(int i) {return 1;};
@@ -4079,7 +4098,8 @@ int main(int c, char **v)
 
     setvbuf(STDOUT, 0, _IONBF, 0);
 
-    if (chdir(DATDIR) == 0)
+#ifndef _WIN32
+    if (CHDIR(DATDIR) == 0)
     {
         DIR *ddir;
         struct dirent *dent;
@@ -4091,11 +4111,18 @@ int main(int c, char **v)
             SC_ASSERT(REMOVE(dent->d_name)==0);
         }
         closedir(ddir);
-        SC_ASSERT(chdir("..")==0);
-        SC_ASSERT(rmdir(DATDIR)==0);
+        SC_ASSERT(CHDIR("..")==0);
+        SC_ASSERT(RMDIR(DATDIR)==0);
     }
-    SC_ASSERT(mkdir(DATDIR,S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH)==0);
-    SC_ASSERT(chdir(DATDIR)==0);
+#else
+    {
+        char syscmd[512];
+        snprintf(syscmd, sizeof(syscmd), "rmdir /S /Q \"%s\"", DATDIR);
+        system(syscmd);
+    }
+#endif
+    SC_ASSERT(MKDIR(DATDIR,S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH)==0);
+    SC_ASSERT(CHDIR(DATDIR)==0);
 
     PD_init_threads(0, NULL);
 

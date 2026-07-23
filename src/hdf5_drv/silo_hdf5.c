@@ -2066,9 +2066,11 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
         *silo_error_code_p = E_COMPRESSION;
     else if (strstr(err_desc->desc, "Lindstrom-") != 0)
         *silo_error_code_p = E_COMPRESSION;
+#ifdef H5E_CANTLOCKFILE
     else if (err_desc->min_num == H5E_CANTLOCKFILE ||
             (strstr(err_desc->desc, "lock") != 0))
         *silo_error_code_p = E_FILELOCKING;
+#endif
 
     return 0;
 }
