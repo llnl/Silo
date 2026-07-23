@@ -50,10 +50,15 @@ National  Security, LLC,  and shall  not  be used  for advertising  or
 product endorsement purposes.
 */
 
-#include <errno.h>
-#include <string.h>
+#ifdef _WIN32
+#include <process.h>
+#include <stdint.h>
+#else
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+#include <errno.h>
+#include <string.h>
 
 #include "silo.h"
 
@@ -91,37 +96,68 @@ int main(int argc, char **argv)
     db = DBCreate("locktest.silo", DB_CLOBBER, DB_LOCAL, "file locking test", DB_HDF5);
     DBFlush(db);
 
-    pid = fork();
-    if (pid == -1) return errno;
-
-    if (pid == 0)
+#ifdef _WIN32
     {
-        /* child is an execv of this same executable with a new arg list */
-        execv(argv[0], new_argv);
-        return errno; /* should never hit */
-    }
+        char const *new_argv[] = {
+            argv[0],
+            "open-phase",
+            NULL
+        };
 
-    waitpid(pid, &status, 0);
+        intptr_t result = _spawnv(_P_WAIT, argv[0], new_argv);
+
+        if (result == -1)
+            return errno;
+
+        status = (int) result;
+    }
+#else
+    {
+        pid_t pid;
+        int wait_status;
+
+        pid = fork();
+
+        if (pid == -1)
+            return errno;
+
+        if (pid == 0)
+        {
+            char *new_argv[] = {
+                argv[0],
+                "open-phase",
+                NULL
+            };
+
+            execv(argv[0], new_argv);
+            return errno;
+        }
+
+        waitpid(pid, &wait_status, 0);
+
+        if (!WIFEXITED(wait_status))
+            return 1;
+
+        status = WEXITSTATUS(wait_status);
+    }
+#endif
 
     DBClose(db);
 
-    if (WIFEXITED(status))
+    if (status == 6)
     {
-        if (WEXITSTATUS(status) == 6)
-        {
-            printf("second DBOpen failed for some reason unrelated to locking\n");
-            return 1;
-        }
-        if (WEXITSTATUS(status) == 5)
-        {
-            printf("second DBOpen failed: HDF5 locking incorrectly appears enabled\n");
-            return 1;
-        }
-        if (WEXITSTATUS(status) == 0)
-        {
-            printf("second DBOpen succeeded: HDF5 locking correctly appears disabled\n");
-            return 0;
-        }
+        printf("second DBOpen failed for some reason unrelated to locking\n");
+        return 1;
+    }
+    if (status == 5)
+    {
+        printf("second DBOpen failed: HDF5 locking incorrectly appears enabled\n");
+        return 1;
+    }
+    if (status == 0)
+    {
+        printf("second DBOpen succeeded: HDF5 locking correctly appears disabled\n");
+        return 0;
     }
 
     printf("There was some kind of failure testing whether file locking is disabled\n");

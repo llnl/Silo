@@ -57,6 +57,8 @@ be used for advertising or product endorsement purposes.
 #include "silo.h"
 #include <std.c>
 
+static char cwd[4096];
+
 static int VersionNumberGE(int aMaj, int aMin, int aPat,
                            int bMaj, int bMin, int bPat)
 {
@@ -169,6 +171,8 @@ main(int argc, char *argv[])
         dbfile = DBOpen("../../pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
+    if (dbfile == 0)
+        dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile)
     {
         printf("On old silo file handle returned from DBOpen...\n");
@@ -209,6 +213,8 @@ main(int argc, char *argv[])
                 dbfile = DBOpen("../../pion0244.silo", DB_UNKNOWN, DB_READ);
             if (dbfile == 0)
                 dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
+            if (dbfile == 0)
+                dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
         }
         else
         {
@@ -276,6 +282,9 @@ main(int argc, char *argv[])
         dbfile = DBOpen("../../pion0244.silo", DB_UNKNOWN, DB_READ);
     if (dbfile == 0)
         dbfile = DBOpen("./bin/pion0244.silo", DB_UNKNOWN, DB_READ);
+    if (dbfile == 0)
+        dbfile = DBOpen("../all_tests/pion0244.silo", DB_UNKNOWN, DB_READ);
+
     if (dbfile == 0)
     {
         fprintf(stderr, "Could not open file.\n");

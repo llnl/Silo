@@ -117,6 +117,21 @@ be used for advertising or product endorsement purposes.
 #ifdef _WIN32
 #include <windows.h>        /* for FileInfo funcs */
 #include <io.h>             /* for FileInfo funcs */
+#define _db_OPEN   _open
+#define _db_READ   _read
+#define _db_WRITE  _write
+#define _db_CLOSE  _close
+#define _db_RDONLY _O_RDONLY
+#define _db_WRONLY _O_WRONLY
+#define _db_BINARY _O_BINARY
+#else
+#define _db_OPEN   open
+#define _db_READ   read
+#define _db_WRITE  write
+#define _db_CLOSE  close
+#define _db_RDONLY O_RDONLY
+#define _db_WRONLY O_WRONLY
+#define _db_BINARY 0
 #endif
 
 #include <stdarg.h>
@@ -2162,14 +2177,14 @@ db_silo_stat_one_file(const char *name, db_silo_stat_t *statbuf)
     {
         /* this logic was copied by and large from HDF5 sec2 VFD */
         int errnotmp = errno;
-        int fd = open(name, O_RDONLY);
+        int fd = _db_OPEN(name, _db_RDONLY | _db_BINARY);
         if (fd != -1)
         {
             struct _BY_HANDLE_FILE_INFORMATION fileinfo;
             GetFileInformationByHandle((HANDLE)_get_osfhandle(fd), &fileinfo);
             statbuf->fileindexhi = fileinfo.nFileIndexHigh;
             statbuf->fileindexlo = fileinfo.nFileIndexLow;
-            close(fd);
+            _db_CLOSE(fd);
         }
         errno = errnotmp;
     }
@@ -2947,22 +2962,22 @@ DBGetDriverTypeFromPath(const char *path)
    char buf[9] = {'\0','\0','\0','\0','\0','\0','\0','\0','\0'};
    int fd;
    int nbytes;
-   int flags = O_RDONLY;
-   if ((fd = open(path, flags)) < 0) {
+   int flags = _db_RDONLY | _db_BINARY;
+   if ((fd = _db_OPEN(path, flags)) < 0) {
       printf("cannot open `%s'\n", path);
       return -1;
    }
-   if ((nbytes = read(fd, (char *)buf, 8)) == -1) {
+   if ((nbytes = _db_READ(fd, (char *)buf, 8)) == -1) {
       printf("cannot read `%s'\n", path);
-      close(fd);
+      _db_CLOSE(fd);
       return -1;
    }
    if (nbytes <= 5) {
       printf("cannot read `%s' buffer too small\n", path);
-      close(fd);
+      _db_CLOSE(fd);
       return -1;
    }
-   (void) close(fd);
+   (void) _db_CLOSE(fd);
    if (strstr(buf, "PDB"))
       return DB_PDB;
 #ifdef DB_HDF5X

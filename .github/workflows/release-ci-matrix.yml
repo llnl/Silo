@@ -1,0 +1,204 @@
+name: Release CI Testing Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      hdf5_assets_repo:
+        description: "Repo containing HDF5 install tarballs"
+        required: true
+        default: "llnl/Silo"
+      hdf5_assets_tag:
+        description: "Release tag containing HDF5 tarballs"
+        required: true
+        default: "ci-release-testing-assets"
+  pull_request:
+
+env:
+  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'llnl/Silo' }}
+  HDF5_ASSETS_TAG:  ${{ inputs.hdf5_assets_tag  || 'ci-release-testing-assets' }}
+
+jobs:
+  test-silo:
+    name: hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}
+    runs-on: ${{ matrix.runson }}
+
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          # HDF5 1.8.23: gcc-11, noszip/szip, shared/static, serial/parallel
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "autotools", gcc: "11", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.8.23", arch: "x86_64", runson: "ubuntu-24.04", config: "autotools", gcc: "11", mpi: "serial",   szip: "noszip", linkage: "shared" }
+
+          # HDF5 1.14.4: gcc-13, noszip/szip, shared only, serial only
+          - { hdf5: "1.14.4", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial", szip: "noszip", linkage: "shared" }
+          - { hdf5: "1.14.4", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial", szip: "szip",   linkage: "shared" }
+          - { hdf5: "1.14.4", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "11", mpi: "serial", szip: "noszip", linkage: "shared" }
+
+          # HDF5 2.1.1: gcc-13/gcc-14, noszip/szip, shared/static, serial/parallel
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "serial",   szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "13", mpi: "parallel", szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "x86_64", runson: "ubuntu-24.04", config: "cmake", gcc: "13", mpi: "serial",   szip: "noszip", linkage: "shared" }
+
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "noszip", linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "serial",   szip: "szip",   linkage: "static" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "parallel", szip: "noszip", linkage: "shared" }
+          - { hdf5: "2.1.1", arch: "aarch64", runson: "ubuntu-24.04-arm", config: "cmake", gcc: "14", mpi: "parallel", szip: "szip",   linkage: "shared" }
+
+    steps:
+      - name: Show runner architecture
+        run: |
+          uname -m
+          dpkg --print-architecture
+
+      - name: Checkout Silo
+        uses: actions/checkout@v5
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            ca-certificates \
+            curl \
+            wget \
+            file \
+            python3 \
+            python3-dev \
+            m4 \
+            autoconf \
+            automake \
+            libtool-bin \
+            gfortran \
+            mpich \
+            libmpich-dev \
+            zlib1g-dev \
+            libaec-dev \
+            xz-utils \
+            unzip \
+            autotools-dev \
+            gcc-${{ matrix.gcc }} g++-${{ matrix.gcc }} gfortran-${{ matrix.gcc }} \
+            make \
+            gh
+
+      - name: Download HDF5 install tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+
+          mkdir -p "$RUNNER_TEMP/hdf5-download" "$RUNNER_TEMP/hdf5-install"
+
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+              asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.xz"
+          else
+              asset="hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-${{ matrix.config }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}-${{ matrix.gcc }}.tar.xz"
+          fi
+
+          gh release download "$HDF5_ASSETS_TAG" \
+            --repo "$HDF5_ASSETS_REPO" \
+            --pattern "$asset" \
+            --dir "$RUNNER_TEMP/hdf5-download"
+
+          tar -xf "$RUNNER_TEMP/hdf5-download/$asset" \
+            -C "$RUNNER_TEMP/hdf5-install" \
+            --strip-components=1
+
+      - name: Configure Silo
+        run: |
+          set -eux
+
+          export HDF5_ROOT="$RUNNER_TEMP/hdf5-install"
+          export PATH="$HDF5_ROOT/bin:$PATH"
+          export LD_LIBRARY_PATH="$HDF5_ROOT/lib:$HDF5_ROOT/lib64:${LD_LIBRARY_PATH:-}"
+
+          if [ "${{ matrix.mpi }}" = "parallel" ]; then
+            export MPICH_CC="gcc-${{ matrix.gcc }}"
+            export MPICH_CXX="g++-${{ matrix.gcc }}"
+            export MPICH_FC="gfortran-${{ matrix.gcc }}"
+            export CC=mpicc
+            export CXX=mpicxx
+            export FC=mpifort
+          else
+            export CC=gcc-${{ matrix.gcc }}
+            export CXX=g++-${{ matrix.gcc }}
+            export FC=gfortran-${{ matrix.gcc }}
+          fi
+
+          silo_szip_args=()
+          if [ "${{ matrix.szip }}" = "szip" ]; then
+            silo_szip_args+=(-DSILO_HDF5_SZIP_DIR:PATH=/usr)
+          fi
+
+          silo_ld_flags=()
+          silo_shared_args=()
+          silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=ON)
+          if [ "${{ matrix.linkage }}" = "static" ]; then
+            silo_shared_args+=(-DSILO_ENABLE_SHARED:BOOL=OFF)
+            silo_pymod_args=(-DSILO_ENABLE_PYTHON_MODULE:BOOL=OFF)
+            silo_ld_flags=(-lz -ldl -lm)
+            if [ "${{ matrix.szip }}" = "szip" ]; then
+              silo_ld_flags=(-lsz -laec -lz -ldl -lm)
+            fi
+          fi
+
+          silo_zlib_args=(-DZLIB_INCLUDE_DIR:PATH=/usr/include)
+          if [ "${{ matrix.linkage }}" = "static" ]; then
+            silo_zlib_args+=(-DZLIB_LIBRARY:FILEPATH="/usr/lib/aarch64-linux-gnu/libz.a")
+          else
+            silo_zlib_args+=(-DZLIB_LIBRARY:FILEPATH="/usr/lib/aarch64-linux-gnu/libz.so")
+          fi
+
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_STANDARD_LIBRARIES="${silo_ld_flags[*]}" \
+            -DCMAKE_CXX_STANDARD_LIBRARIES="${silo_ld_flags[*]}" \
+            -DCMAKE_Fortran_STANDARD_LIBRARIES="${silo_ld_flags[*]}" \
+            -DCMAKE_BUILD_TYPE:STRING=Release \
+            -DCMAKE_INSTALL_PREFIX:PATH="$RUNNER_TEMP/silo-install" \
+            -DBUILD_TESTING:BOOL=ON \
+            -DSILO_ENABLE_HDF5:BOOL=ON \
+            -DSILO_HDF5_DIR:PATH="$HDF5_ROOT" \
+            -DSILO_ZLIB_DIR:PATH=/usr \
+            "${silo_zlib_args[@]}" \
+            "${silo_szip_args[@]}" \
+            "${silo_shared_args[@]}" \
+            -DSILO_ENABLE_FORTRAN:BOOL=ON \
+            -DSILO_ENABLE_BROWSER:BOOL=ON \
+            -DSILO_ENABLE_SILOCK:BOOL=ON \
+            -DSILO_ENABLE_SILEX:BOOL=OFF \
+            -DSILO_ENABLE_ZFP:BOOL=ON \
+            "${silo_pymod_args[@]}"
+
+      - name: Build Silo
+        run: |
+          cmake --build build --parallel
+
+      - name: Run Silo tests
+        run: |
+          cd build
+          ctest -E checksums --output-on-failure
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-hdf5-${{ matrix.hdf5 }}-${{ matrix.arch }}-gcc${{ matrix.gcc }}-${{ matrix.mpi }}-${{ matrix.szip }}-${{ matrix.linkage }}
+          path: |
+            build/**/*.log
+            build/Testing/Temporary/*
