@@ -99,7 +99,7 @@ if (strcmp(A,B))                                                                
     return 1;                                                                                              \
 }
 
-#define FAILED(MSG)                                                                                        \
+#define TEST_FAILED(MSG)                                                                                   \
 {                                                                                                          \
     fprintf(stderr, "%s at line %d.\n", MSG, __LINE__);                                                    \
     return 1;                                                                                              \
@@ -375,9 +375,9 @@ int main(int argc, char **argv)
 
         /* Test invalid namescheme construction */
         ns = DBMakeNamescheme("@foo/bar/gorfo_%d@#n");
-        if (ns) FAILED("DBMakeNamescheme succeeded on an invalid string");
+        if (ns) TEST_FAILED("DBMakeNamescheme succeeded on an invalid string");
         ns = DBMakeNamescheme("@foo/bar/gorfo_%d@#n", 0, dbfile, 0);
-        if (ns) FAILED("DBMakeNamescheme succeeded on an invalid string");
+        if (ns) TEST_FAILED("DBMakeNamescheme succeeded on an invalid string");
 
         /* Test construction via retrieval from MB object */
         DBSetDir(dbfile, "/meshes/mesh1");
@@ -492,7 +492,7 @@ int main(int argc, char **argv)
 
     /* Test case where fewer expressions than conversion specs */
     ns = DBMakeNamescheme("|/domain_%03d/laser_beam_power_%d|n/1|");
-    if (ns) FAILED("DBMakeNamescheme succeeded on an invalid string");
+    if (ns) TEST_FAILED("DBMakeNamescheme succeeded on an invalid string");
 
     /* Test DBEvalNamescheme() logic. Requires multi_file test to have run
        with `use-ns` command-line option. This will have produced a root
@@ -524,7 +524,7 @@ int main(int argc, char **argv)
             /* if the acquired multiblock object is not using nameschemes,
                we cannot perform this test */
             if (mm_w_ns->file_ns == 0 || mm_w_ns->block_ns == 0)
-                FAILED("selected root file candidate has no nameschemes.");
+                TEST_FAILED("selected root file candidate has no nameschemes.");
 
             fns = DBMakeNamescheme(mm_w_ns->file_ns);
             bns = DBMakeNamescheme(mm_w_ns->block_ns);
@@ -549,9 +549,9 @@ int main(int argc, char **argv)
 
             /* if the acquired multiblock object has nameschemes, the test fails */
             if (mm->file_ns != 0 || mm->block_ns != 0)
-                FAILED("Requested eval nameschemes but still get them.");
+                TEST_FAILED("Requested eval nameschemes but still get them.");
             if (mmat->file_ns != 0 || mmat->block_ns != 0)
-                FAILED("Requested eval nameschemes but still get them.");
+                TEST_FAILED("Requested eval nameschemes but still get them.");
 
             /* Ok, now lets generate a Silo object block name from mm_w_ns and compare it
                to what we get for the same block in mm (where nameschemes were evaluated). */
@@ -580,7 +580,7 @@ int main(int argc, char **argv)
             break; 
         }
         if (i == nRootCandidates)
-            FAILED("test-eval requested but no root file candidates found");
+            TEST_FAILED("test-eval requested but no root file candidates found");
     }
     
     /* hackish way to cleanup the circular cache used internally */

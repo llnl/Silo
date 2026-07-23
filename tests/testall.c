@@ -84,6 +84,7 @@ be used for advertising or product endorsement purposes.
 #ifndef _WIN32
 #include <unistd.h>
 #else
+typedef ptrdiff_t ssize_t;
 #include <stdio.h>
 #include <io.h>
 #endif

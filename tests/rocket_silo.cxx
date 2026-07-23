@@ -68,7 +68,6 @@ be used for advertising or product endorsement purposes.
 
 #include <assert.h>
 #include <sys/types.h>
-#include <dirent.h>
 
 #include <silo.h>
 #include <std.c>

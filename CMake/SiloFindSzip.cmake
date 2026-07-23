@@ -86,7 +86,10 @@ if(SZIP_FOUND)
                  ${SZIP_DLL} ${Silo_BINARY_DIR}/bin/$<$<BOOL:${is_multi_config}>:$<CONFIG>>/)
         endif()
     endif()
+elseif(WIN32)
+    message(STATUS
+        "No standalone SZIP package or runtime DLL found; "
+        "assuming SZIP/AEC is incorporated statically into HDF5")
 else()
     message(FATAL_ERROR "Could not find szip, you may want to try setting SILO_HDF5_SZIP_DIR")
 endif()
-

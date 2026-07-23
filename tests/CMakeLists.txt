@@ -52,6 +52,7 @@
 #
 ##############################################################################
 
+##############################################################################
 #
 # The CMake/CTest logic here is pretty ugly due to lack of familiarity with
 # CMake/CTest prior to implementing this. Cleanup and re-organization is
@@ -107,7 +108,15 @@
 # ctest --build memcheck-build -T memcheck --output-on-failure -I 122,122
 # vi Testing/Temporary/MemoryChecker.122.log 
 # cat Testing/Temporary/MemoryChecker.*
-#
+##############################################################################
+
+
+##############################################################################
+# In GitHub CI actions for windows, the dir from which the tests are actually
+# run is D:/a/Silo/Silo/build/tests and each of the tests are compiled and
+# built into D:/a/Silo/Silo/build/tests/bin/Release. The data file copies go
+# into D:/a/Silo/Silo/build/all_tests
+##############################################################################
 
 ###-------------------------------------------------------------------------------------
 # Set the output dir for test executables
@@ -140,21 +149,21 @@ if(WIN32)
          $<TARGET_FILE:silo> ${silo_test_output_dir})
 
     # zlib
-    if(ZLIB_FOUND AND DEFINED ZLIB_DLL)
+    if(ZLIB_FOUND AND ZLIB_DLL)
         add_custom_command(TARGET copy_test_deps POST_BUILD
              COMMAND ${CMAKE_COMMAND} -E copy_if_different
              ${ZLIB_DLL} ${silo_test_output_dir})
     endif()
 
     # szip
-    if(SZIP_FOUND AND DEFINED SZIP_DLL)
+    if(SZIP_FOUND AND SZIP_DLL)
         add_custom_command(TARGET copy_test_deps POST_BUILD
              COMMAND ${CMAKE_COMMAND} -E copy_if_different
              ${SZIP_DLL} ${silo_test_output_dir})
     endif()
 
     # hdf5
-    if(HDF5_FOUND AND DEFINED HDF5_DLL)
+    if(HDF5_FOUND AND HDF5_DLL)
             add_custom_command(TARGET copy_test_deps POST_BUILD
                  COMMAND ${CMAKE_COMMAND} -E copy_if_different
                  ${HDF5_DLL} ${silo_test_output_dir})
@@ -307,9 +316,12 @@ set(SKIP_TEST_SOURCES
     std.c
     testlib.c
 )
+if(WIN32)
+    list(APPEND SKIP_TEST_SOURCES locking.c)
+endif()
 
-if(NOT SILO_ENABLE_SHARED)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx)
+if(NOT SILO_ENABLE_SHARED OR WIN32)
+    list(APPEND SKIP_TEST_SOURCES rocket.cxx pdbtst.c)
 endif()
 
 #
@@ -349,11 +361,13 @@ if(NOT SILO_ENABLE_JSON)
 endif()
 
 
-if(SILO_ENABLE_SHARED)
+if(SILO_ENABLE_SHARED AND NOT WIN32)
     add_library(rocket_silo MODULE rocket_silo.cxx)
     add_dependencies(rocket_silo silo)
     target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
+if(UNIX)
     target_link_libraries(rocket_silo dl m)
+endif()
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
         target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
@@ -480,7 +494,7 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 endforeach()
 
-if(SILO_ENABLE_SHARED)
+if(SILO_ENABLE_SHARED AND NOT WIN32)
     add_dependencies(rocket rocket_silo)
     set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
 endif()
@@ -671,23 +685,25 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
     set_tests_properties(partial-io-ucd3d PROPERTIES DEPENDS "partial-io-setup" RESOURCE_LOCK "partial.h5;ucd3d.h5")
 endif()
 
-add_custom_target(testdtypes ALL)
-add_custom_command(TARGET testdtypes POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_CURRENT_SOURCE_DIR}/testdtypes
-    ${silo_test_output_dir})
-add_test(NAME testdtypes
-    COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
-    "${silo_test_output_dir}/testdtypes")
-set_tests_properties(testdtypes PROPERTIES DEPENDS specmix)
-if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    add_test(NAME testdtypes-hdf5
+if(NOT WIN32)
+    add_custom_target(testdtypes ALL)
+    add_custom_command(TARGET testdtypes POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/testdtypes
+        ${silo_test_output_dir})
+    add_test(NAME testdtypes
         COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
-        "${silo_test_output_dir}/testdtypes" DB_HDF5)
-    set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
+        "${silo_test_output_dir}/testdtypes")
+    set_tests_properties(testdtypes PROPERTIES DEPENDS specmix)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME testdtypes-hdf5
+            COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0
+            "${silo_test_output_dir}/testdtypes" DB_HDF5)
+        set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
+    endif()
 endif()
 
-if(SILO_ENABLE_SILOCK)
+if(SILO_ENABLE_SILOCK AND NOT WIN32)
     add_custom_target(testsilock ALL)
     add_custom_command(TARGET testsilock POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
