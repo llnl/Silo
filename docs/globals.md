@@ -823,37 +823,38 @@ However, a file's settings can be adjusted independently from the library's glob
   Compression features are controlled by an arbitrary string, whose contents are described in more detail below.
   By default, the Silo library does not have compression enabled.
   A number of different compression techniques are available.
-  Some operate in a mesh and variable and data-type agnostic way while others depend on the type of data and sometimes even the type of mesh.
+  Some operate in a mesh-and-variable-and-data-type-agnostic way while others depend on the type of data and sometimes even the type of mesh.
 
   Some compression settings are global to all compression methods.
   There are two global parameters that control behavior of compression algorithms.
-  These must appear in the compression `options` string before any compression-specific parameters.
+  These must appear in the compression `options` string *before* any compression-specific parameters.
 
-  The first is the error mode (`"ERRMODE=<word>"` which controls how the Silo library responds when it encounters an error during compression and/or is unable to compress the data.
-  The two options for `<word>` are `FALLBACK` or `FAIL`. Including `"ERRMODE=FALLBACK"` in the compression options string tells Silo that whenever compression fails, it should simply fallback to writing uncompressed data.
+  The first is the error mode (`"ERRMODE=<word>"`) which controls how the Silo library responds when it encounters an error during compression and/or is unable to compress the data.
+  The two options for `<word>` are `FALLBACK` or `FAIL`.
+  Including `"ERRMODE=FALLBACK"` in the compression `options` string tells Silo that whenever compression fails, it should simply fallback to writing uncompressed data.
   Including `"ERRMODE=FAIL"` in the compression `options` string tells Silo to fail the write and return `E_COMPRESSION` error for the operation.
 
   The second is the minimum compression ratio to be achieved by compressing the data.
   It is specified as `"MINRATIO=<float>"`.
-  For example, including `"MINRATIO=2.5"` in the compression options string tells Silo that all data must be compressed by at least a factor of 2.5:1.
+  For example, including `"MINRATIO=2.5"` in the compression `options` string tells Silo that all data must be compressed by at least a factor of 2.5:1.
   If it is unable the compress by at least this amount, Silo will either fallback or fail the write depending on the `ERRMODE` setting.
 
   The remaining paragraphs describe compression algorithm specific options.
 
   GZIP compression
-  : is enabled using `"METHOD=GZIP"` in the options string.
+  : is enabled using `"METHOD=GZIP"` in the `options` string.
 
     GZIP recognizes the `LEVEL=<int>`, compression parameter.
     The compression level is an integer from 0 to 9, where 0 results in the fastest compression performance but at the expense of lower compression ratios.
     Likewise, a level of 9 results in the slowest compression performance but with possibly better compression ratios.
-    If the `"LEVEL=<int>"` keyword does not appear in the options string or specifies invalid values, the default is level one (1).
+    If the `"LEVEL=<int>"` keyword does not appear in the `options` string or specifies invalid values, the default is level one (1).
     The GZIP method of compression is applied independently to float and integer data for all types of meshes and variables.
     It is also guaranteed to be available to all Silo clients.
 
     When GZIP compression is applied to floating point data, a secondary [HDF5 shuffle](https://docs.hdfgroup.org/hdf5/v1_14/group___d_c_p_l.html#ga31e09cb0bf2da2893eed8a72220e6521) filter is also applied to improve compressibilty of the data.
 
   SZIP compression:
-  : is enabled using `"METHOD=SZIP"` in the options string.
+  : is enabled using `"METHOD=SZIP"` in the `options` string.
     The SZIP compression algorithm is designed specifically for scientific data.
     SZIP recognizes the `BLOCK=<int>`, and `MASK={EC|NN}` parameters.
     The `BLOCK=<int>`, takes an integer value from 0 to 32, which is a blocking size and must be even and not greater than 32, with typical values being 8, 10, 16, or 32.
@@ -870,7 +871,7 @@ However, a file's settings can be adjusted independently from the library's glob
     Like GZIP, SZIP compression is applied to float and integer data independently of the types of meshes and variables.
 
   FPZIP compression
-  : is enabled using `"METHOD=FPZIP"` in the options string.
+  : is enabled using `"METHOD=FPZIP"` in the `options` string.
     The FPZIP compression algorithm was developed by [Peter Lindstrom](https://github.com/lindstro) at LLNL and is also designed for high speed compression of regular arrays of data.
     FPZIP recognizes the `"LOSS=0|1|2|3"` parameter which specifies the amount of loss that is tolerable in the result in terms of quarters of full precision.
     For example, `"LOSS=3"` indicates that a loss of 3/4 of full precision is tolerable (resulting in 8 bit floats or 16 bit doubles).
@@ -881,7 +882,7 @@ However, a file's settings can be adjusted independently from the library's glob
     So, it is not always guaranteed to exist.
 
   HZIP compression
-  : is enabled using `"METHOD=HZIP"` in the options string.
+  : is enabled using `"METHOD=HZIP"` in the `options` string.
     The HZIP compression algorithm was developed by [Peter Lindstrom](https://github.com/lindstro) at LLNL and is designed for high-speed compression of unstructured meshes of quad or hex elements and node-centered variables (it does not yet support zone-centered variables) defined on a mesh.
     Before applying this compression method to any given Silo mesh or variable object, the Silo library checks for compatibility with the constraints of the compression algorithm.
     If the mesh or variable object is compatible, the object will be written with compression enabled.
@@ -889,11 +890,14 @@ However, a file's settings can be adjusted independently from the library's glob
     It is possible to build the Silo library without HZIP compression support.
     So, it is not always guaranteed to exist.
 
-    Note that FPZIP and HZIP compression features are **not** available in a BSD Licensed release of Silo library.
-    They are available only in a Legacy licensed release of the Silo library.
+    Note that FPZIP and HZIP compression features are **not** available in a BSD Licensed installation of Silo library.
+    They are available only in a Legacy licensed installation of the Silo library.
+    Also note that the FPZIP and HZIP compression libraries built into Silo here are unfortunately not name-mangled to avoid possible name collision with any versions of those libraries being independently used as standalone libraries.
+    For applications using FPZIP and HZIP libraries independently of Silo, the Silo library will have to have been configured and installed **without** FPZIP and HZIP.
+    Finally, note that the FPZIP and HZIP compression filters built into Silo here are named `"silo-fpzip"` and `"silo-hzip"` as far as HDF5 is concerned to avoid confusion with any versions of those filters possibly being independently used as standalone HDF5 plugins.
 
   ZFP compression
-  : is enabled using `"METHOD=ZFP"` in the options string.
+  : is enabled using `"METHOD=ZFP"` in the `options` string.
     ZFP compression in the Silo library uses a built-in version of the [H5Z-ZFP](https://h5z-zfp.readthedocs.io/en/latest/) compression filter.
     Data compressed with Silo using ZFP is fully compatible with any reader using the H5Z-ZFP compression filter.
     Use `"RATE=<float>"` to set compression mode to use ZFP's rate-based compression.
@@ -903,6 +907,19 @@ However, a file's settings can be adjusted independently from the library's glob
     Use `"REVERSIBLE"` to set compression mode to use ZFP's reversible compression.
     Note that all other ZFP related parameters having to do with data type and array dimensions are handled by Silo automatically during each
     `DBPutXxx()` call.
+
+    The [H5Z-ZFP]() compression filter and ZFP library is built into Silo and uses the exact same source code in Silo as the standalone version.
+    However, that filter's source code and ZFP library is name-mangled when built into Silo to avoid any collision with any versions of H5Z-ZFP and/or ZFP independently available as standalone shared libraries.
+
+  HDF5 Plugin compression
+  : is enabled using `"METHOD=HDF5_PLUGIN"` in the `options` string.
+    One of either the `"ID=..."` or `"NAME=..."` options below is required.
+    Use `"ID=<filter-id>"` to set the specific HDF5 filter to be used.
+    Use `"NAME=<filter-name>"` to set the specific HDF5 filter to be used.
+    Use `"CDVALS=<uint0>,<uint1>,...,<uintK>"` to specify filter parameters.
+    Optionally, use `"PATH=<path-to-plugin-dir>"` to specify a path where the plugin shared library can be found.
+
+    This last option allows Silo data producers to use any HDF5 compression filter plugin available but not necessarily built into the Silo library.
 
 {{ EndFunc }}
 
