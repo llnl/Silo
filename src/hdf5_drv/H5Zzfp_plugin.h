@@ -8,6 +8,14 @@
 #define H5Z_FILTER_ZFP_VERSION_MINOR 0
 #define H5Z_FILTER_ZFP_VERSION_PATCH 1
 
+/*
+HDF5 generic cd_vals[] memory layout (6 unsigned ints) for
+controlling H5Z-ZFP behavior as a plugin. NOTE: These cd_vals
+used to pass properties in-memory from caller to filter via HDF5
+generic interface are NOT THE SAME AS the cd_vals[] that
+ultimately get stored to the file for the filter "header" data. 
+*/
+
 #define H5Z_ZFP_MODE_RATE      1
 #define H5Z_ZFP_MODE_PRECISION 2
 #define H5Z_ZFP_MODE_ACCURACY  3
@@ -67,10 +75,10 @@ do {                                                    \
     if ((N>=6)&&(CD[0] == H5Z_ZFP_MODE_EXPERT))         \
     {                                                   \
         unsigned int *p; int *q;                        \
-        p = MiB; *p = CD[2];                            \
-        p = MaB; *p = CD[3];                            \
-        p = MaP; *p = CD[4];                            \
-        q = MiE; *q = (int) CD[5];                      \
+        p = &MiB; *p = CD[2];                           \
+        p = &MaB; *p = CD[3];                           \
+        p = &MaP; *p = CD[4];                           \
+        q = &MiE; *q = (int) CD[5];                     \
     }                                                   \
 } while(0)
 
