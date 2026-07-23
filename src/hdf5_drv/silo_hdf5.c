@@ -3674,7 +3674,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
        if (have_zfp == FALSE)
        {
           double tmpdbl = -1;
-          uint tmpuint = 0;
+          unsigned int tmpuint = 0;
           unsigned int cd_values[H5Z_ZFP_CD_NELMTS_MEM];
           int cd_nelmts = H5Z_ZFP_CD_NELMTS_MEM;
           
@@ -3694,7 +3694,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
              strncpy(chararray, ptr+10, 2); 
              chararray[2] = '\0';
              errno = 0;
-             tmpuint = (uint) strtoul(chararray, &check, 10);
+             tmpuint = (unsigned int) strtoul(chararray, &check, 10);
              if (chararray != check && errno == 0 && tmpuint > 0)
                  H5Pset_zfp_precision_cdata(tmpuint, cd_nelmts, cd_values);
           }
@@ -3741,7 +3741,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
     else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
        "METHOD=HDF5_PLUGIN")) != (char *)NULL) 
     {
-        uint tmpuint = 0;
+        unsigned int tmpuint = 0;
         H5Z_filter_t filtid = 0;
         char filtname[64] = "";
         unsigned int cdvals[100];
@@ -3784,7 +3784,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
                 for (char *tok = strtok(ptr+7, ",");
                     (tok != NULL) && (i < cdmaxvals) && (errno==0);
                     tok = strtok(NULL, ","), i++)
-                    cdvals[i] = (uint) strtoul(tok, NULL, 10);
+                    cdvals[i] = (unsigned int) strtoul(tok, NULL, 10);
                 cdnvals = errno == 0 ? i : -1;
             }
 
