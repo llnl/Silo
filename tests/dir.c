@@ -57,6 +57,7 @@ be used for advertising or product endorsement purposes.
 #include <direct.h>
 #include <stdlib.h>
 #include <string.h>
+#define access _access
 #endif
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -208,7 +209,7 @@ int main(int argc, char *argv[])
     DBCp("-r", dbfile, dbfile2, "/quad_dir/quad_subdir1", "quad_dir_copy", DB_EOA);
 
     /* Test a complicated whole file copy ACROSS drivers */
-    if (driver2 != DB_PDB && access("multi_ucd3d.pdb", R_OK) == 0)
+    if (driver2 != DB_PDB && access("multi_ucd3d.pdb", 0) == 0)
     {
         int result;
         DBfile *fsrc = DBOpen("multi_ucd3d.pdb", DB_PDB, DB_READ);
@@ -223,7 +224,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else if (driver2 == DB_PDB && access("multi_ucd3d.h5", R_OK) == 0)
+    else if (driver2 == DB_PDB && access("multi_ucd3d.h5", 0) == 0)
     {
         int result;
         DBfile *fsrc = DBOpen("multi_ucd3d.h5", DB_HDF5, DB_READ);
