@@ -1,0 +1,510 @@
+name: Release CI Windows Testing Matrix
+
+on:
+  workflow_dispatch:
+    inputs: 
+      hdf5_assets_repo:
+        description: "Repo containing HDF5 release assets for Silo testing"
+        required: true
+        default: "llnl/Silo" 
+      hdf5_assets_tag:
+        description: "Release tag containing HDF5 tarballs"
+        required: true
+        default: "ci-release-testing-assets"
+  pull_request:
+
+env:
+  HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'llnl/Silo' }}
+  HDF5_ASSETS_TAG: ${{ inputs.hdf5_assets_tag || 'ci-release-testing-assets' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test-silo-windows:
+    name: windows-vs2022-hdf5-${{ matrix.hdf5 }}
+
+    runs-on: windows-2022
+
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+
+      matrix:
+        include:
+          - hdf5: "1.8.23"
+            hdf5_asset: "hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-1.8.23-Std-win10_64-vs17.zip"
+            hdf5_sha256: "f410d1a48524811c07ec1989b2450d5b19fb698d2f994a34459c3142da7dd025"
+            package_type: "msi"
+            install_subdir: 'HDF_Group\HDF5\1.8.23'
+
+          - hdf5: "1.14.4-3"
+            hdf5_asset: "hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-1.14.4-3-win-vs2022_cl.zip"
+            hdf5_sha256: "3ba1507bf8f546cfc45e11a0594c5eaea3476895fe8f8b5125491dcffc179bde"
+            package_type: "nested_zip"
+
+          - hdf5: "2.1.1"
+            hdf5_asset: "hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_url: "https://github.com/llnl/Silo/releases/download/ci-release-testing-assets/hdf5-2.1.1-win-vs2022_cl.zip"
+            hdf5_sha256: "5dbcb869940cbd7aa921ff49965b00e3ded01ebc5642d6bbd4e33a52264fc100"
+            package_type: "nested_zip"
+
+    steps:
+      - name: Checkout Silo
+        uses: actions/checkout@v5
+
+      - name: Verify required build tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $requiredCommands = @(
+            "cmake",
+            "ctest",
+            "perl",
+            "git"
+          )
+
+          foreach ($command in $requiredCommands) {
+            $resolved = Get-Command $command -ErrorAction SilentlyContinue
+
+            if (-not $resolved) {
+              throw "Required command '$command' was not found in PATH."
+            }
+
+            Write-Host "$command => $($resolved.Source)"
+          }
+
+          Write-Host
+          Write-Host "CMake:"
+          cmake --version
+
+          Write-Host
+          Write-Host "CTest:"
+          ctest --version
+
+          Write-Host
+          Write-Host "Perl:"
+          where.exe perl
+          perl --version
+
+          Write-Host
+          Write-Host "Git:"
+          git --version
+
+          Write-Host
+          Write-Host "Visual Studio installation:"
+
+          $vswhere = Join-Path `
+            ${env:ProgramFiles(x86)} `
+            "Microsoft Visual Studio\Installer\vswhere.exe"
+
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe was not found."
+          }
+
+          $vsInstall = & $vswhere `
+            -latest `
+            -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+
+          if (-not $vsInstall) {
+            throw "Visual Studio with the x64 C++ toolchain was not found."
+          }
+
+          Write-Host $vsInstall
+
+      - name: Download HDF5
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
+
+          $downloadDir = Join-Path `
+            $env:RUNNER_TEMP `
+            "hdf5-download"
+
+          $extractDir = Join-Path `
+            $env:RUNNER_TEMP `
+            "hdf5-extracted"
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $downloadDir |
+            Out-Null
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $extractDir |
+            Out-Null
+
+          $archive = Join-Path `
+            $downloadDir `
+            "${{ matrix.hdf5_asset }}"
+
+          Write-Host "Downloading:"
+          Write-Host "${{ matrix.hdf5_url }}"
+
+          Invoke-WebRequest `
+            -Uri "${{ matrix.hdf5_url }}" `
+            -OutFile $archive
+
+          if (-not (Test-Path $archive)) {
+            throw "HDF5 download did not create $archive"
+          }
+
+          $archiveInfo = Get-Item $archive
+
+          if ($archiveInfo.Length -eq 0) {
+            throw "Downloaded HDF5 archive is empty."
+          }
+
+          Write-Host "Downloaded $($archiveInfo.Length) bytes."
+
+          $actualHash = (
+            Get-FileHash `
+              -Path $archive `
+              -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          Write-Host "SHA-256: $actualHash"
+
+          $expectedHash = "${{ matrix.hdf5_sha256 }}"
+
+          if ($expectedHash) {
+            $expectedHash = $expectedHash.ToLowerInvariant()
+
+            if ($actualHash -ne $expectedHash) {
+              throw (
+                "HDF5 SHA-256 mismatch: " +
+                "expected $expectedHash, got $actualHash"
+              )
+            }
+          }
+
+          Expand-Archive `
+            -Path $archive `
+            -DestinationPath $extractDir `
+            -Force
+
+          "HDF5_EXTRACT_DIR=$extractDir" |
+            Out-File `
+              -FilePath $env:GITHUB_ENV `
+              -Encoding utf8 `
+              -Append
+
+          Write-Host
+          Write-Host "Top-level extracted contents:"
+
+          Get-ChildItem `
+            -Force `
+            -Path $extractDir |
+            Format-Table Name, Length, Mode
+
+      - name: Prepare HDF5
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $outerDir = $env:HDF5_EXTRACT_DIR
+          $packageType = "${{ matrix.package_type }}"
+
+          if ($packageType -eq "msi") {
+            $msi = Get-ChildItem `
+              -Path $outerDir `
+              -Recurse `
+              -Filter *.msi |
+              Select-Object -First 1
+
+            if (-not $msi) {
+              throw "No MSI found in HDF5 package."
+            }
+
+            $process = Start-Process `
+              -FilePath msiexec.exe `
+              -ArgumentList @(
+                "/i",
+                "`"$($msi.FullName)`"",
+                "/qn",
+                "/norestart"
+              ) `
+              -Wait `
+              -PassThru
+
+            if ($process.ExitCode -ne 0) {
+              throw "HDF5 MSI install failed with exit code $($process.ExitCode)."
+            }
+
+            $hdf5Root = Join-Path `
+              $env:ProgramW6432 `
+              '${{ matrix.install_subdir }}'
+          }
+          elseif ($packageType -eq "nested_zip") {
+            $innerZip = Get-ChildItem `
+              -Path $outerDir `
+              -Recurse `
+              -Filter *.zip |
+              Select-Object -First 1
+
+            if (-not $innerZip) {
+              throw "No inner ZIP found in HDF5 package."
+            }
+
+            $portableDir = Join-Path `
+              $env:RUNNER_TEMP `
+              "hdf5-portable-${{ matrix.hdf5 }}"
+
+            Expand-Archive `
+              -Path $innerZip.FullName `
+              -DestinationPath $portableDir `
+              -Force
+
+            # Find the actual prefix by locating include/hdf5.h.
+            $header = Get-ChildItem `
+              -Path $portableDir `
+              -Recurse `
+              -Filter hdf5.h |
+              Select-Object -First 1
+
+            if (-not $header) {
+              throw "Could not locate hdf5.h in nested ZIP."
+            }
+
+            $cursor = $header.Directory
+            $hdf5Root = $null
+
+            while ($cursor) {
+              if (
+                (Test-Path (Join-Path $cursor.FullName "include")) -and
+                (Test-Path (Join-Path $cursor.FullName "lib"))
+              ) {
+                $hdf5Root = $cursor.FullName
+                break
+              }
+
+              $cursor = $cursor.Parent
+            }
+
+            if (-not $hdf5Root) {
+              throw "Could not infer HDF5 root from nested ZIP."
+            }
+          }
+          else {
+            throw "Unknown package_type: $packageType"
+          }
+
+          if (-not (Test-Path $hdf5Root)) {
+            throw "HDF5 root does not exist: $hdf5Root"
+          }
+
+          Write-Host "HDF5 root: $hdf5Root"
+
+          "HDF5_ROOT=$hdf5Root" |
+            Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure Silo
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installPrefix = Join-Path `
+            $env:RUNNER_TEMP `
+            "silo-install"
+
+          $cmakeArgs = @(
+            "-S", ".",
+            "-B", "build",
+            "--trace-expand",
+            "--trace-redirect=cmake-trace.txt",
+            "-G", "Visual Studio 17 2022",
+            "-A", "x64",
+
+            "-DCMAKE_INSTALL_PREFIX:PATH=$installPrefix",
+
+            "-DBUILD_TESTING:BOOL=ON",
+
+            "-DSILO_ENABLE_HDF5:BOOL=ON",
+            "-DSILO_HDF5_DIR:PATH=$env:HDF5_ROOT",
+
+            "-DHDF5_ROOT:PATH=$env:HDF5_ROOT",
+            "-DHDF5_DIR:PATH=$env:HDF5_DIR",
+            "-DCMAKE_PREFIX_PATH:PATH=$env:HDF5_ROOT",
+            "-DHDF5_USE_STATIC_LIBRARIES:BOOL=OFF",
+
+            "-DSILO_ENABLE_SHARED:BOOL=ON",
+
+            # Visual Studio does not provide a Fortran compiler. The Intel
+            # HDF5 package may contain Fortran libraries, but this initial
+            # Silo Windows matrix deliberately tests C and C++ only.
+            "-DSILO_ENABLE_FORTRAN:BOOL=OFF",
+
+            # Enable the normal command-line browser, but avoid optional
+            # dependencies that need separate Windows setup.
+            "-DSILO_ENABLE_BROWSER:BOOL=ON",
+            "-DSILO_ENABLE_SILOCK:BOOL=ON",
+            "-DSILO_ENABLE_SILEX:BOOL=OFF",
+            "-DSILO_ENABLE_ZFP:BOOL=ON",
+            "-DSILO_ENABLE_PYTHON_MODULE:BOOL=OFF"
+          )
+
+          Write-Host "CMake arguments:"
+
+          foreach ($argument in $cmakeArgs) {
+            Write-Host "  $argument"
+          }
+
+          & cmake @cmakeArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "CMake configuration failed with $LASTEXITCODE."
+          }
+
+      - name: Display selected HDF5 configuration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $cache = Join-Path `
+            $PWD `
+            "build\CMakeCache.txt"
+
+          if (-not (Test-Path $cache)) {
+            throw "CMakeCache.txt was not created."
+          }
+
+          Write-Host "Relevant CMake cache entries:"
+
+          Select-String `
+            -Path $cache `
+            -Pattern `
+              "HDF5",
+              "ZLIB",
+              "SZIP",
+              "AEC",
+              "SILO_ENABLE_SHARED",
+              "CMAKE_MSVC_RUNTIME_LIBRARY" |
+            ForEach-Object {
+              Write-Host $_.Line
+            }
+
+      - name: Build Silo
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          cmake `
+            --build build `
+            --config Release `
+            --parallel `
+            --verbose
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Silo build failed with $LASTEXITCODE."
+          }
+
+      - name: Run Silo tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # HDF5's shared-library package may contain DLLs in bin or in
+          # component-specific subdirectories. Add all directories containing
+          # DLLs to PATH.
+          $dllDirectories = Get-ChildItem `
+            -Path $env:HDF5_ROOT `
+            -Recurse `
+            -Include *.dll `
+            -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              $_.Directory.FullName
+            } |
+            Sort-Object -Unique
+
+          foreach ($directory in $dllDirectories) {
+            $env:PATH = "$directory;$env:PATH"
+          }
+
+          # Also add directories containing Silo DLLs. Visual Studio generators
+          # commonly place these under configuration-specific directories.
+          $siloDllDirectories = Get-ChildItem `
+            -Path build `
+            -Recurse `
+            -Include *.dll `
+            -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              $_.Directory.FullName
+            } |
+            Sort-Object -Unique
+
+          foreach ($directory in $siloDllDirectories) {
+            $env:PATH = "$directory;$env:PATH"
+          }
+
+          Write-Host "DLL search directories added to PATH:"
+
+          $dllDirectories |
+            ForEach-Object {
+              Write-Host "  $_"
+            }
+
+          $siloDllDirectories |
+            ForEach-Object {
+              Write-Host "  $_"
+            }
+
+          ctest `
+            --test-dir build `
+            --build-config Release `
+            -E checksums `
+            --output-on-failure
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "CTest failed with $LASTEXITCODE."
+          }
+
+      - name: Install Silo
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          cmake `
+            --install build `
+            --config Release
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Silo installation failed with $LASTEXITCODE."
+          }
+
+      - name: Display installed Silo files
+        shell: pwsh
+        run: |
+          $installPrefix = Join-Path `
+            $env:RUNNER_TEMP `
+            "silo-install"
+
+          Get-ChildItem `
+            -Path $installPrefix `
+            -Recurse |
+            Select-Object FullName
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-hdf5-${{ matrix.hdf5 }}-${{ matrix.linkage }}-diagnostics
+          if-no-files-found: ignore
+          path: |
+            cmake-trace.txt
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/CMakeFiles/CMakeError.log
+            build/CMakeFiles/CMakeOutput.log
+            build/Testing/Temporary/*
+            build/**/*.log
+            build/**/*.vcxproj
+            ${{ runner.temp }}/hdf5-msi-install.log

@@ -95,6 +95,10 @@ if(ZLIB_FOUND)
                  ${zlib_dll} ${Silo_BINARY_DIR}/bin/$<$<BOOL:${is_multi_config}>:$<CONFIG>>/)
         endif()
     endif()
+elseif(WIN32)
+    message(STATUS
+        "No standalone ZLIB package or runtime DLL found; "
+        "assuming ZLIB is incorporated statically into HDF5")
 else()
     message(FATAL_ERROR "Could not find zlib, you may want to try setting SILO_ZLIB_DIR")
 endif()

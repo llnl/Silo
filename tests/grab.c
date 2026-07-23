@@ -278,7 +278,7 @@ main(int argc, char *argv[])
     type = DBUngrabDriver(dbfile, (void *)&silo_h5id);
     if (type != (driver&0xF))
     {
-       printf("Wrong drive type returned from Ungrab\n");
+       printf("Wrong driver type=%d returned from Ungrab\n", type);
        return 1;
     }
   }
@@ -296,8 +296,7 @@ main(int argc, char *argv[])
     type = DBGetDriverTypeFromPath(filename);
     if (type != (driver&0xF))
     {
-       printf("Wrong drive type=%d returned from GetDriverTypeFromPath\n",
-       type);
+       printf("Wrong driver type=%d returned from GetDriverTypeFromPath\n", type);
        return 1;
     }
 

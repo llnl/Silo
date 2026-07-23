@@ -508,7 +508,7 @@ main(int argc, char *argv[])
     DBClearOptlist(optList);
     DBFreeMultimesh(mm);
 
-#if !defined(_WIN32)
+#ifndef _WIN32
 #warning HACK FOR SINGLE VARIABLE
 #endif
     {

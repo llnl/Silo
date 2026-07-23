@@ -52,14 +52,18 @@ product endorsement purposes.
 #include <hdf5.h>
 
 #include <errno.h>
-#include <libgen.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#else
+#define random rand
+#define srandom srand
+#endif
 
 /* useful macro for comparing HDF5 versions */
 #define HDF5_VERSION_GE(Maj,Min,Rel)  \
@@ -130,20 +134,26 @@ static void th5_mem_profiler_stop() {}
 /* returns time in seconds */
 double GetTime()
 {
-    static double t0 = -1;
-    double t1;
+    static double t0 = 0;
+    double t1 = 0;;
+#ifndef _WIN32
     struct timeval tv1;
+#endif
 
-    if (t0<0)
+    if (t0<=0)
     {
+#ifndef _WIN32
         struct timeval tv0;
         gettimeofday(&tv0, 0);
         t0 = (double)tv0.tv_sec*1e+6+(double)tv0.tv_usec;
+#endif
         return 0;
     }
 
+#ifndef _WIN32
     gettimeofday(&tv1, 0);
     t1 = (double)tv1.tv_sec*1e+6+(double)tv1.tv_usec;
+#endif
 
     return (t1-t0)/1e+6;
 }
@@ -698,7 +708,7 @@ int main(int argc, char **argv)
     int help = 0;
     H5AC_cache_config_t *h5_mdc_config_ptr = 0;
 
-    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "nd=", 3)) {
             char *p = argv[i], *q;
@@ -781,7 +791,7 @@ int main(int argc, char **argv)
     printf("Creates a 1, 2, or 3 level dir hierarchy with datasets at the bottom\n");
     printf("Command-line...\n    ");
     for (i=0; i<argc; i++)
-        printf("%s ", i==0?basename(argv[i]):argv[i]);
+        printf("%s ", argv[i]);
     printf("\nTest parameters...\n");
     H5get_libversion(&h5majno, &h5minno, &h5patno);
     printf("    HDF5 Library version = %u.%u.%u\n", h5majno, h5minno, h5patno);
@@ -967,6 +977,7 @@ int main(int argc, char **argv)
     th5_mem_profiler_stop();
 
     /* Output some information about the performance */
+#ifndef _WIN32
     {
     double t1 = GetTime();
     struct stat sbuf;
@@ -1029,5 +1040,6 @@ int main(int argc, char **argv)
     }
     }
     }
+#endif
     return 0;
 }
