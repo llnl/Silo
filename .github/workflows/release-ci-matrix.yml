@@ -11,7 +11,6 @@ on:
         description: "Release tag containing HDF5 tarballs"
         required: true
         default: "ci-release-testing-assets"
-  pull_request:
 
 env:
   HDF5_ASSETS_REPO: ${{ inputs.hdf5_assets_repo || 'llnl/Silo' }}
