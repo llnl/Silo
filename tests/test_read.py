@@ -47,13 +47,12 @@
 # reflect those  of the United  States Government or  Lawrence Livermore
 # National  Security, LLC,  and shall  not  be used  for advertising  or
 # product endorsement purposes.
-import os
+import os, sys
 import Silo
 
 # ---- file 1 ----
-if os.access("multi_ucd3d.pdb",os.R_OK):
-    file = "multi_ucd3d.pdb"
-elif os.access("multi_ucd3d.h5",os.R_OK):
+file = "multi_ucd3d.pdb"
+if len(sys.argv) > 1 and sys.argv[1] == "DB_HDF5" and os.access("multi_ucd3d.h5",os.R_OK):
     file = "multi_ucd3d.h5"
 
 db = Silo.Open(file)
@@ -84,9 +83,8 @@ db.Close()
 print("\n")
 
 # ---- file 2 ----
-if os.access("multi_rect3d.pdb",os.R_OK):
-    file = "multi_rect3d.pdb"
-elif os.access("multi_rect3d.h5",os.R_OK):
+file = "multi_rect3d.pdb"
+if len(sys.argv) > 1 and sys.argv[1] == "DB_HDF5" and os.access("multi_rect3d.h5",os.R_OK):
     file = "multi_rect3d.h5"
 
 db = Silo.Open(file)

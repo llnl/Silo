@@ -70,6 +70,9 @@ else()
     set(_envvar_path_sep ":")
 endif()
 
+# List of build types with debugging enabled
+set(_debug_build_types Debug RelWithDebInfo)
+
 ###-----------------------------------------------------------------------------
 # project command will automatically create cmake vars for major, minor,
 # patch and tweak from passed VERSION
@@ -159,7 +162,11 @@ CMAKE_DEPENDENT_OPTION(SILO_ENABLE_HZIP "Enable Lindstrom hex/quad mesh compress
 # Conflicting option settings
 #
 if(NOT SILO_ENABLE_SHARED AND SILO_ENABLE_PYTHON_MODULE)
-    message(FATAL "Python module requires SILO_ENABLE_SHARED=ON")
+    message(FATAL_ERROR "Python module requires SILO_ENABLE_SHARED=ON")
+endif()
+
+if(SILO_BUILD_FOR_ASAN AND NOT CMAKE_BUILD_TYPE IN_LIST _debug_build_types)
+    message(FATAL_ERROR "SILO_BUILD_FOR_ASAN requires CMAKE_BUILD_TYPE=Debug|RelWithDebInfo")
 endif()
 
 ##
@@ -797,7 +804,6 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
 
-    set(_debug_build_types Debug RelWithDebInfo)
     if(CMAKE_BUILD_TYPE IN_LIST _debug_build_types)
         find_program(MEMORYCHECK_COMMAND NAMES valgrind)
         if (MEMORYCHECK_COMMAND)

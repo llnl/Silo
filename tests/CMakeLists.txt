@@ -656,6 +656,19 @@ if(MULTI_BLOCK_TESTS)
 endif()
 
 #
+# The dir.c test ues multi_ucd3d.[pdb,h5] to do some things but it corrupts the content.
+# So, we create a dependency of dir test on a COPY of multi_ucd3d_copy.[pdb,h5]
+#
+add_test(NAME dir-input-copy COMMAND "${CMAKE_COMMAND}" -E copy multi_ucd3d.pdb multi_ucd3d_copy.pdb)
+set_tests_properties(dir PROPERTIES DEPENDS dir-input-copy)
+set_tests_properties(dir-input-copy PROPERTIES DEPENDS multi_test)
+if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+    add_test(NAME dir-input-copy-hdf5 COMMAND "${CMAKE_COMMAND}" -E copy multi_ucd3d.h5 multi_ucd3d_copy.h5)
+    set_tests_properties(dir-hdf5 PROPERTIES DEPENDS dir-input-copy-hdf5)
+    set_tests_properties(dir-input-copy-hdf5 PROPERTIES DEPENDS multi_test-hdf5)
+endif()
+
+#
 # The multi_file test tests storing Silo database across multiple files
 # using nameschemes or not, with some blocks empty or not and with blocks in subdirs or not.
 # The multidir option for multi_file requires MPI.
@@ -770,28 +783,25 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES LABELS "python;hdf5")
     endif()
 
-    add_test(NAME multi_file-reset COMMAND $<TARGET_FILE:multi_test>)
-    set_tests_properties(multi_file-reset PROPERTIES RESOURCE_LOCK "multi_file_tests")
+    add_test(NAME multi_test-reset COMMAND $<TARGET_FILE:multi_test>)
     add_test(NAME test-read-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py")
+    add_test(NAME test-error-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py")
     set_tests_properties(test-read-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-    set_tests_properties(test-read-py PROPERTIES DEPENDS multi_file-reset)
-    set_tests_properties(test-read-py PROPERTIES RESOURCE_LOCK "multi_file_tests")
-    set_tests_properties(test-read-py PROPERTIES LABELS "python")
+    set_tests_properties(test-error-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
+    set_tests_properties(multi_test-reset PROPERTIES DEPENDS multi_test LABELS "python")
+    set_tests_properties(test-read-py PROPERTIES DEPENDS multi_test-reset LABELS "python")
+    set_tests_properties(test-error-py PROPERTIES DEPENDS multi_test-reset LABELS "python")
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-       add_test(NAME multi_file-hdf-friendly COMMAND $<TARGET_FILE:multi_test> hdf-friendly DB_HDF5)
-       set_tests_properties(multi_file-hdf-friendly PROPERTIES RESOURCE_LOCK "multi_file_tests")
-       add_test(NAME test-read-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py")
+       add_test(NAME multi_test-reset-hdf5 COMMAND $<TARGET_FILE:multi_test> hdf-friendly DB_HDF5)
+       add_test(NAME test-read-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py" DB_HDF5)
+       add_test(NAME test-error-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py" DB_HDF5)
        set_tests_properties(test-read-py-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-       set_tests_properties(test-read-py-hdf5 PROPERTIES DEPENDS multi_file-hdf-friendly)
-       set_tests_properties(test-read-py-hdf5 PROPERTIES RESOURCE_LOCK "multi_file_tests")
-       set_tests_properties(test-read-py-hdf5 PROPERTIES LABELS "python;hdf5")
+       set_tests_properties(test-error-py-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
+       set_tests_properties(multi_test-reset-hdf5 PROPERTIES DEPENDS multi_test-hdf5 LABELS "python;hdf5")
+       set_tests_properties(test-read-py-hdf5 PROPERTIES DEPENDS multi_test-reset-hdf5 LABELS "python;hdf5")
+       set_tests_properties(test-error-py-hdf5 PROPERTIES DEPENDS multi_test-reset-hdf5 LABELS "python;hdf5")
     endif()
-
-    add_test(NAME test-error-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py")
-    set_tests_properties(test-error-py PROPERTIES RESOURCE_LOCK "multi_file_tests")
-    set_tests_properties(test-error-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-    set_tests_properties(test-error-py PROPERTIES LABELS "python")
 
     add_test(NAME testonehex COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/testonehex" DB_PDB)
     set_tests_properties(testonehex PROPERTIES DEPENDS onehex)

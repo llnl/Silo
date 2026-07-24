@@ -209,10 +209,10 @@ int main(int argc, char *argv[])
     DBCp("-r", dbfile, dbfile2, "/quad_dir/quad_subdir1", "quad_dir_copy", DB_EOA);
 
     /* Test a complicated whole file copy ACROSS drivers */
-    if (driver2 != DB_PDB && access("multi_ucd3d.pdb", 0) == 0)
+    if (driver2 != DB_PDB && access("multi_ucd3d_copy.pdb", 0) == 0)
     {
         int result;
-        DBfile *fsrc = DBOpen("multi_ucd3d.pdb", DB_PDB, DB_READ);
+        DBfile *fsrc = DBOpen("multi_ucd3d_copy.pdb", DB_PDB, DB_READ);
         DBfile *fdst = DBCreate("foo.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_HDF5);
         result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
         DBClose(fsrc);
@@ -224,11 +224,11 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else if (driver2 == DB_PDB && access("multi_ucd3d.h5", 0) == 0)
+    else if (driver2 == DB_PDB && access("multi_ucd3d_copy.h5", 0) == 0)
     {
         int result;
-        DBfile *fsrc = DBOpen("multi_ucd3d.h5", DB_HDF5, DB_READ);
-        DBfile *fdst = DBCreate("foo.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_PDB);
+        DBfile *fsrc = DBOpen("multi_ucd3d_copy.h5", DB_HDF5, DB_READ);
+        DBfile *fdst = DBCreate("bar.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_PDB);
         result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
         DBClose(fsrc);
         DBClose(fdst);
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
             return 1;
         }
-        fsrc = DBOpen("multi_ucd3d.h5", DB_HDF5, DB_APPEND);
+        fsrc = DBOpen("multi_ucd3d_copy.h5", DB_HDF5, DB_APPEND);
         result = DBCp("-rs", fsrc, fsrc, "/block5", "block5_copy", DB_EOA);
         DBClose(fsrc);
         if (result != 0)
@@ -250,7 +250,8 @@ int main(int argc, char *argv[])
     }
     else
     {
-        fprintf(stderr, "\n\nComplex whole file, cross driver copy requires \"multi_ucd3d.[h5,pdb]\"\n\n\n");
+        fprintf(stderr, "\n\nComplex whole file, cross driver copy requires \"multi_ucd3d_copy.[h5,pdb]\"\n\n\n");
+        return 1;
     }
 
     build_ucd_tri(dbfile2, "trimesh", 0x2); /* make a larger tri mesh here */
