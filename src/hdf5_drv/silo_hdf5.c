@@ -3742,7 +3742,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
     else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
        "METHOD=HDF5_PLUGIN")) != (char *)NULL) 
     {
-        uint tmpuint = 0;
+        unsigned int tmpuint = 0;
         H5Z_filter_t filtid = 0;
         char filtname[64] = "";
         unsigned int cdvals[100];
@@ -3785,7 +3785,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
                 for (char *tok = strtok(ptr+7, ",");
                     (tok != NULL) && (i < cdmaxvals) && (errno==0);
                     tok = strtok(NULL, ","), i++)
-                    cdvals[i] = (uint) strtoul(tok, NULL, 10);
+                    cdvals[i] = (unsigned int) strtoul(tok, NULL, 10);
                 cdnvals = errno == 0 ? i : -1;
             }
 
