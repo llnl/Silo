@@ -3667,7 +3667,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
        if (have_zfp == FALSE)
        {
           double tmpdbl = -1;
-          uint tmpuint = 0;
+          unsigned int tmpuint = 0;
           unsigned int cd_values[H5Z_ZFP_CD_NELMTS_MEM];
           int cd_nelmts = H5Z_ZFP_CD_NELMTS_MEM;
           
@@ -3683,7 +3683,7 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
              "PRECISION=")) != (char *)NULL)
           {
              strncpy(chararray, ptr+10, 2); 
-             tmpuint = (uint) strtoul(chararray, &check, 10);
+             tmpuint = (unsigned int) strtoul(chararray, &check, 10);
              if (chararray != check && errno == 0 && tmpuint > 0)
                  H5Pset_zfp_precision_cdata(tmpuint, cd_nelmts, cd_values);
           }
