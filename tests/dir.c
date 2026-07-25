@@ -104,6 +104,7 @@ int main(int argc, char *argv[])
     int            ndirs = 0;
     int            ntocs = 0;
     int            compat = 0;
+    int            xcopy = 0;
 
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "DB_PDB",6)) {
@@ -129,6 +130,8 @@ int main(int argc, char *argv[])
             compat = DB_COMPAT_OVER_PERF;
         } else if (!strcmp(argv[i], "perf-over-compat")) {
             compat = DB_PERF_OVER_COMPAT;
+        } else if (!strcmp(argv[i], "xcopy")) {
+            xcopy = 1;
 	} else {
             fprintf(stderr, "%s: ignored argument `%s'\n", argv[0], argv[i]);
         }
@@ -209,7 +212,7 @@ int main(int argc, char *argv[])
     DBCp("-r", dbfile, dbfile2, "/quad_dir/quad_subdir1", "quad_dir_copy", DB_EOA);
 
     /* Test a complicated whole file copy ACROSS drivers */
-    if (driver2 != DB_PDB && access("multi_ucd3d_copy.pdb", 0) == 0)
+    if (xcopy && driver2 != DB_PDB && access("multi_ucd3d_copy.pdb", 0) == 0)
     {
         int result;
         DBfile *fsrc = DBOpen("multi_ucd3d_copy.pdb", DB_PDB, DB_READ);
@@ -224,7 +227,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else if (driver2 == DB_PDB && access("multi_ucd3d_copy.h5", 0) == 0)
+    else if (xcopy && driver2 == DB_PDB && access("multi_ucd3d_copy.h5", 0) == 0)
     {
         int result;
         DBfile *fsrc = DBOpen("multi_ucd3d_copy.h5", DB_HDF5, DB_READ);
@@ -248,9 +251,9 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else
+    else if (xcopy)
     {
-        fprintf(stderr, "\n\nComplex whole file, cross driver copy requires \"multi_ucd3d_copy.[h5,pdb]\"\n\n\n");
+        fprintf(stderr, "\n\nComplex whole file, cross driver copy requires both PDB and HDF5 drivers and \"multi_ucd3d_copy.[h5,pdb]\"\n\n\n");
         return 1;
     }
 

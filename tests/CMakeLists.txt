@@ -659,13 +659,16 @@ endif()
 # The dir.c test ues multi_ucd3d.[pdb,h5] to do some things but it corrupts the content.
 # So, we create a dependency of dir test on a COPY of multi_ucd3d_copy.[pdb,h5]
 #
-add_test(NAME dir-input-copy COMMAND "${CMAKE_COMMAND}" -E copy ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.pdb ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.pdb)
-set_tests_properties(dir PROPERTIES DEPENDS dir-input-copy)
-set_tests_properties(dir-input-copy PROPERTIES DEPENDS multi_test)
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    add_test(NAME dir-input-copy-hdf5 COMMAND "${CMAKE_COMMAND}" -E copy ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.h5 ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.h5)
-    set_tests_properties(dir-hdf5 PROPERTIES DEPENDS dir-input-copy-hdf5)
-    set_tests_properties(dir-input-copy-hdf5 PROPERTIES DEPENDS multi_test-hdf5)
+    add_test(NAME dir-xcopy-input COMMAND "${CMAKE_COMMAND}" -E copy ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.h5 ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.h5)
+    set_tests_properties(dir-xcopy-input PROPERTIES DEPENDS multi_test-hdf5)
+    add_test(NAME dir-xcopy COMMAND $<TARGET_FILE:dir> xcopy)
+    set_tests_properties(dir-xcopy PROPERTIES DEPENDS dir-xcopy-input)
+
+    add_test(NAME dir-hdf5-xcopy-input COMMAND "${CMAKE_COMMAND}" -E copy ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.pdb ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.pdb)
+    set_tests_properties(dir-hdf5-xcopy-input PROPERTIES DEPENDS multi_test)
+    add_test(NAME dir-hdf5-xcopy COMMAND $<TARGET_FILE:dir> xcopy DB_HDF5)
+    set_tests_properties(dir-hdf5-xcopy PROPERTIES DEPENDS dir-hdf5-xcopy-input)
 endif()
 
 #
