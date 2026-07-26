@@ -327,6 +327,52 @@ However, a file's settings can be adjusted independently from the library's glob
 
 {{ EndFunc }}
 
+## `DBDriverVersion()`
+
+* **Summary:** Get version information for underlying driver library
+
+* **C Signature:**
+
+  ```
+  int DBDriverVersion(int driver, int *Maj, int *Min, int *Pat)
+  ```
+
+* **Fortran Signature:**
+
+  ```
+  None
+  ```
+
+* **Arguments:**
+
+  Arg name | Description
+  :---|:---
+  `driver` | `int`, Id of driver for which version information is needed
+  `Maj` | `int*`, major version number if non-NULL
+  `Min` | `int*`, minor version number if non-NULL
+  `Pat` | `int*`, patch version number if non-NULL
+
+* **Returned value:**
+
+  0 on success and -1 on failure.
+
+* **Example:**
+
+  ```
+  int maj;
+  DBDriverVersion(DB_PDBP, &maj, 0, 0); /* obtain PDB library version for PDB Proper driver */
+  ```
+
+* **Description:**
+
+  For the PDB driver, the PDB library has only a single version number, `PDB_SYSTEM_VERSION`.
+  That value is returned in `*maj` if `maj` is non-NULL and the other arguments are never touched.
+  If Silo is configured with PDB Proper driver enabled, the value returned will be whatever it is for the PDB library used.
+  For the HDF5 driver, the major, minor and release version digits for the HDF5 library the current installation is compiled with are returned.
+  The method can fail if the driver for which version information is requested is not enabled in the current installation.
+
+{{ EndFunc }}
+
 ## `DBSetAllowOverwrites()`
 ## `DBSetAllowOverwritesFile()`
 

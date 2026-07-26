@@ -4033,7 +4033,7 @@ DBADDRCMP_FC (int *object_id, char *compname, float *val)
 
     API_BEGIN("dbaddrcmp", int, -1) {
         object = (DBobject *) DBFortranAccessPointer(*object_id);
-        API_RETURN(DBAddFltComponent(object, compname, *val));
+        API_RETURN(DBAddFltComponent(object, compname, (double) *val));
     }
     API_END_NOPOP; /*BEWARE: If API_RETURN above is removed use API_END */
 }

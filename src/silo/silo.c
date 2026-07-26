@@ -1578,8 +1578,9 @@ DBLs(DBfile *_dbfile, char const *cl_args, char *list[], int *nlist)
     int            ls_mesh, ls_var, ls_mat, ls_curve, ls_multi, ls_dir;
     int            ls_low, ls_obj, ls_arr, ls_link, ls_mrg;
     int            count_list = FALSE, build_list = FALSE, print_list = FALSE;
-    char           opts[256], cwd[256], orig_dir[256], *paths[64];
-    DBtoc         *toc = NULL;
+    int            full_paths = FALSE;
+    char           opts[256], cwd[256], orig_dir[256];
+    char          *paths[32]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     int            left_margin, col_margin, line_width;
     char          *me = "DBLs";
     int            _nlist_orig, has_opt_a = FALSE, nargs;
@@ -1605,6 +1606,11 @@ DBLs(DBfile *_dbfile, char const *cl_args, char *list[], int *nlist)
     for (i = 0; i < nargs; i++) {
 
         switch (args[i][0]) {
+            case '\0':
+
+                /* ignore empty cl_arg strings */
+                break;
+
             case '-':
 
                 strcpy(&opts[nopts], &args[i][1]);
@@ -1613,10 +1619,13 @@ DBLs(DBfile *_dbfile, char const *cl_args, char *list[], int *nlist)
 
             default:
 
-                paths[npaths++] = args[i];
+                paths[npaths++] = strdup(args[i]);
                 break;
         }
     }
+
+    if (args)
+        DBFreeStringArray(args, nargs);
 
      /*----------------------------------------
       *  Set listing options based on input.
@@ -1673,6 +1682,9 @@ DBLs(DBfile *_dbfile, char const *cl_args, char *list[], int *nlist)
             case 'x':
                 ls_low = has_opt_a ? FALSE : TRUE;
                 break;
+            case 'f':
+                full_paths = TRUE;
+                break;
             default:
                 return db_perror("invalid list option", E_BADARGS, me);
         }
@@ -1686,7 +1698,7 @@ DBLs(DBfile *_dbfile, char const *cl_args, char *list[], int *nlist)
 
     if (npaths <= 0) {
         npaths = 1;
-        paths[0] = ".";
+        paths[0] = strdup(".");
     }
 
     left_margin = 10;
@@ -1706,19 +1718,27 @@ if (LS_VAR && toc->n##CAT > 0) { \
     } \
     else if (build_list) { \
         for (i = 0; i < toc->n##CAT && *nlist<_nlist_orig; i++) { \
-            list[*nlist] = ALLOC_N(char, strlen(toc->CAT##_names[i]) + 1); \
-            strcpy(list[(*nlist)++], toc->CAT##_names[i]); \
+            if (full_paths) { \
+                char *fpath = db_join_path(kcwd, toc->CAT##_names[i]); \
+                list[*nlist] = ALLOC_N(char, strlen(fpath) + 1); \
+                strcpy(list[(*nlist)++], fpath); \
+                free(fpath); \
+            } else { \
+                list[*nlist] = ALLOC_N(char, strlen(toc->CAT##_names[i]) + 1); \
+                strcpy(list[(*nlist)++], toc->CAT##_names[i]); \
+            } \
         } \
     } \
     else if (print_list) { \
         printf("%7d "#CAT"s:\n", toc->n##CAT); \
-        _DBstrprint(stdout, toc->CAT##_names, toc->n##CAT, \
-                    'c', left_margin, col_margin, line_width); \
+        _DBstrprint(stdout, toc->CAT##_names, toc->n##CAT, 'c', left_margin, col_margin, line_width); \
         printf("\n"); \
     } \
 }
 
     for (k = 0; k < npaths; k++) {
+        DBtoc *toc = NULL;
+        char kcwd[256];
 
         DBGetDir(_dbfile, cwd);
 
@@ -1729,7 +1749,12 @@ if (LS_VAR && toc->n##CAT > 0) { \
 
         toc = DBGetToc(_dbfile);
         if (!toc)
+        {
+            DBSetDir(_dbfile, orig_dir);
             return db_perror("unable to get toc", E_INTERNAL, me);
+        }
+
+        DBGetDir(_dbfile, kcwd);
 
         PROCESS_LIST(ls_curve, curve);
         PROCESS_LIST(ls_low, var); /* misc. vars */
@@ -1762,14 +1787,8 @@ if (LS_VAR && toc->n##CAT > 0) { \
          * be relative to it.
          */
         DBSetDir(_dbfile, orig_dir);
-
+        FREE(paths[k]);
     }
-
-#ifndef _WIN32
-#warning CLEAN UP IS LOST IN ABOVE EARLY RETURNS
-#endif
-    if (args)
-        DBFreeStringArray(args, nargs);
 
     if (nlist && (*nlist >= _nlist_orig))
         return -1;
@@ -4068,6 +4087,29 @@ DBFileVersionGE(const DBfile *dbfile, int Maj, int Min, int Pat)
 }
 
 /*-------------------------------------------------------------------------
+ * Function:    DBDriverVersion
+ *
+ * Purpose:     Return version of library used in underlying driver. 
+ *
+ * Returns:     0 on success, -1 on failure
+ *
+ * Programmer:  Mark C. Miller, Sat Jul 11 13:15:05 PDT 2026
+ *-------------------------------------------------------------------------*/
+PUBLIC int
+DBDriverVersionReal(int driver, int *drvrlib_vmaj, int *drvrlib_vmin, int *drvrlib_vpat)
+{
+    int retval = 0;
+    API_BEGIN("DBDriverVersion", int, -1) {
+        if (DBVersionCB[driver])
+            retval = (DBVersionCB[driver])(drvrlib_vmaj, drvrlib_vmin, drvrlib_vpat);
+        else
+            retval = -1;
+        API_RETURN(retval);
+    }
+    API_END_NOPOP;
+}
+
+/*-------------------------------------------------------------------------
  * Function:    DBFileName
  *
  * Purpose:     Return the name of the associated file.
@@ -4698,7 +4740,7 @@ DBInqFileHasObjects(DBfile *f)
     if (f == 0)
         return -1;
 
-    if (DBInqVarExists(f, "_silolibinfo"))
+    if (DBInqVarExists(f, SILO_VSTRING_NAME))
         return 1;
     if (DBInqVarExists(f, "_hdf5libinfo"))
         return 1;
@@ -5558,8 +5600,10 @@ DBSetDir(DBfile *dbfile, const char *path)
             API_ERROR(NULL, E_NOFILE);
         if (SILO_Globals.enableGrabDriver == TRUE)
             API_ERROR("DBSetDir", E_GRABBED) ; 
-        if (!path || !*path)
-            API_ERROR("path", E_BADARGS);
+        if (!path)
+            API_ERROR("path is NULL", E_BADARGS);
+        if (!*path)
+            API_ERROR("*path is NULL", E_BADARGS);
         if (STR_EQUAL(path, "."))
         {
             API_RETURN(0);
@@ -5868,6 +5912,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
     int *isser, int *nser, char **sernm, char **sertstr, void **serd)
 {
     char *p = 0;
+    size_t np = 0;
     int pass = 0;
     int dtyp = DB_NOTYPE;
     int i0 = i;
@@ -5902,7 +5947,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
 
         if (pass == 1)
         {
-            p = (char *) malloc((size_t)p);
+            p = (char *) malloc(np);
             *serd = p;
         }
 
@@ -5912,21 +5957,21 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
             {
                 if (pass == 1)
                     *((int*)p) = (int) strtol(srcObj->pdb_names[j]+4, NULL, 0);
-                p += sizeof(int);
+                np += sizeof(int);
                 if (dtyp == DB_NOTYPE) dtyp = DB_INT;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<f>", 4))
             {
                 if (pass == 1)
                      *((float*)p) = (float) strtod(srcObj->pdb_names[j]+4, NULL);
-                p += sizeof(float);
+                np += sizeof(float);
                 if (dtyp == DB_NOTYPE) dtyp = DB_FLOAT;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<d>", 4))
             {
                 if (pass == 1)
                     *((double*)p) = strtod(srcObj->pdb_names[j]+4, NULL);
-                p += sizeof(double);
+                np += sizeof(double);
                 if (dtyp == DB_NOTYPE) dtyp = DB_DOUBLE;
             }
             else if (!strncmp(srcObj->pdb_names[j], "'<s>", 4))
@@ -5937,7 +5982,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
                      strcpy(p, srcObj->pdb_names[j]+4);
                      p[len] = '\0';
                 }
-                p += (len+1);
+                np += (len+1);
                 if (dtyp == DB_NOTYPE) dtyp = DB_CHAR;
             }
             else
@@ -5945,7 +5990,7 @@ CheckForComponentSeries(DBobject const *srcObj, int i,
                 int len = (int) strlen(srcObj->pdb_names[j]);
                 if (pass == 1)
                      strcpy(p, srcObj->pdb_names[j]);
-                p += (len+1);
+                np += (len+1);
             }
         }
     }
@@ -6144,6 +6189,18 @@ done:
     return retval;
 }
 
+static int
+str_ends_with(char const *str, char const *suffix)
+{
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+
+    return str_len >= suffix_len &&
+           memcmp(str + str_len - suffix_len,
+                  suffix,
+                  suffix_len) == 0;
+}
+
 /*-------------------------------------------------------------------------
  * Function:   db_copy_single_object_abspath
  *
@@ -6159,19 +6216,38 @@ done:
  *
  * Programmer:  Mark C. Miller, Wed Apr 18 09:23:55  PDT 2018
  *
+ * Mark C. Miller, Sat Jul  4 23:03:09 PDT 2026
+ * Fix bug with destination object path in copying sub-objects.
+ * Fix handling of immediate mode (small) arrays.
  *-------------------------------------------------------------------------*/
 static int
 db_copy_single_object_abspath(char const *opts,
     DBfile *srcFile, char const *srcObjAbsName, DBObjectType srcType,
-    DBfile *dstFile, char const *dstObjAbsName, DBObjectType dstType)
+    DBfile *dstFile, char const *dstObjAbsName, DBObjectType dstType,
+    int deref_links, int dont_copy_just_link)
 {
     int q;
     char *_dstObjAbsName;
     DBobject *dstObj, *srcObj;
+    int srcDriverType, dstDriverType;
+    int retval = 1;
 
 #ifndef _WIN32
 #warning CHECK ARGS HERE. ALLOW FOR NULL dstFile AND dstObjAbsName
 #warning WHY CHECK dstType HERE
+#endif
+
+    /* Query driver type information */
+    srcDriverType = DBGetDriverType(srcFile);
+    dstDriverType = DBGetDriverType(dstFile);
+
+#ifdef DB_HDF5X
+    if (dont_copy_just_link && dstDriverType != DB_HDF5X)
+    {
+        db_perror("copying by creating links supported only for HDF5 destination files",
+            E_BADARGS, dstObjAbsName);
+        return 0;
+    }
 #endif
 
     /* Query type information if not already known */
@@ -6199,10 +6275,7 @@ db_copy_single_object_abspath(char const *opts,
     else if (dstType != DB_INVALID_OBJECT)
     {
         int srcSize, dstSize;
-#ifndef _WIN32
-#warning USE FILE-BASED FUNCTION WHEN AVAILABLE
-#endif
-        if (!DBGetAllowOverwrites())
+        if (!DBGetAllowOverwritesFile(dstFile))
         {
             db_perror("overwrite of pre-existing dst prevented due "
                 "to DBSetAllowOverwrites(0)", E_BADARGS, dstObjAbsName);
@@ -6222,12 +6295,35 @@ db_copy_single_object_abspath(char const *opts,
         _dstObjAbsName = STRDUP(dstObjAbsName);
     }
 
+    /* We need to handle symlinks specially. Worse, PDB driver doesn't support them.
+       We can legitimately copy links ONLY if the destination file is not a PDB file of
+       some sort and we are NOT aiming to dereference links */
+#ifdef HAVE_PDBP_DRIVER
+    if (srcType == DB_SYMLINK && dstDriverType != DB_PDB && dstDriverType != DB_PDBP && deref_links != 1)
+#else
+    if (srcType == DB_SYMLINK && dstDriverType != DB_PDB && deref_links != 1)
+#endif
+    {
+        static char linkval[1024];
+        DBGetSymlink(srcFile, srcObjAbsName, linkval);
+        DBMkSymlink(dstFile, linkval, _dstObjAbsName);
+        FREE(_dstObjAbsName); 
+        return 1;
+    }
+
+    if (dont_copy_just_link)
+    {
+        DBMkSymlink(dstFile, srcObjAbsName, _dstObjAbsName);
+        FREE(_dstObjAbsName); 
+        return 1;
+    }
+
     /* Access the source object using generic interface */
     srcObj = DBGetObject(srcFile, srcObjAbsName);
     if (!srcObj)
     {
-        db_perror("Unable to access source object for copy operation",
-            E_NOTFOUND, srcObjAbsName);
+        db_perror("Unable to access source object for copy operation", E_NOTFOUND, srcObjAbsName);
+        FREE(_dstObjAbsName); 
         return 0;
     }
 
@@ -6243,11 +6339,17 @@ db_copy_single_object_abspath(char const *opts,
     /* Ok, lets do what we came here to do...create the dst object and
        start populating it */
     dstObj = DBMakeObject(_dstObjAbsName, srcType, srcObj->ncomponents);
-    for (q = 0; q < srcObj->ncomponents; q++)
+    for (q = 0; q < srcObj->ncomponents && retval == 1; q++)
     {
         int isser = 0, nser = 0;
         char *sernm = 0, *sertstr = 0;
         void *serd = 0;
+        char typeflag = '\0';
+        double imvals[10] = {0,0,0,0,0,0,0,0,0,0}; /* immediate mode values...embedded in actual name string */
+        int nimvals = sscanf(srcObj->pdb_names[q], "'<%c>%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg", &typeflag,
+            imvals+0, imvals+1, imvals+2, imvals+3, imvals+4,
+            imvals+5, imvals+6, imvals+7, imvals+8, imvals+9);
+        if (nimvals > 0) nimvals--; /* don't count the typeflag */
         CheckForComponentSeries(srcObj, q, &isser, &nser, &sernm, &sertstr, &serd);
         if (isser)
         {
@@ -6259,21 +6361,51 @@ db_copy_single_object_abspath(char const *opts,
             free(serd);
             q += (nser-1);
         }
-        else if (!strncmp(srcObj->pdb_names[q], "'<i>", 4))
-            DBAddIntComponent(dstObj, srcObj->comp_names[q],
-                (int) strtol(srcObj->pdb_names[q]+4, NULL, 0));
-        else if (!strncmp(srcObj->pdb_names[q], "'<f>", 4))
-            DBAddFltComponent(dstObj, srcObj->comp_names[q],
-                (float) strtod(srcObj->pdb_names[q]+4, NULL));
-        else if (!strncmp(srcObj->pdb_names[q], "'<d>", 4))
-            DBAddDblComponent(dstObj, srcObj->comp_names[q],
-                strtod(srcObj->pdb_names[q]+4, NULL));
+        else if (!strncmp(srcObj->pdb_names[q], "'<i>", 4)) {
+            if (nimvals == 1)
+                DBAddIntComponent(dstObj, srcObj->comp_names[q],
+                    (int) strtol(srcObj->pdb_names[q]+4, NULL, 0));
+            else {
+                int imvalsi[10];
+                for (int qq = 0; qq < nimvals; qq++) imvalsi[qq] = (int) imvals[qq];
+                DBAddIntNComponent(dstObj, srcObj->comp_names[q], nimvals, imvalsi);
+            }
+        }
+        else if (!strncmp(srcObj->pdb_names[q], "'<f>", 4)) {
+            if (nimvals == 1)
+                DBAddFltComponent(dstObj, srcObj->comp_names[q],
+                    strtod(srcObj->pdb_names[q]+4, NULL));
+            else {
+                DBAddFltNComponent(dstObj, srcObj->comp_names[q], nimvals, imvals);
+            }
+        }
+        else if (!strncmp(srcObj->pdb_names[q], "'<d>", 4)) {
+            if (nimvals == 1)
+                DBAddDblComponent(dstObj, srcObj->comp_names[q],
+                    strtod(srcObj->pdb_names[q]+4, NULL));
+            else
+                DBAddDblNComponent(dstObj, srcObj->comp_names[q], nimvals, imvals);
+        }
+        else if (!strncmp(srcObj->comp_names[q], "time", 4) &&
+                 str_ends_with(srcObj->pdb_names[q], "time")) {
+            int zero = 0, one = 1;
+            float ftime;
+            DBReadVarSlice(srcFile, srcObj->pdb_names[q], &zero, &one, &one, 1, &ftime);
+            DBAddFltComponent(dstObj, srcObj->comp_names[q], (double) ftime);
+        }
+        else if (!strncmp(srcObj->comp_names[q], "dtime", 5) &&
+                 str_ends_with(srcObj->pdb_names[q], "dtime")) {
+            int zero = 0, one = 1;
+            double dtime;
+            DBReadVarSlice(srcFile, srcObj->pdb_names[q], &zero, &one, &one, 1, &dtime);
+            DBAddDblComponent(dstObj, srcObj->comp_names[q], dtime);
+        }
         else
         {
             DBObjectType subObjType;
             char *subObjName;
             char *srcObjDirName, *srcSubObjAbsName;
-             
+
             if (!strncmp(srcObj->pdb_names[q], "'<s>", 4))
                 subObjName = db_strndup(srcObj->pdb_names[q]+4, strlen(srcObj->pdb_names[q])-5);
             else
@@ -6302,17 +6434,22 @@ db_copy_single_object_abspath(char const *opts,
                        subObjType == DB_ZONELIST || subObjType == DB_PHZONELIST)) ||
                      (srcType == DB_CSGMESH && subObjType == DB_CSGZONELIST)) 
             {
-                char *dstObjDirName = db_dirname(dstObjAbsName);
+                char *dstObjDirName = db_dirname(_dstObjAbsName);
                 char *dstSubObjAbsName = db_join_path(dstObjDirName, subObjName);
 
-                db_copy_single_object_abspath(opts, /* recursive call */
-                   srcFile, srcSubObjAbsName, subObjType,
-                   dstFile, dstSubObjAbsName, DB_INVALID_OBJECT);
+                retval = db_copy_single_object_abspath(opts, /* recursive call */
+                             srcFile, srcSubObjAbsName, subObjType,
+                             dstFile, dstSubObjAbsName, DB_INVALID_OBJECT,
+                             deref_links, dont_copy_just_link);
 
                 DBAddStrComponent(dstObj, srcObj->comp_names[q], subObjName);
 
                 FREE(dstObjDirName);
                 FREE(dstSubObjAbsName);
+            }
+            else
+            {
+                DBAddStrComponent(dstObj, srcObj->comp_names[q], subObjName);
             }
             free(subObjName);
             free(srcObjDirName);
@@ -6325,7 +6462,7 @@ db_copy_single_object_abspath(char const *opts,
     DBFreeObject(dstObj);
     FREE(_dstObjAbsName);
 
-    return 1;
+    return retval;
 }
 
 /*-------------------------------------------------------------------------
@@ -6377,7 +6514,7 @@ db_copy_single_object_abspath(char const *opts,
  *
  *      -2 treat varargs list of args as src/dst path pairs and where any
  *         null dst is inferred to have same path as associated src except
-           that relative paths are interpreted relative to dst files cwg.
+           that relative paths are interpreted relative to dst file's cwg.
  *      -1 like -2 except caller passes only src paths. All dst paths are
  *         inferred to be same as associated src path. The dst file's cwg
  *         will then determine how any relative src paths are interpreted.
@@ -6438,6 +6575,8 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
     char const **srcPathNames = 0, **dstPathNames = 0;
     int srcPathNamesAlloc = 0, dstPathNamesAlloc = 0;
     char srcStartCwg[1024], dstStartCwg[1024];
+    int src_dst_same_file = (srcFile == dstFile);
+    int retval = 0;
 
 #ifndef _WIN32
 #warning WARN ABOUT CERTAIN OPTIONS NOT YET SUPPORTED
@@ -6474,7 +6613,6 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
 
     if ((dont_copy_just_symlink || dont_copy_just_hardlink) && srcFile != dstFile)
         return db_perror("srcFile and dstFile must be same for -s or -l", E_BADARGS, me);
-
 
     if (n_src_dst_triple || n_src_dir_triple) // -3 or -4
     {
@@ -6530,11 +6668,11 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         }
     }
 
-    if (n_src_dir_triple && N == 0)
+    if ((n_src_dir_triple || n_src_dst_triple) && N == 0)
     {
         if (srcPathNamesAlloc) FREE(srcPathNames);
         if (dstPathNamesAlloc) FREE(dstPathNames);
-        return 0;
+        return db_perror("empty destination list or dir", E_BADARGS, me);
     }
     if (!n_src_dir_triple && N < 2)
     {
@@ -6574,8 +6712,8 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         char *srcObjAbsName, *dstObjAbsName;
         char savcwg[1024], srccwg[1024], dstcwg[1024];
         char opts2[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-        char **dirItems=0, **otherItems;
-        int  dirItemCount=0, otherItemCount;
+        char **dirItems=0;
+        int  dirItemCount=0;
 
         if (i == 0)
         {
@@ -6591,7 +6729,7 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
 
         if (srcType == DB_INVALID_OBJECT)
         {
-            db_perror(DBSPrintf("\"%s\" invalid object", srcObjAbsName), E_BADARGS, me);
+            retval = db_perror(DBSPrintf("\"%s\" invalid object", srcObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
@@ -6599,65 +6737,113 @@ DBCp(char const *opts, DBfile *srcFile, DBfile *dstFile, ...)
         {
             if (!db_copy_single_object_abspath(opts, 
                     srcFile, srcObjAbsName, srcType,
-                    dstFile, dstObjAbsName, dstType))
+                    dstFile, dstObjAbsName, dstType,
+                    deref_links, dont_copy_just_symlink))
             {
-                db_perror("Object copy failed", E_CALLFAIL, me);
+                retval = db_perror("Object copy failed", E_CALLFAIL, me);
                 goto endLoop;
             }
             goto endLoop;
         }
 
-        /* If we get this far into the loop body here, then src is a dir */
         if (!recurse_on_dirs)
         {
-            db_perror(DBSPrintf("Cannot copy dir \"%s\" without -r flag",
+            retval = db_perror(DBSPrintf("Cannot copy dir \"%s\" without -r flag",
                 srcObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
         if (dstType != DB_INVALID_OBJECT && dstType != DB_DIR)
         {
-            db_perror(DBSPrintf("Cannot copy dir \"%s\" onto pre-existing non-dir \"%s\"",
+            retval = db_perror(DBSPrintf("Cannot copy dir \"%s\" onto pre-existing non-dir \"%s\"",
                 srcObjAbsName, dstObjAbsName), E_BADARGS, me);
             goto endLoop;
         }
 
-#if 0
-        /* get the contents of this dir in two lists; all the dirs, everything else */
-        DBLs(srcFile, DBSPrintf("-d %s", srcObjAbsName), 0, &dirItemCount); /* just count it first */
-        dirItems = ALLOC_N(char*, ++dirItemCount);
-        DBLs(srcFile, DBSPrintf("-d %s", srcObjAbsName), dirItems, &dirItemCount);
+        /* If we get this far into the loop body here, then src object to be copied is a dir.
+           We have to copy everything inside the src dir to a dst dir. If the dst dir already
+           exists, then we are copying the src dir *into* the dst dir. */
 
-        DBLs(srcFile, DBSPrintf("-a -d %s", srcObjAbsName), 0, &otherItemCount); /* just count it first */
-        otherItems = ALLOC_N(char*, ++otherItemCount);
-        DBLs(srcFile, DBSPrintf("-a -d %s", srcObjAbsName), otherItems, &otherItemCount);
-#endif
-        /* get the contents of this dir */
-        DBSetDir(srcFile, srcObjAbsName);
-        DBLs(srcFile, "-a -x", 0, &dirItemCount); /* just count it first */
-        dirItems = ALLOC_N(char*, dirItemCount);
-        DBLs(srcFile, "-a -x", dirItems, &dirItemCount);
-
-        if (dstType == DB_INVALID_OBJECT)
+        if (src_dst_same_file) /* we have to do everything without any SetDir calls */
         {
-            DBMkDir(dstFile, dstObjAbsName);
-            DBSetDir(dstFile, dstObjAbsName);
+            char *dstDirAbsName;
+            char *lsargs = strdup(DBSPrintf("-a -x -f %s", srcObjAbsName));
+            DBLs(srcFile, lsargs, 0, &dirItemCount); /* just count it first */
+            if (dirItemCount == 0)
+            {
+                free(lsargs);
+                goto endLoop;
+            } 
+            dirItems = ALLOC_N(char*, dirItemCount);
+            DBLs(srcFile, lsargs, dirItems, &dirItemCount);
+            free(lsargs);
+
+
+            if (dstType == DB_INVALID_OBJECT)
+            {
+                DBMkDir(dstFile, dstObjAbsName);
+                dstDirAbsName = dstObjAbsName;
+            }
+            else if (dstType == DB_DIR)
+            {
+                char *srcDirBaseName = db_basename(srcObjAbsName);
+                DBObjectType ot = DBInqVarType(dstFile, srcDirBaseName);
+                if (ot == DB_INVALID_OBJECT)
+                    DBMkDir(dstFile, srcDirBaseName);
+                free(srcDirBaseName);
+                dstDirAbsName = srcObjAbsName;
+            }
+
+            /* Recursive call to DBCp for the contents of the current dir object */
+
+            if (n_src_dir_triple)
+            {
+                retval = DBCp(opts, srcFile, dstFile, dirItemCount, dirItems, dstDirAbsName);
+            }
+            else
+            {
+                char *cpargs = strdup(DBSPrintf("%s -4", opts));
+                retval = DBCp(cpargs, srcFile, dstFile, dirItemCount, dirItems, dstDirAbsName);
+                free(cpargs);
+            }
         }
-        else if (dstType == DB_DIR)
+        else /* different src and dst files */
         {
-            char *srcDirBaseName = db_basename(srcObjAbsName);
-            DBMkDir(dstFile, srcDirBaseName);
-            DBSetDir(dstFile, srcDirBaseName);
-            free(srcDirBaseName);
+            /* get the contents of this dir */
+            DBSetDir(srcFile, srcObjAbsName);
+            DBLs(srcFile, "-a -x", 0, &dirItemCount); /* just count it first */
+            if (dirItemCount == 0) goto endLoop;
+            dirItems = ALLOC_N(char*, dirItemCount);
+            DBLs(srcFile, "-a -x", dirItems, &dirItemCount);
+
+            if (dstType == DB_INVALID_OBJECT)
+            {
+                DBMkDir(dstFile, dstObjAbsName);
+                DBSetDir(dstFile, dstObjAbsName);
+            }
+            else if (dstType == DB_DIR)
+            {
+                char *srcDirBaseName = db_basename(srcObjAbsName);
+                DBObjectType ot = DBInqVarType(dstFile, srcDirBaseName);
+                if (ot == DB_INVALID_OBJECT)
+                    DBMkDir(dstFile, srcDirBaseName);
+                DBSetDir(dstFile, srcDirBaseName);
+                free(srcDirBaseName);
+            }
+
+            /* Recursive call to DBCp for the contents of the current dir object */
+            if (n_src_dir_triple)
+                retval = DBCp(opts, srcFile, dstFile, dirItemCount, dirItems, ".");
+            else
+            {
+                char *cpargs = strdup(DBSPrintf("%s -4", opts));
+                retval = DBCp(cpargs, srcFile, dstFile, dirItemCount, dirItems, ".");
+                free(cpargs);
+            }
+
+            DBSetDir(srcFile, "..");
+            DBSetDir(dstFile, "..");
         }
-
-        if (n_src_dir_triple)
-            DBCp(opts, srcFile, dstFile, dirItemCount, dirItems, ".");
-        else
-            DBCp(DBSPrintf("%s -4", opts), srcFile, dstFile, dirItemCount, dirItems, ".");
-
-        DBSetDir(srcFile, "..");
-        DBSetDir(dstFile, "..");
 
 endLoop:
         if (dirItems)
@@ -6676,7 +6862,7 @@ endLoop:
     DBSetDir(srcFile, srcStartCwg);
     DBSetDir(dstFile, dstStartCwg);
 
-    return 0;
+    return retval;
 }
 
 #if 1

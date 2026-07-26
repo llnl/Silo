@@ -214,12 +214,37 @@ PyObject *silo_Create(PyObject *self, PyObject *args)
     DBfile *db = DBCreate(filename, mode, DB_LOCAL, info, driver);
     if (!db)
     {
-        PyErr_SetString(PyExc_TypeError,
-                        "File creation failed");
+        PyErr_SetString(PyExc_TypeError, "File creation failed");
         return NULL;
     }
     DBSetAllowOverwrites(1);
     return DBfile_NEW(db);
+}
+
+PyObject *silo_ShowErrors(PyObject *self, PyObject *args)
+{
+    int emode;
+    if (!PyArg_ParseTuple(args, "i", &emode))
+    {
+        PyErr_SetString(PyExc_TypeError, "ShowErrors takes 1 int argument");
+        return NULL;
+    }
+
+    PyErr_Clear();
+    if (emode == DB_TOP || 
+        emode == DB_NONE ||
+        emode == DB_ALL ||
+        emode == DB_ABORT ||
+        emode == DB_ALL_AND_DRVR)
+        DBShowErrors(emode, NULL);
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "Invalid error mode");
+        return NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 // ****************************************************************************
@@ -251,8 +276,9 @@ void SILOMODULE_API initSilo(void)
               "Usage: Open(filename [, DB_READ|DB_APPEND]])");
     AddMethod("Create", silo_Create,
               "Usage: Create(filename , info [, DB_PDB|DB_HDF5 [, DB_CLOBBER|DB_NOCLOBBER]])");
+    AddMethod("ShowErrors", silo_ShowErrors,
+              "Usage: ShowErrors([DB_TOP|DB_NONE|DB_ALL|DB_ABORT|DB_ALL_AND_DRVR])");
     AddMethod(NULL, NULL);
-
 
     PY_SILO_MOD_DEF(siloModule, "Silo", &SiloMethods[0]);
 
@@ -261,6 +287,13 @@ void SILOMODULE_API initSilo(void)
     SiloError = PyErr_NewException("Silo.SiloException", NULL, NULL);
     PyDict_SetItemString(d, "SiloException", SiloError);
     Py_DECREF(SiloError);
+
+    // Error Modes
+    ADD_CONSTANT(DB_TOP);
+    ADD_CONSTANT(DB_NONE);
+    ADD_CONSTANT(DB_ALL);
+    ADD_CONSTANT(DB_ABORT);
+    ADD_CONSTANT(DB_ALL_AND_DRVR);
 
     // File Drivers
     ADD_CONSTANT(DB_PDB);

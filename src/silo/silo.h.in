@@ -1872,6 +1872,7 @@ typedef struct DBfile_pub {
     int            (*cpnobjs)(int, struct DBfile *, char const * const *, struct DBfile *, char const * const *);
     int            (*mksymlink)(struct DBfile *, char const *, char const *);
     int            (*g_symlink)(struct DBfile *, char const *, char *);
+    void          *(*g_compstuff)(struct DBfile *, char const *objname, char const *compname, int *type, int *nvals);
 } DBfile_pub;
 
 typedef struct DBfile {
@@ -1973,6 +1974,7 @@ SILO_API extern int                    DBForceSingle(int);
 SILO_API extern DBfile *               DBOpenReal(char const *name, int dbtype, int mode);
 SILO_API extern DBfile *               DBCreateReal(char const *name, int mode, int targ, char const *info, int dbtype);
 SILO_API extern int                    DBInqFileReal(char const *name);
+SILO_API extern int                    DBDriverVersionReal(int driver, int *maj, int *min, int *pat);
 SILO_API extern int                    DBStat(char const *fname);
 /* 
  * The above functions are the 'Real' implementations of their macro counterparts (below).
@@ -1986,6 +1988,7 @@ SILO_API extern int                    DBStat(char const *fname);
 #define DBOpen(NM, DR, MD)            (SiloCheckVersion, DBOpenReal(NM, DR, MD))
 #define DBCreate(NM, MD, TG, NF, DR)  (SiloCheckVersion, DBCreateReal(NM, MD, TG, NF, DR))
 #define DBInqFile(NM)                 (SiloCheckVersion, DBInqFileReal(NM))
+#define DBDriverVersion(DR, MAJ, MIN, PAT) (SiloCheckVersion, DBDriverVersionReal(DR, MAJ, MIN, PAT))
 SILO_API extern int                    DBFlush(DBfile *);
 SILO_API extern int                    DBClose(DBfile *);
 SILO_API extern DBtoc *                DBGetToc(DBfile *);

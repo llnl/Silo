@@ -70,6 +70,9 @@ else()
     set(_envvar_path_sep ":")
 endif()
 
+# List of build types with debugging enabled
+set(_debug_build_types Debug RelWithDebInfo)
+
 ###-----------------------------------------------------------------------------
 # project command will automatically create cmake vars for major, minor,
 # patch and tweak from passed VERSION
@@ -159,7 +162,11 @@ CMAKE_DEPENDENT_OPTION(SILO_ENABLE_HZIP "Enable Lindstrom hex/quad mesh compress
 # Conflicting option settings
 #
 if(NOT SILO_ENABLE_SHARED AND SILO_ENABLE_PYTHON_MODULE)
-    message(FATAL "Python module requires SILO_ENABLE_SHARED=ON")
+    message(FATAL_ERROR "Python module requires SILO_ENABLE_SHARED=ON")
+endif()
+
+if(SILO_BUILD_FOR_ASAN AND NOT CMAKE_BUILD_TYPE IN_LIST _debug_build_types)
+    message(FATAL_ERROR "SILO_BUILD_FOR_ASAN requires CMAKE_BUILD_TYPE=Debug|RelWithDebInfo")
 endif()
 
 ##
@@ -769,7 +776,11 @@ if(SILO_ENABLE_SILOCK AND NOT WIN32)
     endif()
     if(SILO_BUILD_FOR_ASAN)
         target_compile_options(silock PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
-        target_link_options(silock PRIVATE -Wl,--no-as-needed -fsanitize=address,undefined)
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            target_link_options(silock PRIVATE -Wl,--no-as-needed -fsanitize=address,undefined)
+        else()
+            target_link_options(silock PRIVATE -fsanitize=address,undefined)
+        endif()
     endif()
     target_include_directories(silock PRIVATE
         ${silo_build_include_dir}
@@ -793,7 +804,6 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
 
-    set(_debug_build_types Debug RelWithDebInfo)
     if(CMAKE_BUILD_TYPE IN_LIST _debug_build_types)
         find_program(MEMORYCHECK_COMMAND NAMES valgrind)
         if (MEMORYCHECK_COMMAND)
@@ -803,9 +813,14 @@ if(BUILD_TESTING)
         if(SILO_BUILD_FOR_ASAN)
             string(APPEND CMAKE_C_FLAGS_DEBUG " -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1")
             string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1")
-            string(APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed -fsanitize=address,undefined")
-            string(APPEND CMAKE_SHARED_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed -fsanitize=address,undefined")
-            string(APPEND CMAKE_MODULE_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed -fsanitize=address,undefined")
+            string(APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG " -fsanitize=address,undefined")
+            string(APPEND CMAKE_SHARED_LINKER_FLAGS_DEBUG " -fsanitize=address,undefined")
+            string(APPEND CMAKE_MODULE_LINKER_FLAGS_DEBUG " -fsanitize=address,undefined")
+            if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+                string(APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed")
+                string(APPEND CMAKE_SHARED_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed")
+                string(APPEND CMAKE_MODULE_LINKER_FLAGS_DEBUG " -Wl,--no-as-needed")
+            endif()
             set(SILO_ASAN_OPTIONS "detect_leaks=1;halt_on_error=0;malloc_context_size=50;fast_unwind_on_malloc=0;detect_stack_use_after_return=1")
 
             execute_process(
