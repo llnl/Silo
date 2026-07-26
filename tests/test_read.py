@@ -47,13 +47,12 @@
 # reflect those  of the United  States Government or  Lawrence Livermore
 # National  Security, LLC,  and shall  not  be used  for advertising  or
 # product endorsement purposes.
-import os
+import os, sys
 import Silo
 
 # ---- file 1 ----
-if os.access("multi_ucd3d.pdb",os.R_OK):
-    file = "multi_ucd3d.pdb"
-elif os.access("multi_ucd3d.h5",os.R_OK):
+file = "multi_ucd3d.pdb"
+if len(sys.argv) > 1 and sys.argv[1] == "DB_HDF5" and os.access("multi_ucd3d.h5",os.R_OK):
     file = "multi_ucd3d.h5"
 
 db = Silo.Open(file)
@@ -65,28 +64,28 @@ print("\n-- TOC --\n",toc)
 
 print("cycle='%d'"%db.GetVar("cycle"))
 print("dtime='%f'"%db.GetVar("dtime"))
-print("_fileinfo='%s'"%db.GetVar("_fileinfo"))
-print("d_vartypes=",db.GetVar("d_vartypes"))
-print("d_varnames=",db.GetVar("d_varnames"))
+print("_fileinfo='%s'"%db.GetVarInfo("_fileinfo"))
+print("d['vartypes']=",db.GetVarInfo("d",1)['vartypes'])
+print("d['varnames']=",db.GetVarInfo("d",1)['varnames'])
 
 db.SetDir("block0")
 toc = db.GetToc()
-print("mesh1_coord0=",db.GetVar("mesh1_coord0")[1:10])
-print("v_data=",db.GetVar("v_data")[1:10])
+print("mesh1['coord0']=",db.GetVarInfo("mesh1",1)['coord0'][1:10])
+print(db.GetVarInfo("v",1))
+print("v['value0']=",db.GetVarInfo("v",1)['value0'][1:10])
 
 db.SetDir("../block7")
 toc = db.GetToc()
-print("mesh1_coord0=",db.GetVar("mesh1_coord0")[1:10])
-print("v_data=",db.GetVar("v_data")[1:10])
+print("mesh1['coord0']=",db.GetVarInfo("mesh1",1)['coord0'][1:10])
+print("v['value0']=",db.GetVarInfo("v",1)['value0'][1:10])
 
 db.Close()
 
 print("\n")
 
 # ---- file 2 ----
-if os.access("multi_rect3d.pdb",os.R_OK):
-    file = "multi_rect3d.pdb"
-elif os.access("multi_rect3d.h5",os.R_OK):
+file = "multi_rect3d.pdb"
+if len(sys.argv) > 1 and sys.argv[1] == "DB_HDF5" and os.access("multi_rect3d.h5",os.R_OK):
     file = "multi_rect3d.h5"
 
 db = Silo.Open(file)
@@ -98,15 +97,15 @@ print("\n-- TOC --\n",toc)
 print("cycle='%d'"%db.GetVar("cycle"))
 print("time='%f'"%db.GetVar("time"))
 print("_fileinfo='%s'"%db.GetVar("_fileinfo"))
-print("defvars_defns=",db.GetVar("defvars_defns"))
+print("defvars['defns']=",db.GetVarInfo("defvars",1)['defns'])
 
 db.SetDir("block0")
 toc = db.GetToc()
-print("mesh1_coord0=",db.GetVar("mesh1_coord0"))
+print("mesh1['coord0']=",db.GetVarInfo("mesh1",1)['coord0'])
 
 db.SetDir("/block7")
 toc = db.GetToc()
-print("mesh1_coord0=",db.GetVar("mesh1_coord0"))
+print("mesh1['coord0']=",db.GetVarInfo("mesh1",1)['coord0'])
 
 db.SetDir("/")
 toc = db.GetToc()

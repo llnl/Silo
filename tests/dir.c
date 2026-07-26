@@ -57,6 +57,7 @@ be used for advertising or product endorsement purposes.
 #include <direct.h>
 #include <stdlib.h>
 #include <string.h>
+#define access _access
 #endif
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
     int            ndirs = 0;
     int            ntocs = 0;
     int            compat = 0;
+    int            xcopy = 0;
 
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "DB_PDB",6)) {
@@ -128,6 +130,8 @@ int main(int argc, char *argv[])
             compat = DB_COMPAT_OVER_PERF;
         } else if (!strcmp(argv[i], "perf-over-compat")) {
             compat = DB_PERF_OVER_COMPAT;
+        } else if (!strcmp(argv[i], "xcopy")) {
+            xcopy = 1;
 	} else {
             fprintf(stderr, "%s: ignored argument `%s'\n", argv[0], argv[i]);
         }
@@ -177,6 +181,7 @@ int main(int argc, char *argv[])
     DBSetDir(dbfile, "quad_subdir3");
     DBMkSymlink(dbfile, "/quad_dir/quad_subdir1", "dirlink");
     DBMkSymlink(dbfile, "dir2.h5:/gorfo", "extlink");
+    db_errno = 0;
 
     build_quad(dbfile, "quadmesh");
 
@@ -205,6 +210,52 @@ int main(int argc, char *argv[])
 
     /* Try a recursive copy */
     DBCp("-r", dbfile, dbfile2, "/quad_dir/quad_subdir1", "quad_dir_copy", DB_EOA);
+
+    /* Test a complicated whole file copy ACROSS drivers */
+    if (xcopy && driver2 != DB_PDB && access("multi_ucd3d_copy.pdb", 0) == 0)
+    {
+        int result;
+        DBfile *fsrc = DBOpen("multi_ucd3d_copy.pdb", DB_PDB, DB_READ);
+        DBfile *fdst = DBCreate("foo.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_HDF5);
+        result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
+        DBClose(fsrc);
+        DBClose(fdst);
+        if (result != 0)
+        {
+            fprintf(stderr, "Complex whole file, cross driver copy from PDB to HDF5 failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
+            return 1;
+        }
+    }
+    else if (xcopy && driver2 == DB_PDB && access("multi_ucd3d_copy.h5", 0) == 0)
+    {
+        int result;
+        DBfile *fsrc = DBOpen("multi_ucd3d_copy.h5", DB_HDF5, DB_READ);
+        DBfile *fdst = DBCreate("bar.silo", 0, DB_LOCAL, "cross-driver whole file copy test", DB_PDB);
+        result = DBCp("-r", fsrc, fdst, "/", "/", DB_EOA);
+        DBClose(fsrc);
+        DBClose(fdst);
+        if (result != 0)
+        {
+            fprintf(stderr, "Complex whole file, cross driver copy from HDF5 to PDB failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
+            return 1;
+        }
+        fsrc = DBOpen("multi_ucd3d_copy.h5", DB_HDF5, DB_APPEND);
+        result = DBCp("-rs", fsrc, fsrc, "/block5", "block5_copy", DB_EOA);
+        DBClose(fsrc);
+        if (result != 0)
+        {
+            fprintf(stderr, "Copying via symlinks failed\n");
+            fprintf(stderr, "Errno = %d, \"%s\"\n", DBErrno(), DBErrString());
+            return 1;
+        }
+    }
+    else if (xcopy)
+    {
+        fprintf(stderr, "\n\nComplex whole file, cross driver copy requires both PDB and HDF5 drivers and \"multi_ucd3d_copy.[h5,pdb]\"\n\n\n");
+        return 1;
+    }
 
     build_ucd_tri(dbfile2, "trimesh", 0x2); /* make a larger tri mesh here */
 
@@ -284,7 +335,6 @@ int main(int argc, char *argv[])
 
     DBClose(dbfile);
     DBClose(dbfile2);
-
 
     /* test attempt to DBCreate a file without clobbering it and
        for which the path is really a dir in the host filesystem */

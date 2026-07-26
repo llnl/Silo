@@ -1287,7 +1287,10 @@ main(int argc, char *argv[])
 #endif /*HAVE_READLINE_HISTORY_H && HAVE_READLINE_HISTORY*/
 
     /* Turn off Silo error reporting */
-    DBShowErrors(DB_TOP, NULL);
+    if (Verbosity > 1)
+        DBShowErrors(DB_ALL_AND_DRVR, NULL);
+    else
+        DBShowErrors(DB_TOP, NULL);
 
     /* Initialize data structures. */
     out_init();
