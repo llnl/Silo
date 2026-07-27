@@ -191,7 +191,7 @@ jobs:
       - name: Run Silo tests
         run: |
           cd build
-          ctest -E checksums --output-on-failure
+          ctest -j1 --stop-on-failure --output-on-failure -E checksums
 
       - name: Upload failure logs
         if: failure()

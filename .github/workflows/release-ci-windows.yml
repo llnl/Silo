@@ -458,10 +458,12 @@ jobs:
             }
 
           ctest `
+            -j1 `
             --test-dir build `
             --build-config Release `
-            -E checksums `
-            --output-on-failure
+            --stop-on-failure `
+            --output-on-failure `
+            -E checksums
 
           if ($LASTEXITCODE -ne 0) {
             throw "CTest failed with $LASTEXITCODE."
