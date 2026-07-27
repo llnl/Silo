@@ -271,6 +271,17 @@ set(PDB_ONLY_SOURCES
     testpdb.c
 )
 
+set(ROCKET_SOURCES
+    rocket.cxx
+    rocket_silo.cxx
+)
+if(VTK_DIR)
+    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
+    if (VTK_FOUND)
+        list(APPEND ROCKET_SOURCES rocket_vtk.cxx)
+    endif()
+endif()
+
 set(PARALLEL_SOURCES
     bcastopen.c
     bcastopen_main.c
@@ -297,9 +308,12 @@ endif()
 #
 #     * Associated test is not working
 #     * Source file is used only within other tests
-#     * Special dependency logic is required
+#     * Special dependency logic is required meaning the test is
+#       not skipped in the sense it is never run but just skipped
+#       from the main (default) build loop and handled seperately
 #
 set(SKIP_TEST_SOURCES
+    ${ROCKET_SOURCES}
     add_amr_mrgtree.c
     cpz1plt.c
     ioperf.c
@@ -310,8 +324,6 @@ set(SKIP_TEST_SOURCES
     ioperf_stdio.c
     largefile_netcdf.c
     listtypes_main.c
-    rocket_silo.cxx
-    rocket_vtk.cxx
     silo_overwrite_multi_example.c
     std.c
     testlib.c
@@ -321,7 +333,10 @@ if(WIN32)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx pdbtst.c)
+    list(APPEND SKIP_TEST_SOURCES pdbtst.c)
+endif()
+if(NOT VTK_DIR)
+    list(APPEND SKIP_TEST_SOURCES rocket_vtk.cxx)
 endif()
 
 #
@@ -342,7 +357,6 @@ endif()
 #
 set(SPECIAL_TEST_SOURCES
     merge_block.c
-    rocket_silo.cxx
     test_mat_compression.c
 )
 
@@ -360,16 +374,28 @@ if(NOT SILO_ENABLE_JSON)
     list(APPEND SKIP_TEST_SOURCES ${JSON_C_TEST_SOURCES})
 endif()
 
+#
+# Handle special logic for rocket test
+#
+if(SILO_ENABLE_SHARED)
 
-if(SILO_ENABLE_SHARED AND NOT WIN32)
+    add_executable(rocket rocket.cxx)
+    target_link_libraries(rocket PRIVATE silo)
+    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+    if(WIN32)
+        set_target_properties(rocket PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    endif()
+    if(CMAKE_DL_LIBS AND NOT APPLE)
+        target_link_libraries(rocket PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+    if(UNIX)
+        target_link_libraries(rocket PRIVATE m)
+    endif()
+
+    # Silo plugin
     add_library(rocket_silo MODULE rocket_silo.cxx)
-    add_dependencies(rocket_silo silo)
-    target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
-if(UNIX)
-    target_link_libraries(rocket_silo dl m)
-endif()
+    target_link_libraries(rocket_silo PRIVATE silo rocket)
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
         target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
     endif()
     target_include_directories(rocket_silo PRIVATE
@@ -377,6 +403,21 @@ endif()
         ${Silo_SOURCE_DIR}/src/silo
         ${SILO_TESTS_SOURCE_DIR})
     set_target_properties(rocket_silo PROPERTIES PREFIX "")
+
+    # VTK plugin if requested
+    if(VTK_FOUND)
+        add_library(rocket_vtk MODULE rocket_vtk.cxx)
+        target_link_libraries(rocket_vtk PRIVATE rocket VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+        set_target_properties(rocket_vtk PROPERTIES PREFIX "")
+        if(COMMAND vtk_module_autoinit)
+            vtk_module_autoinit(TARGETS rocket_vtk MODULES VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+        endif()
+    endif()
+    add_test(NAME rocket COMMAND $<TARGET_FILE:rocket>)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME rocket-hdf5 COMMAND $<TARGET_FILE:rocket> DB_HDF5)
+        set_tests_properties(rocket-hdf5 PROPERTIES DEPENDS rocket)
+    endif()
 endif()
 
 add_library(testlib_obj OBJECT testlib.c)
@@ -493,11 +534,6 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 
 endforeach()
-
-if(SILO_ENABLE_SHARED AND NOT WIN32)
-    add_dependencies(rocket rocket_silo)
-    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
-endif()
 
 target_sources(listtypes PRIVATE listtypes_main.c listtypes.c)
 set_tests_properties(listtypes PROPERTIES DEPENDS ucd REQUIRED_FILES ucd.pdb)

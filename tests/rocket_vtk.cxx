@@ -76,7 +76,7 @@ be used for advertising or product endorsement purposes.
 #include <vtkPoints.h>
 #include <vtkUnstructuredGrid.h>
 
-#include <rocket.h>
+#include "rocket.h"
 
 using std::cout;
 using std::cerr;
@@ -143,7 +143,7 @@ static int vtk_binary = 0;
 static int vtk_api = 1;
 static int ProcessArgsForVTK(const int argc, const char *const *const argv)
 {
-    int show_all_errors = FALSE;
+    int show_all_errors = 0;
     int j, i = 1;
 
     while (i < argc)
@@ -162,13 +162,13 @@ static int ProcessArgsForVTK(const int argc, const char *const *const argv)
     return 0;
 }
 
-static int WriteVTKApiSingleMesh(char const *vtkFileName, const vector<string>& dom_classes)
+static void WriteVTKApiSingleMesh(char const *vtkFileName, const vector<string>& dom_classes)
 {
     float *coords[3];
     coords[0] = &xvals_g[0];
     coords[1] = &yvals_g[0];
     coords[2] = &zvals_g[0];
-    char *coordnames[3];
+    char const *coordnames[3];
     coordnames[0] = "X";
     coordnames[1] = "Y";
     coordnames[2] = "Z";
@@ -226,10 +226,10 @@ static int WriteVTKApiSingleMesh(char const *vtkFileName, const vector<string>& 
     ugrid->Delete();
 }
 
-static int WriteVTKApiMultiMesh(char const *root, const vector<string>& dom_classes)
+static void WriteVTKApiMultiMesh(char const *root, const vector<string>& dom_classes)
 {
     float *coords[3];
-    char *coordnames[3];
+    char const *coordnames[3];
     coordnames[0] = "X";
     coordnames[1] = "Y";
     coordnames[2] = "Z";
@@ -284,7 +284,7 @@ static int WriteFormatReal(int argc, const char *const *const argv)
 {
     ProcessArgsForVTK(argc, argv);
 
-    char *dclasses[] = {"Domain0", "Domain1", "Domain2", "Domain3", "Domain4"};
+    char const *dclasses[] = {"Domain0", "Domain1", "Domain2", "Domain3", "Domain4"};
     int ndoms = sizeof(dclasses) / sizeof(dclasses[0]);
     vector<string> dom_classes(dclasses, dclasses + ndoms);
     int nmats = 5;

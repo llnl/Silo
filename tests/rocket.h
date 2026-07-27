@@ -73,8 +73,6 @@ be used for advertising or product endorsement purposes.
 #include <sys/types.h>
 #include <dirent.h>
 
-#include <silo.h>
-
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
