@@ -95,7 +95,7 @@ jobs:
       run: |
         export PATH="$PWD/hdf5-1.14.4-3/bin:$PATH"
         cd cmake_build
-        ctest -j4 --stop-on-failure --output-log ctest.log
+        ctest -j0 --stop-on-failure --output-log ctest.log
 
     - name: Check Silo CTest+ASAN
       id: makecheck-cmake-asan
@@ -103,7 +103,7 @@ jobs:
       run: |
         export PATH="$PWD/hdf5-1.14.4-3/bin:$PATH"
         cd cmake_asan_build
-        ctest -j4 --stop-on-failure --output-log ctest.log
+        ctest -j0 --stop-on-failure --output-log ctest.log
 
     - name: Package Artifact CMake
       id: pack-cmake
