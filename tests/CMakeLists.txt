@@ -330,6 +330,7 @@ set(SKIP_TEST_SOURCES
 )
 if(WIN32)
     list(APPEND SKIP_TEST_SOURCES locking.c)
+    list(APPEND SKIP_TEST_SOURCES rocket.cxx rocket_silo.cxx rocket_vtk.cxx)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
@@ -377,7 +378,7 @@ endif()
 #
 # Handle special logic for rocket test
 #
-if(SILO_ENABLE_SHARED)
+if(SILO_ENABLE_SHARED AND NOT WIN32)
 
     add_executable(rocket rocket.cxx)
     target_link_libraries(rocket PRIVATE silo)
