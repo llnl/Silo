@@ -262,7 +262,7 @@ static int SaveInternalString(DBnamescheme const *ns, const char *sval)
 }
 
 /* very simple circular cache for strings returned from DBGetName */
-#define DB_MAX_RETSTRS 32
+#define DB_MAX_RETSTRS 512
 static char * retstrbuf[DB_MAX_RETSTRS];
 static char * SaveReturnedString(char const * retstr)
 {

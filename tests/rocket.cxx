@@ -77,9 +77,7 @@ be used for advertising or product endorsement purposes.
 #include <dlfcn.h>
 #endif
 
-#include <rocket.h>
-
-#include <std.c>
+#include "rocket.h"
 
 using std::cout;
 using std::cerr;
@@ -784,7 +782,12 @@ WriteAllFormats(int argc, char **argv)
             string fmtname, pname;
             if (dname.rfind(".dylib") != string::npos)
             {
-                fmtname = dname.substr(7,dname.size()-12);
+                fmtname = dname.substr(7,dname.size()-13);
+                pname = string(dirs[d])+"/"+dname;
+            }
+            else if (dname.rfind(".dll") != string::npos)
+            {
+                fmtname = dname.substr(7,dname.size()-11);
                 pname = string(dirs[d])+"/"+dname;
             }
             else if (dname.rfind(".so") != string::npos)

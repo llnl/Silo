@@ -69,10 +69,9 @@ be used for advertising or product endorsement purposes.
 #include <assert.h>
 #include <sys/types.h>
 
-#include <silo.h>
-#include <std.c>
-
-#include <rocket.h>
+#include "silo.h"
+#include "std.c"
+#include "rocket.h"
 
 using std::cout;
 using std::cerr;

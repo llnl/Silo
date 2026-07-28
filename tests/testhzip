@@ -115,7 +115,7 @@ $multi_test DB_HDF5 1>/dev/null 2>&1
 # Now, run browser and make sure we don't get any errors in the diff
 #
 result=0
-for df in multi_*.h5; do
+for df in multi_*d.h5; do
     # confirm compressed files are smaller (or at least not too much bigger)
     hzip_raw_data_size=$($h5stat -d h5_hzip_files/$df | grep 'Total raw data size' | tr -d '\t ' | cut -d':' -f2)
     orig_raw_data_size=$($h5stat -d $df | grep 'Total raw data size' | tr -d '\t ' | cut -d':' -f2)

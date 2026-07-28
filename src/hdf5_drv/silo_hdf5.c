@@ -2066,7 +2066,7 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
         *silo_error_code_p = E_COMPRESSION;
     else if (strstr(err_desc->desc, "Lindstrom-") != 0)
         *silo_error_code_p = E_COMPRESSION;
-#ifdef H5E_CANTLOCKFILE
+#if HDF5_VERSION_GE(1,10,0)
     else if (err_desc->min_num == H5E_CANTLOCKFILE ||
             (strstr(err_desc->desc, "lock") != 0))
         *silo_error_code_p = E_FILELOCKING;
@@ -2880,6 +2880,7 @@ db_hdf5_InitCallbacks(DBfile_hdf5 *dbfile, int target)
     dbfile->pub.g_comp = db_hdf5_GetComponent;
     dbfile->pub.g_comptyp = db_hdf5_GetComponentType;
     dbfile->pub.g_compnames = db_hdf5_GetComponentNames;
+    dbfile->pub.g_compstuff = db_hdf5_GetComponentStuff;
     dbfile->pub.c_obj = db_hdf5_WriteObject; /*DBChangeObject==DBWriteObject*/
     dbfile->pub.w_obj = db_hdf5_WriteObject;
     dbfile->pub.w_comp = db_hdf5_WriteComponent;
@@ -6019,6 +6020,17 @@ db_hdf5_initiate_close(DBfile *_dbfile)
     return 0;
 }
 
+INTERNAL int
+db_hdf5_Version(int *maj, int *min, int *pat)
+{
+    unsigned _maj, _min, _rel;
+    H5get_libversion(&_maj, &_min, &_rel);
+    if (maj) *maj = (int) _maj;
+    if (min) *min = (int) _min;
+    if (pat) *pat = (int) _rel;
+    return 0;
+}
+
 /*-------------------------------------------------------------------------
  * Function:    db_hdf5_Open
  *
@@ -7148,7 +7160,7 @@ SILO_CALLBACK int
 db_hdf5_GetComponentType(DBfile *_dbfile, char const *objname, char const *compname)
 {
     int datatype = DB_NOTYPE;
-    db_hdf5_GetComponentStuff(_dbfile, objname, compname, &datatype);
+    db_hdf5_GetComponentStuff(_dbfile, objname, compname, &datatype, 0);
     return datatype;
 }
 
@@ -7168,7 +7180,7 @@ db_hdf5_GetComponentType(DBfile *_dbfile, char const *objname, char const *compn
 SILO_CALLBACK void *
 db_hdf5_GetComponent(DBfile *_dbfile, char const *objname, char const *compname)
 {
-    return db_hdf5_GetComponentStuff(_dbfile, objname, compname, 0);
+    return db_hdf5_GetComponentStuff(_dbfile, objname, compname, 0, 0);
 }
 
 /*-------------------------------------------------------------------------
@@ -7220,7 +7232,7 @@ db_hdf5_GetComponent(DBfile *_dbfile, char const *objname, char const *compname)
  */
 SILO_CALLBACK void *
 db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *compname,
-    int *just_get_datatype)
+    int *just_get_datatype, int *nvals)
 {
     DBfile_hdf5 *dbfile = (DBfile_hdf5*)_dbfile;
     static char *me = "db_hdf5_GetComponent";
@@ -7337,6 +7349,7 @@ db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *comp
             }
 
             for (i=0, mult=1; i<ndims; i++) mult *= (int) dim[i];
+            if (nvals) *nvals = mult;
 
             if (just_get_datatype == 0)
             {
@@ -7485,17 +7498,21 @@ db_hdf5_GetComponentNames(DBfile *_dbfile, char const *objname, char ***comp_nam
  *
  *   Mark C. Miller, Fri Apr 10 15:00:03 PDT 2026
  *   Limit loops looking for tiny array cases to DB_MAX_H5_OBJ_VALS.
+ *
+ *   Mark C. Miller, Sat Jul  4 23:00:22 PDT 2026
+ *   Handle immediate mode arrays where small arrays are embedded directly
+ *   in pdb_names member as in "'<d>5,7,13". Also fix handling time/dtime
+ *   when the are paths to raw variable objects.
  *-------------------------------------------------------------------------
  */
 static int count_commas(char const *str)
 {
     int n = 0;
-    char const *p = strchr(str, ',');
-    while (p)
-    {
-        n++;
-        p = strchr(p, ',');
-    }
+
+    while (*str)
+        if (*str++ == ',')
+            n++;
+
     return n;
 }
 
@@ -7633,49 +7650,62 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
             UNWIND();
         }
         for (i=0, moffset=foffset=0; i<obj->ncomponents; i++) {
-            int nvals = count_commas(obj->pdb_names[i]) + 1;
+            int scnvals, nvals = count_commas(obj->pdb_names[i]) + 1;
+            hsize_t hsnvals = (hsize_t) nvals;
             if (!strncmp(obj->pdb_names[i], "'<i>", 4)) {
+                int *mi;
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_INT : H5Tarray_create(H5T_NATIVE_INT, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_int : H5Tarray_create( dbfile->T_int, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(int));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_INT)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_int)<0) {
+                mi = (int *)(object+moffset);
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(int*)(object+moffset) = strtol(obj->pdb_names[i]+4, NULL, 0);
-                moffset += sizeof(int);
-                foffset += H5Tget_size(dbfile->T_int);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                scnvals = sscanf(obj->pdb_names[i]+4, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                    mi+0,mi+1,mi+2,mi+3,mi+4,mi+5,mi+6,mi+7,mi+8,mi+9);
+                moffset += (nvals * sizeof(int));
+                foffset += (nvals * H5Tget_size(dbfile->T_int));
             } else if (!strncmp(obj->pdb_names[i], "'<f>", 4)) {
+                float *mf;
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_FLOAT : H5Tarray_create(H5T_NATIVE_FLOAT, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_float : H5Tarray_create( dbfile->T_float, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(float));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_FLOAT)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_float)<0) {
+                mf = (float *)(object+moffset);
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(float*)(object+moffset) = strtod(obj->pdb_names[i]+4, NULL);
-                moffset += sizeof(float);
-                foffset += H5Tget_size(dbfile->T_float);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                sscanf(obj->pdb_names[i]+4, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g",
+                    mf+0,mf+1,mf+2,mf+3,mf+4,mf+5,mf+6,mf+7,mf+8,mf+9);
+                moffset += (nvals * sizeof(float));
+                foffset += (nvals * H5Tget_size(dbfile->T_float));
             } else if (!strncmp(obj->pdb_names[i], "'<d>", 4)) {
+                double *md;
+                hid_t _matype = (nvals == 1) ? H5T_NATIVE_DOUBLE : H5Tarray_create(H5T_NATIVE_DOUBLE, 1, &hsnvals);
+                hid_t _fatype = (nvals == 1) ?  dbfile->T_double : H5Tarray_create( dbfile->T_double, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(double));
-                if (H5Tinsert(mtype, obj->comp_names[i], moffset,
-                              H5T_NATIVE_DOUBLE)<0 ||
-                    H5Tinsert(ftype, obj->comp_names[i], foffset,
-                              dbfile->T_double)<0) {
+                md = (double*)(object+moffset);
+                if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
+                    H5Tinsert(ftype, obj->comp_names[i], foffset, _fatype)<0) {
                     free(object);
                     object = 0;
                     db_perror("H5Tinsert", E_CALLFAIL, me);
                     UNWIND();
                 }
-                *(double*)(object+moffset) = strtod(obj->pdb_names[i]+4, NULL);
-                moffset += sizeof(double);
-                foffset += H5Tget_size(dbfile->T_double);
+                if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
+                sscanf(obj->pdb_names[i]+4, "%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg",
+                    md+0,md+1,md+2,md+3,md+4,md+5,md+6,md+7,md+8,md+9);
+                moffset += (nvals * sizeof(double));
+                foffset += (nvals * H5Tget_size(dbfile->T_double));
             } else if (!strncmp(obj->pdb_names[i], "'<s>", 4)) {
                 size_t len = strlen(obj->pdb_names[i]+4); /* inc. trailing ' for '\0' */
 #ifndef _WIN32
@@ -8979,7 +9009,7 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
     hid_t       o=-1, attr=-1, atype=-1, h5str=-1;
     char        *file_value=NULL, *mem_value=NULL, *bkg=NULL, bigname[1024];
     DBObjectType objtype;
-    int         _objtype, nmembs, i, j;
+    int         _objtype, nmembs, i, j, added_datatype_member;
     hsize_t     memb_size[4];
     DBobject    *obj=NULL;
     size_t      asize, nelmts, msize;
@@ -9031,51 +9061,68 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
         }
 
         /* Add members to the DBobject */
-#ifndef _MSC_VER
-#warning THIS IFDEFD CODE IS IN TRANSITION TO BETTER GENERIC OBJECTS
-#endif
+        added_datatype_member = 0;
         for (i=0; i<nmembs; i++) {
             int ndims = 0;
             hid_t member_type = db_hdf5_get_cmemb(atype, i, &ndims, memb_size);
-            char *name = H5Tget_member_name(atype, i);
+            char *memname = H5Tget_member_name(atype, i);
             hid_t mtype = H5Tcreate(H5T_COMPOUND, msize);
             for (nelmts=1, j=0; j<ndims; j++) nelmts *= memb_size[j];
             
             switch (H5Tget_class(member_type)) {
             case H5T_INTEGER:
-                db_hdf5_put_cmemb(mtype, name, 0, ndims, memb_size,
+                db_hdf5_put_cmemb(mtype, memname, 0, ndims, memb_size,
                                   H5T_NATIVE_INT);
                 memcpy(mem_value, file_value, H5Tget_size(atype));
                 H5Tconvert(atype, mtype, 1, mem_value, bkg, H5P_DEFAULT);
-                DBAddIntNComponent(obj, name, nelmts, (int*)mem_value);
+                DBAddIntNComponent(obj, memname, nelmts, (int*)mem_value);
                 break;
 
             case H5T_FLOAT:
-                db_hdf5_put_cmemb(mtype, name, 0, ndims, memb_size,
+                db_hdf5_put_cmemb(mtype, memname, 0, ndims, memb_size,
                                   H5T_NATIVE_DOUBLE);
                 memcpy(mem_value, file_value, H5Tget_size(atype));
                 H5Tconvert(atype, mtype, 1, mem_value, bkg, H5P_DEFAULT);
                 if (4 == (int) H5Tget_size(member_type))
                 {
-                    DBAddFltNComponent(obj, name, nelmts, (double*)mem_value);
+                    DBAddFltNComponent(obj, memname, nelmts, (double*)mem_value);
                 }
                 else
                 {
-                    DBAddDblNComponent(obj, name, nelmts, (double*)mem_value);
+                    DBAddDblNComponent(obj, memname, nelmts, (double*)mem_value);
                 }
                 break;
 
             case H5T_STRING:
                 h5str = H5Tcopy(H5T_C_S1);
                 H5Tset_size(h5str, H5Tget_size(member_type));
-                db_hdf5_put_cmemb(mtype, name, 0, ndims, memb_size, h5str);
+                db_hdf5_put_cmemb(mtype, memname, 0, ndims, memb_size, h5str);
                 memcpy(mem_value, file_value, H5Tget_size(atype));
                 H5Tconvert(atype, mtype, 1, mem_value, bkg, H5P_DEFAULT);
+
+                /* We have to handle a possible 'datatype' member of a number of silo objects here.
+                   Integer data in Silo has always been integer but floating point data can be either
+                   single or double precision and HDF5 driver DOES NOT store a 'datatype' member to
+                   remember and instead just knows the data type of the underlying HDF5 datasets. */
+                if (!added_datatype_member && !strncmp((const char *)mem_value, "/.silo/#", 8) &&
+                    (objtype == DB_QUADRECT || objtype == DB_QUADCURV || objtype == DB_QUADMESH || objtype == DB_QUADVAR ||
+                     objtype == DB_UCDMESH || objtype == DB_UCDVAR || objtype == DB_MATERIAL || objtype == DB_MATSPECIES ||
+                     objtype == DB_CSGMESH || objtype == DB_CSGVAR || objtype == DB_CURVE ||
+                     objtype == DB_POINTMESH || objtype == DB_POINTVAR || objtype == DB_ARRAY || objtype == DB_MRGVAR))
+                {
+                    int type = db_hdf5_GetVarType(_dbfile, (const char *)mem_value);
+                    if (type == DB_FLOAT || type == DB_DOUBLE)
+                    {
+                        DBAddIntComponent(obj, "datatype", type);
+                        added_datatype_member = 1;
+                    }
+                } 
+
                 if (1==nelmts) {
-                    DBAddStrComponent(obj, name, mem_value);
+                    DBAddStrComponent(obj, memname, mem_value);
                 } else {
                     for (j=0; (size_t)j<nelmts; j++) {
-                        sprintf(bigname, "%s%d", name, j+1);
+                        sprintf(bigname, "%s%d", memname, j+1);
                         DBAddStrComponent(obj, bigname,
                                           mem_value+j*H5Tget_size(member_type));
                     }
@@ -9090,21 +9137,15 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
             }
 
             /* Release member resources */
-            free(name);
+            free(memname);
             H5Tclose(mtype);
             H5Tclose(member_type);
         }
 
-#ifndef _MSC_VER
-#warning REVISIT THIS CLEANUP CODE. IS THERE A BETTER SYMBOLIC VALUE THAN -1
-#endif
         /* Cleanup */
         H5Tclose(atype);
         H5Aclose(attr);
         H5Tclose(o);
-#ifndef _MSC_VER
-#warning USE FREE() MACRO HERE
-#endif
         free(file_value);
         free(mem_value);
         free(bkg);
@@ -9116,9 +9157,6 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
-#ifndef _MSC_VER
-#warning USE FREE() MACRO HERE
-#endif
         if (file_value) free(file_value);
         if (mem_value) free(mem_value);
         if (bkg) free(bkg);

@@ -55,6 +55,8 @@ be used for advertising or product endorsement purposes.
 #include "silo.h"               /*include public silo           */
 #include "std.c"
 
+#define VERVAL(MAJ, MIN, PAT) ((size_t)MAJ*1000000+(size_t)MIN*1000+(size_t)PAT)
+
 /*-------------------------------------------------------------------------
  * Function:	main
  *
@@ -113,7 +115,20 @@ main(int argc, char *argv[])
     obj_names[12] = "../block11/u";
 
     if (DBSortObjectsByOffset(dbfile, 13, (DBCAS_t) obj_names, ordering) < 0)
-        return skip_retval;
+    {
+        int maj, min, pat;
+        DBDriverVersion(driverType, &maj, &min, &pat);
+        if (driverType == DB_HDF5 && VERVAL(maj,min,pat) < VERVAL(1,12,0))
+        {
+            fprintf(stderr, "Object sorting not testable on this version of HDF5\n");
+            return 0;
+        }
+        else
+        {
+            fprintf(stderr, "Object sorting failed: DBErrno = %d, \"%s\"\n", DBErrno(), DBErrString());
+            return 1;
+        }
+    }
     
     printf("UNsorted objects...\n");
     for (i = 0; i < 13; i++)

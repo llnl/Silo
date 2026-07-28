@@ -330,6 +330,18 @@ main(int argc, char *argv[])
     }
     DBClose(dbfile);
 
+    /* Ok, now test driver version info function */
+    {
+        int maj, min, pat;
+        DBDriverVersion(driver, &maj, &min, &pat);
+        if (driver == DB_PDB)
+            printf("PDB Lite: PDB_SYSTEM_VERSION=%d\n", maj);
+        else if (driver == DB_PDBP)
+            printf("PDB Proper: PDB_SYSTEM_VERSION=%d\n", maj);
+        else if (driver == DB_HDF5)
+            printf("HDF5 version is %d.%d.%d\n", maj, min, pat);
+    }
+
     CleanupDriverStuff();
     return 0;
 }

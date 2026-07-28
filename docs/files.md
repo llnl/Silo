@@ -1122,12 +1122,12 @@ These are all documented in the [Global Library Behavior](globals.md) section.
       * `int N`: number of objects in the following lists.
       * `DBCAS_t srcPathNames`: list of `N` source path names.
       * `DBCAS_t dstPathNames`: list of `N` destination path names.
-      * In this case, a terminating `DB_EOA` is not necessary.
+      * In this case, a terminating `DB_EOA` is not necessary and ignored if present.
     * `-4`: Like `-3`, except 3rd arg is treated as a single `dst` dir name.
       * `int N`: number of paths in `srcPathNames`.
       * `DBCAS_t srcPathNames`: list of `N` source path names.
       * `char const *dstDIR`: pre-existing destination dir path.
-      * In this case, a terminating `DB_EOA` is not necessary.
+      * In this case, a terminating `DB_EOA` is not necessary and ignored if present.
     * `-5`: Internal use only...like `-4` except used only internally when `DBCp` recursively calls itself.
  
   **Other rules:**
@@ -1144,6 +1144,9 @@ These are all documented in the [Global Library Behavior](globals.md) section.
 
  In all the different ways this function can be invoked, there are really just two fundamentally different interpretations of the list(s) of names.
  Either each source path is paired also with a destination path or all source paths go into a single destination path which, just as for linux `cp`, must then also be a directory already present in the destination.
+
+ When copying from HDF5 to PDB, symbolic linking is not honored.
+ Instead linked objects are derefenced and copied.
 
 {{ EndFunc }}
 

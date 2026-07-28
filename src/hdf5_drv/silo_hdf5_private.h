@@ -169,7 +169,7 @@ SILO_CALLBACK int db_hdf5_GetComponentType(DBfile *_dbfile, char const *objname,
 SILO_CALLBACK void *db_hdf5_GetComponent(DBfile *_dbfile, char const *objname,
                                     char const *compname);
 SILO_CALLBACK void *db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname,
-                                    char const *compname, int *just_get_datatype);
+                                    char const *compname, int *just_get_datatype, int *nvals);
 SILO_CALLBACK DBObjectType db_hdf5_InqVarType(DBfile *_dbfile, char const *name);
 SILO_CALLBACK int db_hdf5_InqMeshName(DBfile *_dbfile, char const *name,
                                  char *meshname/*out*/);

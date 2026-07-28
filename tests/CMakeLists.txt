@@ -271,6 +271,17 @@ set(PDB_ONLY_SOURCES
     testpdb.c
 )
 
+set(ROCKET_SOURCES
+    rocket.cxx
+    rocket_silo.cxx
+)
+if(VTK_DIR)
+    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
+    if (VTK_FOUND)
+        list(APPEND ROCKET_SOURCES rocket_vtk.cxx)
+    endif()
+endif()
+
 set(PARALLEL_SOURCES
     bcastopen.c
     bcastopen_main.c
@@ -297,9 +308,12 @@ endif()
 #
 #     * Associated test is not working
 #     * Source file is used only within other tests
-#     * Special dependency logic is required
+#     * Special dependency logic is required meaning the test is
+#       not skipped in the sense it is never run but just skipped
+#       from the main (default) build loop and handled seperately
 #
 set(SKIP_TEST_SOURCES
+    ${ROCKET_SOURCES}
     add_amr_mrgtree.c
     cpz1plt.c
     ioperf.c
@@ -310,18 +324,20 @@ set(SKIP_TEST_SOURCES
     ioperf_stdio.c
     largefile_netcdf.c
     listtypes_main.c
-    rocket_silo.cxx
-    rocket_vtk.cxx
     silo_overwrite_multi_example.c
     std.c
     testlib.c
 )
 if(WIN32)
     list(APPEND SKIP_TEST_SOURCES locking.c)
+    list(APPEND SKIP_TEST_SOURCES rocket.cxx rocket_silo.cxx rocket_vtk.cxx)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx pdbtst.c)
+    list(APPEND SKIP_TEST_SOURCES pdbtst.c)
+endif()
+if(NOT VTK_DIR)
+    list(APPEND SKIP_TEST_SOURCES rocket_vtk.cxx)
 endif()
 
 #
@@ -342,7 +358,6 @@ endif()
 #
 set(SPECIAL_TEST_SOURCES
     merge_block.c
-    rocket_silo.cxx
     test_mat_compression.c
 )
 
@@ -360,16 +375,28 @@ if(NOT SILO_ENABLE_JSON)
     list(APPEND SKIP_TEST_SOURCES ${JSON_C_TEST_SOURCES})
 endif()
 
-
+#
+# Handle special logic for rocket test
+#
 if(SILO_ENABLE_SHARED AND NOT WIN32)
+
+    add_executable(rocket rocket.cxx)
+    target_link_libraries(rocket PRIVATE silo)
+    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+    if(WIN32)
+        set_target_properties(rocket PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    endif()
+    if(CMAKE_DL_LIBS AND NOT APPLE)
+        target_link_libraries(rocket PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+    if(UNIX)
+        target_link_libraries(rocket PRIVATE m)
+    endif()
+
+    # Silo plugin
     add_library(rocket_silo MODULE rocket_silo.cxx)
-    add_dependencies(rocket_silo silo)
-    target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
-if(UNIX)
-    target_link_libraries(rocket_silo dl m)
-endif()
+    target_link_libraries(rocket_silo PRIVATE silo rocket)
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
         target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
     endif()
     target_include_directories(rocket_silo PRIVATE
@@ -377,6 +404,21 @@ endif()
         ${Silo_SOURCE_DIR}/src/silo
         ${SILO_TESTS_SOURCE_DIR})
     set_target_properties(rocket_silo PROPERTIES PREFIX "")
+
+    # VTK plugin if requested
+    if(VTK_FOUND)
+        add_library(rocket_vtk MODULE rocket_vtk.cxx)
+        target_link_libraries(rocket_vtk PRIVATE rocket VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+        set_target_properties(rocket_vtk PROPERTIES PREFIX "")
+        if(COMMAND vtk_module_autoinit)
+            vtk_module_autoinit(TARGETS rocket_vtk MODULES VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+        endif()
+    endif()
+    add_test(NAME rocket COMMAND $<TARGET_FILE:rocket>)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME rocket-hdf5 COMMAND $<TARGET_FILE:rocket> DB_HDF5)
+        set_tests_properties(rocket-hdf5 PROPERTIES DEPENDS rocket)
+    endif()
 endif()
 
 add_library(testlib_obj OBJECT testlib.c)
@@ -494,11 +536,6 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 endforeach()
 
-if(SILO_ENABLE_SHARED AND NOT WIN32)
-    add_dependencies(rocket rocket_silo)
-    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
-endif()
-
 target_sources(listtypes PRIVATE listtypes_main.c listtypes.c)
 set_tests_properties(listtypes PROPERTIES DEPENDS ucd REQUIRED_FILES ucd.pdb)
 set_tests_properties(listtypes PROPERTIES LABELS "pdb")
@@ -604,26 +641,36 @@ endif()
 #
 set(MULTI_BLOCK_TESTS)
 add_test(NAME multi_test-read COMMAND $<TARGET_FILE:multi_test> testread)
-set_tests_properties(multi_test-read PROPERTIES DEPENDS "multi_test")
+set_tests_properties(multi_test-read PROPERTIES DEPENDS multi_test)
 add_test(NAME multi_test-badread COMMAND $<TARGET_FILE:multi_test> testbadread)
-set_tests_properties(multi_test-badread PROPERTIES DEPENDS "multi_test")
+set_tests_properties(multi_test-badread PROPERTIES DEPENDS multi_test)
 add_test(NAME multi_test-earlyclose COMMAND $<TARGET_FILE:multi_test> earlyclose)
+set_tests_properties(multi_test-earlyclose PROPERTIES DEPENDS multi_test)
 list(APPEND MULTI_BLOCK_TESTS multi_test multi_test-read multi_test-badread multi_test-earlyclose)
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    set_tests_properties(readstuff-hdf5 PROPERTIES DEPENDS "multi_test-hdf5")
+    add_test(NAME dir-hdf5-xcopy-input COMMAND "${CMAKE_COMMAND}" -E copy
+        ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.pdb ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.pdb)
+    set_tests_properties(dir-hdf5-xcopy-input PROPERTIES DEPENDS multi_test)
+    add_test(NAME dir-xcopy-input COMMAND "${CMAKE_COMMAND}" -E copy
+        ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d.h5 ${CMAKE_CURRENT_BINARY_DIR}/multi_ucd3d_copy.h5)
+    set_tests_properties(dir-xcopy-input PROPERTIES DEPENDS multi_test-hdf5)
+    set_tests_properties(multi_test-earlyclose PROPERTIES DEPENDS dir-xcopy-input)
+    set_tests_properties(readstuff-hdf5 PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
     add_test(NAME multi_test-read-hdf5 COMMAND $<TARGET_FILE:multi_test> testread DB_HDF5)
-    set_tests_properties(multi_test-read-hdf5 PROPERTIES DEPENDS "multi_test-hdf5")
+    set_tests_properties(multi_test-read-hdf5 PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
     add_test(NAME multi_test-badread-hdf5 COMMAND $<TARGET_FILE:multi_test> testbadread DB_HDF5)
-    set_tests_properties(multi_test-badread-hdf5 PROPERTIES DEPENDS "multi_test-hdf5")
+    set_tests_properties(multi_test-badread-hdf5 PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
     add_test(NAME multi_test-earlyclose-hdf5 COMMAND $<TARGET_FILE:multi_test> earlyclose DB_HDF5)
     add_test(NAME multi_test-flush COMMAND $<TARGET_FILE:multi_test> testflush DB_HDF5)
     add_test(NAME multi_test-libver COMMAND $<TARGET_FILE:multi_test> libver DB_HDF5)
+    set_tests_properties(multi_test-libver PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
     add_test(NAME multi_test-libver-read COMMAND $<TARGET_FILE:multi_test> testread DB_HDF5)
-    set_tests_properties(multi_test-libver-read PROPERTIES DEPENDS "multi_test-libver")
+    set_tests_properties(multi_test-libver-read PROPERTIES DEPENDS multi_test-libver)
     if(SILO_ENABLE_HZIP)
         add_test(NAME multi_test-hzip COMMAND $<TARGET_FILE:multi_test> hzip DB_HDF5)
+        set_tests_properties(multi_test-hzip PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
         add_test(NAME multi_test-hzip-read COMMAND $<TARGET_FILE:multi_test> testread DB_HDF5)
-        set_tests_properties(multi_test-hzip-read PROPERTIES DEPENDS "multi_test-hzip")
+        set_tests_properties(multi_test-hzip-read PROPERTIES DEPENDS multi_test-hzip)
         list(APPEND MULTI_BLOCK_TESTS multi_test-hzip multi_test-hzip-read)
 
         add_custom_target(testhzip ALL)
@@ -642,10 +689,21 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         multi_test-earlyclose-hdf5 multi_test-flush multi_test-libver multi_test-libver-read)
 endif()
 if(MULTI_BLOCK_TESTS)
-    set_tests_properties(${MULTI_BLOCK_TESTS} PROPERTIES RESOURCE_LOCK 
-        "multi_curv2d.pdb;multi_curv3d.pdb;multi_point2d.pdb;multi_rect2d.pdb;multi_rect3d.pdb;multi_ucd3d.pdb;
-         multi_curv2d.h5;multi_curv3d.h5;multi_point2d.h5;multi_rect2d.h5;multi_rect3d.h5;multi_ucd3d.h5")
+    set(_multi_test_lock "multi_test_data_files")
+    set_tests_properties(${MULTI_BLOCK_TESTS} PROPERTIES RESOURCE_LOCK ${_multi_test_lock})
     set_tests_properties(${MULTI_BLOCK_TESTS} PROPERTIES LABELS "multi")
+endif()
+
+#
+# The dir.c test ues multi_ucd3d.[pdb,h5] to do some things but it corrupts the content.
+# So, we create a dependency of dir test on a COPY of multi_ucd3d_copy.[pdb,h5]
+#
+if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+    add_test(NAME dir-xcopy COMMAND $<TARGET_FILE:dir> xcopy)
+    set_tests_properties(dir-xcopy PROPERTIES DEPENDS dir-xcopy-input)
+
+    add_test(NAME dir-hdf5-xcopy COMMAND $<TARGET_FILE:dir> xcopy DB_HDF5)
+    set_tests_properties(dir-hdf5-xcopy PROPERTIES DEPENDS dir-hdf5-xcopy-input)
 endif()
 
 #
@@ -654,21 +712,28 @@ endif()
 # The multidir option for multi_file requires MPI.
 #
 set(MULTI_FILE_TESTS)
-add_test(NAME multi_file-usens COMMAND $<TARGET_FILE:multi_file> use-ns)
-add_test(NAME multi_file-evalns COMMAND $<TARGET_FILE:multi_file> eval-ns)
-set_tests_properties(multi_file-evalns PROPERTIES DEPENDS multi_file-usens)
-add_test(NAME multi_file-usens-empties COMMAND $<TARGET_FILE:multi_file> use-ns empties)
-add_test(NAME multi_file-multidir COMMAND $<TARGET_FILE:multi_file> multidir)
 add_test(NAME multi_file-multidir-usens COMMAND $<TARGET_FILE:multi_file> multidir use-ns)
-list(APPEND MULTI_FILE_TESTS multi_file multi_file-usens multi_file-evalns multi_file-usens-empties multi_file-multidir multi_file-multidir-usens)
+list(APPEND MULTI_FILE_TESTS multi_file-multidir-usens)
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    add_test(NAME multi_file-usens-hdf5 COMMAND $<TARGET_FILE:multi_file> use-ns DB_HDF5)
-    add_test(NAME multi_file-evalns-hdf5 COMMAND $<TARGET_FILE:multi_file> eval-ns DB_HDF5)
-    set_tests_properties(multi_file-evalns-hdf5 PROPERTIES DEPENDS multi_file-usens-hdf5)
-    add_test(NAME multi_file-usens-empties-hdf5 COMMAND $<TARGET_FILE:multi_file> use-ns empties DB_HDF5)
-    add_test(NAME multi_file-multidir-hdf5 COMMAND $<TARGET_FILE:multi_file> multidir DB_HDF5)
     add_test(NAME multi_file-multidir-usens-hdf5 COMMAND $<TARGET_FILE:multi_file> multidir use-ns DB_HDF5)
-list(APPEND MULTI_FILE_TESTS multi_file-hdf5 multi_file-usens-hdf5 multi_file-evalns-hdf5 multi_file-usens-empties-hdf5 multi_file-multidir-hdf5 multi_file-multidir-usens-hdf5)
+    list(APPEND MULTI_FILE_TESTS multi_file-multidir-usens-hdf5)
+endif()
+# These tests all take way too long under ASAN 
+if(NOT SILO_BUILD_FOR_ASAN)
+    add_test(NAME multi_file-usens COMMAND $<TARGET_FILE:multi_file> use-ns)
+    add_test(NAME multi_file-evalns COMMAND $<TARGET_FILE:multi_file> eval-ns)
+    set_tests_properties(multi_file-evalns PROPERTIES DEPENDS multi_file-usens)
+    add_test(NAME multi_file-usens-empties COMMAND $<TARGET_FILE:multi_file> use-ns empties)
+    add_test(NAME multi_file-multidir COMMAND $<TARGET_FILE:multi_file> multidir)
+    list(APPEND MULTI_FILE_TESTS multi_file multi_file-usens multi_file-evalns multi_file-usens-empties multi_file-multidir)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME multi_file-usens-hdf5 COMMAND $<TARGET_FILE:multi_file> use-ns DB_HDF5)
+        add_test(NAME multi_file-evalns-hdf5 COMMAND $<TARGET_FILE:multi_file> eval-ns DB_HDF5)
+        set_tests_properties(multi_file-evalns-hdf5 PROPERTIES DEPENDS multi_file-usens-hdf5)
+        add_test(NAME multi_file-usens-empties-hdf5 COMMAND $<TARGET_FILE:multi_file> use-ns empties DB_HDF5)
+        add_test(NAME multi_file-multidir-hdf5 COMMAND $<TARGET_FILE:multi_file> multidir DB_HDF5)
+        list(APPEND MULTI_FILE_TESTS multi_file-hdf5 multi_file-usens-hdf5 multi_file-evalns-hdf5 multi_file-usens-empties-hdf5 multi_file-multidir-hdf5)
+    endif()
 endif()
 set_tests_properties(${MULTI_FILE_TESTS} PROPERTIES RESOURCE_LOCK "multi_file_tests")
 set_tests_properties(${MULTI_FILE_TESTS} PROPERTIES LABELS "multi")
@@ -763,28 +828,29 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES LABELS "python;hdf5")
     endif()
 
-    add_test(NAME multi_file-reset COMMAND $<TARGET_FILE:multi_test>)
-    set_tests_properties(multi_file-reset PROPERTIES RESOURCE_LOCK "multi_file_tests")
+    add_test(NAME multi_test-reset COMMAND $<TARGET_FILE:multi_test>)
     add_test(NAME test-read-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py")
+    add_test(NAME test-error-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py")
     set_tests_properties(test-read-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-    set_tests_properties(test-read-py PROPERTIES DEPENDS multi_file-reset)
-    set_tests_properties(test-read-py PROPERTIES RESOURCE_LOCK "multi_file_tests")
-    set_tests_properties(test-read-py PROPERTIES LABELS "python")
+    set_tests_properties(test-error-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
+    set_tests_properties(multi_test-reset PROPERTIES DEPENDS multi_test-earlyclose LABELS "python")
+    set_tests_properties(test-read-py PROPERTIES DEPENDS multi_test-reset LABELS "python")
+    set_tests_properties(test-error-py PROPERTIES DEPENDS multi_test-reset LABELS "python")
+    set_tests_properties(multi_test-reset test-read-py PROPERTIES RESOURCE_LOCK ${_multi_test_lock})
+    set_tests_properties(multi_test-reset test-read-py PROPERTIES REQUIRED_FILES "multi_ucd3d.pdb;multi_rect3d.pdb")
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-       add_test(NAME multi_file-hdf-friendly COMMAND $<TARGET_FILE:multi_test> hdf-friendly DB_HDF5)
-       set_tests_properties(multi_file-hdf-friendly PROPERTIES RESOURCE_LOCK "multi_file_tests")
-       add_test(NAME test-read-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py")
+       add_test(NAME multi_test-reset-hdf5 COMMAND $<TARGET_FILE:multi_test> hdf-friendly DB_HDF5)
+       add_test(NAME test-read-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_read.py" DB_HDF5)
+       add_test(NAME test-error-py-hdf5 COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py" DB_HDF5)
        set_tests_properties(test-read-py-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-       set_tests_properties(test-read-py-hdf5 PROPERTIES DEPENDS multi_file-hdf-friendly)
-       set_tests_properties(test-read-py-hdf5 PROPERTIES RESOURCE_LOCK "multi_file_tests")
-       set_tests_properties(test-read-py-hdf5 PROPERTIES LABELS "python;hdf5")
+       set_tests_properties(test-error-py-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
+       set_tests_properties(multi_test-reset-hdf5 PROPERTIES DEPENDS multi_test-earlyclose-hdf5 LABELS "python;hdf5")
+       set_tests_properties(test-read-py-hdf5 PROPERTIES DEPENDS multi_test-reset-hdf5 LABELS "python;hdf5")
+       set_tests_properties(test-error-py-hdf5 PROPERTIES DEPENDS multi_test-reset-hdf5 LABELS "python;hdf5")
+       set_tests_properties(multi_test-reset-hdf5 test-read-py-hdf5 PROPERTIES RESOURCE_LOCK ${_multi_test_lock})
+       set_tests_properties(multi_test-reset-hdf5 test-read-py-hdf5 PROPERTIES REQUIRED_FILES "multi_ucd3d.h5;multi_rect3d.h5")
     endif()
-
-    add_test(NAME test-error-py COMMAND ${Python_EXECUTABLE} "${silo_test_output_dir}/test_error.py")
-    set_tests_properties(test-error-py PROPERTIES RESOURCE_LOCK "multi_file_tests")
-    set_tests_properties(test-error-py PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH}")
-    set_tests_properties(test-error-py PROPERTIES LABELS "python")
 
     add_test(NAME testonehex COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/testonehex" DB_PDB)
     set_tests_properties(testonehex PROPERTIES DEPENDS onehex)
