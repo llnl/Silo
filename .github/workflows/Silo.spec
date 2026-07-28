@@ -90,7 +90,7 @@ This package contains the development files of %{name}.
 %{_libdir}/cmake/%{name}/SiloConfigVersion.cmake
 %{_libdir}/cmake/%{name}/SiloTargets-release.cmake
 %{_libdir}/cmake/%{name}/SiloTargets.cmake
-%{_libdir}/libsiloh5.so.4.12.0
+%{_libdir}/libsiloh5.so.4.12.1
 %{_libdir}/libsiloh5.so.412
 %{_libdir}/libsiloh5.so
 %{_libdir}/Silo.so
