@@ -102,7 +102,7 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
 endif()
 
 if(SILO_BUILD_FOR_ASAN)
-    target_compile_options(browser PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+    target_compile_options(browser PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O0)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
         target_link_options(browser PRIVATE -Wl,--no-as-needed -fsanitize=address,undefined)
     else()
