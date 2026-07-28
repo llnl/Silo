@@ -1,3 +1,4 @@
+(fortran-interface)=
 # Fortran Interface
 
 The functions described in this section are either unique to the Fortran interface or facilitate the mixing of C/C++ and Fortran within a single application interacting with a Silo file.

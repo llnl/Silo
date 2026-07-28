@@ -1,6 +1,6 @@
 # Files and File Structure
 
-If you are looking for information regarding how to use Silo from a parallel application, please See the section on [Multi-Block Objects Parallel I/O](./parallel.md#multi-block-objects-and-parallel-i-o).
+If you are looking for information regarding how to use Silo from a parallel application, please See the section on [Multi-Block Objects Parallel I/O](#multi-block-objects-and-parallel-i-o).
 
 The Silo API is implemented on a number of different low-level drivers.
 These drivers control the low-level file format Silo generates.
@@ -13,7 +13,7 @@ These directory hierarchies are analogous to the Unix file system.
 Directories serve to divide the name space of a Silo file so the user can organize content within a Silo file in a way that is natural to the application.
 
 Note that the organization of objects into directories within a Silo file may have direct implications for how these collections of objects are presented to users by post-processing tools.
-For example, except for directories used to store multi-block objects (See [Multi-Block Objects Parallel I/O](./parallel.md#multi-block-objects-and-parallel-i-o)), VisIt will use directories in a Silo file to create sub-menus within its Graphical User Interface (GUI).
+For example, except for directories used to store multi-block objects (See [Multi-Block Objects Parallel I/O](#multi-block-objects-and-parallel-i-o)), VisIt will use directories in a Silo file to create sub-menus within its Graphical User Interface (GUI).
 If VisIt opens a Silo file with two directories, "foo" and "bar", and there are various meshes and variables in each of these directories, then many of VisIt's GUI menus will contain sub-menus named "foo" and "bar" where the objects found in those directories will be placed in the GUI.
 
 Silo also supports the concept of *grabbing* the low-level driver.

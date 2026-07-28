@@ -1,37 +1,28 @@
 import os, sys
 
-project = u'Silo User Manual'
-copyright = u'1996-2023, LLNL, LLNL-SM-654357'
-author = u'LLNL'
-release = u'4.11.1'
+project = "Silo User Manual"
+copyright = "1996-2026, LLNL, LLNL-SM-654357"
+author = "LLNL"
+release = "4.12.0"
 
-extensions = ['sphinx.ext.mathjax']
+#
+# Add directory containin python extensions for Sphinx
+#
+sys.path.insert(0, os.path.abspath("_ext"))
 
-if os.environ.get('READTHEDOCS'):
-    from subprocess import call
-    call(['pip', 'install', 'myst_parser'])
-extensions.append('myst_parser')
+extensions = [
+    "sphinx.ext.mathjax",
+    "myst_parser",
+    "copy_pagefind_anchors",
+]
 
-# Attempt add_css_file only if the version of Sphinx actually supports it
-def setup(app):
-    if hasattr(app, 'add_css_file'):
-        app.add_css_file('custom.css')
-    elif hasattr(app, 'add_stylesheet'):
-        app.add_stylesheet('custom.css')
-
-# Files to exclude
-exclude_patterns = [ "func-template.md" ]
-
-# Using default suffix would have been fine, but root_doc
-# variable winds up assuming `.rst` without this.
 source_suffix = {
-    '.md': 'markdown'
+    ".md": "markdown",
+    ".rst": "restructuredtext",
 }
 
-# Top of MyST/Sphinx doc tree WITHOUT the extension
-#root_doc = u'index-sphinx'
+root_doc = "index"
 
-# MYST specific extensions
 myst_enable_extensions = [
     "deflist",
     "dollarmath",
@@ -39,24 +30,27 @@ myst_enable_extensions = [
     "substitution",
     "attrs_block",
     "attrs_inline",
-    "colon_fence"
+    "colon_fence",
 ]
-myst_heading_anchors = 3
+
+myst_heading_anchors = 6
 
 myst_substitutions = {
   "EndFunc": "<hr class=\"docutils\" />"+"<br>"*40
 }
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-try:
-    html_theme
-except:
-    html_theme = "sphinx_rtd_theme"
+exclude_patterns = [
+    "func-template.md",
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+]
 
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
 html_theme_options = {
-    # Toc options
-    'navigation_depth': 4
+    "navigation_depth": 4,
 }
+
+html_css_files = ["custom.css"]
+html_js_files = ["redirect-rtd-search-to-pagefind.js"]

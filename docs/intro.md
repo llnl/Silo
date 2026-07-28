@@ -590,7 +590,7 @@ Wherever the C interface returns integer error information in the return value o
 The above example demonstrates this rule.
 
 Finally, there are a few function in Silo's API that are unique to the Fortran interface.
-Those functions are described in the section of the API manual having to do with Fortran.
+Those functions are described in the section of the [API manual having to do with Fortran](#fortran-interface).
 
 ## Using Silo in Parallel
 

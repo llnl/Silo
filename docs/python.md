@@ -109,6 +109,7 @@ Type "help", "copyright", "credits" or "license" for more info.
 
 {{ EndFunc }}
 
+(dbfile-getvarinfo)=
 ## `<DBfile>.GetVarInfo()`
 
 * **Summary:** Get metadata and bulk data of any object (See [`DBGetObject`](./generic.md#dbgetobject))

@@ -69,7 +69,7 @@ For this reason, where a specific application of MRG trees is desired (to repres
 
   The paragraphs below describe how to utilize an MRG tree to describe various common kinds of decompositions and subsets.
 
-  Multi-Block Grouping (obsoletes `DBOPT_GROUPING` options for DBPutMultimesh, and [`_visit_domain_groups`](conventions.md#visit-domain-groups) convention.
+  Multi-Block Grouping (obsoletes `DBOPT_GROUPING` options for DBPutMultimesh, and [`_visit_domain_groups`](#visit-domain-groups) convention.
 
   A multi-block grouping is the assignment of the blocks of a multi-block mesh (e.g. the mesh objects created with `DBPutXxxmesh()` calls and enumerated by name in a `DBPutMultimesh()` call) to one of several groups.
   Each group in the grouping represents several blocks of the multi-block mesh.
@@ -873,6 +873,7 @@ The solution is to ensure the string has characters separating fields that are n
 
 {{ EndFunc }}
 
+(dbopt-region-pnames)=
 ## `DBOPT_REGION_PNAMES`
 
 * **Summary:** Option list option for defining variables on specific regions of a mesh

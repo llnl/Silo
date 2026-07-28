@@ -1,0 +1,59 @@
+(function () {
+  function findSearchForm() {
+    return (
+      document.querySelector("form[action$='search.html']") ||
+      document.querySelector("form[action*='search']") ||
+      document.querySelector(".wy-side-nav-search form")
+    );
+  }
+
+  function siteRootFromPath() {
+    if (typeof DOCUMENTATION_OPTIONS !== "undefined" &&
+        DOCUMENTATION_OPTIONS.URL_ROOT) {
+      return DOCUMENTATION_OPTIONS.URL_ROOT;
+    }
+
+    const path = window.location.pathname;
+
+    const buildIndex = path.indexOf("/_build/");
+    if (buildIndex !== -1) {
+      return path.slice(0, buildIndex + "/_build/".length);
+    }
+
+    const parts = path.split("/").filter(Boolean);
+    if (parts.length >= 1 && /^\d+$/.test(parts[0])) {
+      return "/" + parts[0] + "/";
+    }
+
+    if (parts.length >= 2 && parts[0] === "en") {
+      return "/en/" + parts[1] + "/";
+    }
+
+    return "/";
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const form = findSearchForm();
+    if (!form) return;
+
+    form.addEventListener("submit", function (event) {
+      const input =
+        form.querySelector("input[name='q']") ||
+        form.querySelector("input[type='search']") ||
+        form.querySelector("input[type='text']");
+
+      if (!input || !input.value.trim()) return;
+
+      event.preventDefault();
+
+      const root = siteRootFromPath();
+      const searchUrl = new URL(
+        "pagefind-search.html",
+        new URL(root, window.location.href)
+      );
+
+      searchUrl.searchParams.set("q", input.value.trim());
+      window.location.href = searchUrl.toString();
+    });
+  });
+})();
