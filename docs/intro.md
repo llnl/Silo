@@ -1,4 +1,13 @@
-﻿# Introduction to Silo
+﻿%
+% I can use the following commands to build the docs locally
+%
+% rm -rf _build
+% env PYTHONPATH=`pwd`/_ext /Users/miller86/visit/develop/release/build-mb-3.5.0-darwin-24-arm64-release/thirdparty_shared/third_party/python/3.13.9/darwin-arm64/bin/sphinx-build -E -W --keep-going -b html . _build -a
+% /Users/miller86/visit/develop/release/build-mb-3.5.0-darwin-24-arm64-release/thirdparty_shared/third_party/python/3.13.9/darwin-arm64/bin/python3 -m pagefind --include-characters "_-./:+#<>" --exclude-selectors "a.headerlink" --site _build
+% python3 -m http.server 8000
+%
+%
+# Introduction to Silo
 
 ## Overview
 
