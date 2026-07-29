@@ -383,12 +383,12 @@ static PyObject *DBfile_DBGetVarInfo(PyObject *self, PyObject *args)
 
         // Handle possible incomplete datatype information in generic objects from HDF5 driver by
         // overriding a DB_FLOAT_OR_DOUBLE datatype value with whatever the generic object's pdb
-        // component holds.
+        // component metadata holds.
         if (compname == "datatype" && 
             type == DB_INT && 
             !pdbname.compare(0, 4, "'<i>") &&
             *((int*)comp) == DB_FLOAT_OR_DOUBLE)
-            *((int*)comp) = std::stoi(pdbname.substr(4));
+            *((int*)comp) = std::stoi(pdbname.substr(4)); // get value from pdb component
         
         int ival = -1;
         switch (type)
