@@ -7291,8 +7291,36 @@ db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *comp
         if (mno>=n) {
             if (mnof == -1)
             {
-                db_perror(compname, E_NOTFOUND, me);
-                UNWIND();
+                /* We did NOT find any member of the specified object matching compname.
+                   However, we could be here for one of those cases where we added a faux
+                   "datatype" member to a generic object returned from DBGetObject. The
+                   difference is that there we were building a generic Silo run-time object
+                   and here, we're interrogating the actual HDF5 struct-like object stored
+                   to the file. Apparently, and for reasons I don't understand, the HDF5
+                   driver adds a "datatype" member to the struct-like objects stored to the
+                   file ONLY when it is NOT DB_FLOAT or DB_DOUBLE. The best we can do is
+                   return a value indicating we cannot fully determine the value for "datatype". */
+                if (!strncmp(compname, "datatype", 8))
+                {
+                    if (just_get_datatype == 0)
+                    {
+                        retval = malloc(sizeof(int));
+                        *((int*)retval) = DB_FLOAT_OR_DOUBLE;
+                        if (nvals) *nvals = 1;
+                        goto endStuff;
+                    }
+                    else
+                    {
+                        *just_get_datatype = DB_INT;
+                        if (nvals) *nvals = 1;
+                        goto endStuff;
+                    }
+                }
+                else
+                {
+                    db_perror(compname, E_NOTFOUND, me);
+                    UNWIND();
+                }
             }
             mno = mnof;
         }
@@ -7401,6 +7429,8 @@ db_hdf5_GetComponentStuff(DBfile *_dbfile, char const *objname, char const *comp
                 }
             }
         }
+
+endStuff:
         
         /* Release objects */
         if (mnofname) free(mnofname);

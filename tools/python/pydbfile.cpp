@@ -348,7 +348,15 @@ static PyObject *DBfile_DBGetVarInfo(PyObject *self, PyObject *args)
     // being read and, if it is a compressed mesh/var object, do the work
     // necessary to prepare for its decompression. Too much work for now.
     //
+    db_errno = 0;
     DBobject *silo_obj = DBGetObject(db, str);
+    if (silo_obj == NULL)
+    {
+        char errmsg[256];
+        snprintf(errmsg, sizeof(errmsg), "DBGetObject returns NULL for \"%s\" (%s)", str, DBErrString());
+        SiloErrorFunc(errmsg);
+        return NULL;
+    }
 
     PyObject *retval = PyDict_New();
     PyDict_SetItemString(retval, "name", PyString_FromString(silo_obj->name));
@@ -367,11 +375,21 @@ static PyObject *DBfile_DBGetVarInfo(PyObject *self, PyObject *args)
             if (!comp)
             {
                 char msg[256];
-                snprintf(msg, sizeof(msg), "Unable to get component \"%s\" for object \%s\"", compname.c_str(), str);
+                snprintf(msg, sizeof(msg), "Unable to get component \"%s\" for object \"%s\"", compname.c_str(), str);
                 SiloErrorFunc(msg);
                 continue;
             }
         }
+
+        // Handle possible incomplete datatype information in generic objects from HDF5 driver by
+        // overriding a DB_FLOAT_OR_DOUBLE datatype value with whatever the generic object's pdb
+        // component metadata holds.
+        if (compname == "datatype" && 
+            type == DB_INT && 
+            !pdbname.compare(0, 4, "'<i>") &&
+            *((int*)comp) == DB_FLOAT_OR_DOUBLE)
+            *((int*)comp) = std::stoi(pdbname.substr(4)); // get value from pdb component
+        
         int ival = -1;
         switch (type)
         {

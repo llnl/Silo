@@ -91,6 +91,30 @@ Type "help", "copyright", "credits" or "license" for more info.
 
 {{ EndFunc }}
 
+## `Silo.ShowErrors()`
+
+* **Summary:** Manipulate Silo library error handling and reporting
+
+* **C Signature:**
+
+  ```
+  NoneType Silo.ShowErrors(int level)
+  ```
+
+* **Arguments:**
+
+  Arg name | Description
+  :---|:---
+  `level` | [required int] one of `DB_NONE`, `DB_TOP`, `DB_ALL`, `DB_ALL_AND_DRVR` or `DB_ABORT`
+
+
+* **Description:**
+
+  Controls the Silo library's error handling and reporting behavior.
+  See [`DBShowErrors()`](./globals.md#dbshowerrors).
+
+{{ EndFunc }}
+
 ## `<DBfile>.GetToc()`
 
 * **Summary:** Get the table of contents
