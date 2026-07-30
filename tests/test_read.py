@@ -110,3 +110,24 @@ print("mesh1['coord0']=",db.GetVarInfo("mesh1",1)['coord0'])
 db.SetDir("/")
 toc = db.GetToc()
 db.Close()
+
+# Test a really, really old Silo file to make sure we at least
+# don't crash the python module
+def look_for_file(fname):
+    if os.access(fname,os.R_OK):
+        return fname
+    elif os.access("../../%s"%fname,os.R_OK):
+        return "../../%s"%fname
+    elif os.access("./bin/%s"%fname,os.R_OK):
+        return "./bin/%s"%fname
+    elif os.access("../all_tests/%s"%fname,os.R_OK):
+        return "../all_tests/%s"%fname
+
+db = Silo.Open(look_for_file("pion0244.silo"))
+toc = db.GetToc()
+objName = toc.qmesh_names[0]
+try:
+    print(db.GetVarInfo(objName,1))
+except Silo.SiloException:
+    pass
+db.Close()

@@ -397,7 +397,8 @@ typedef enum {
     DB_FLOATA=24,
     DB_DOUBLEA=25,
 
-    DB_NOTYPE=26           /*unknown type */
+    DB_NOTYPE=26,          /*unknown type */
+    DB_FLOAT_OR_DOUBLE=27  /* for "datatype" component queries on HDF5 driver */
 } DBdatatype;
 
 /* Flags for DBCreate (used only in DBCreate) */
