@@ -1112,11 +1112,15 @@ The functions described here allow users to read and write arbitrary arrays of r
   :::{note}
   A component named `datatype` is common across many Silo objects.
   This component is typically used to hold type information of the object's problem-sized arrays.
+
   For example, in a `DBucdvar` object, the `datatype` member is an `int` member holding one of Silo's [`DBdatatype` enum values](./header.md#dbdatatype) indicating the type of data the `void **vals` member of the [`DBucdvar`](./header.md#dbucdvar) points to.
+
   In the PDB driver, this `datatype` information is always explicitly stored with every Silo object's metadata.
   In the HDF5 driver, for reasons that are lost to history, this `datatype` information is most often stored as part of the HDF5 dataset objects holding the problem-sized raw data and not part of the Silo object metadata.
+
   This means that for Silo/HDF5 files when a `datatype` component member's value is queried with `DBGetComponent()`, it can sometimes return the type value `DB_FLOAT_OR_DOUBLE`.
-  If `DB_FLOAT_OR_DOUBLE` is observed for value of `datatype`, the true value must be obtained by making other interrogations.
+  If `DB_FLOAT_OR_DOUBLE` is observed for value of `datatype` component of a generic object, the true value must be obtained by making other interrogations.
+
   A common solution is to examine the `pdb_names` member of the associated [`DBobject`](./header.md#dbobject), assuming one is available such as in this code in the python module...
 
    ```{literalinclude} ../tools/python/pydbfile.cpp
