@@ -249,6 +249,24 @@ if(SILO_ENABLE_HZIP OR HDF5_PROVIDES_ZLIB_SUPPORT)
     include(SiloFindZlib)
 endif()
 
+function(silo_target_link_hdf5 target_name)
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        if(HDF5_C_TARGET)
+            target_link_libraries(${target_name} ${HDF5_C_TARGET})
+        else()
+            target_link_libraries(${target_name} ${HDF5_C_LIBRARIES})
+            if(HDF5_PROVIDES_ZLIB_SUPPORT AND ZLIB_FOUND)
+                if(TARGET ZLIB::ZLIB)
+                    target_link_libraries(${target_name} ZLIB::ZLIB)
+                elseif(ZLIB_LIBRARY)
+                    target_link_libraries(${target_name} ${ZLIB_LIBRARY})
+                endif()
+            endif()
+        endif()
+        target_include_directories(${target_name} PRIVATE ${HDF5_INCLUDE_DIRS})
+    endif()
+endfunction()
+
 ##
 # szip  if HDF5 was built with szip support on Windows (needed to find dll's)
 ##
@@ -734,12 +752,7 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
     # with HDF5, will use $<TARGET_LINKER_FILE:silo> in place of plain 'silo'
     # when telling broswer and silex to link with silo
     set_target_properties(silo PROPERTIES OUTPUT_NAME siloh5)
-    if(HDF5_C_TARGET)
-        target_link_libraries(silo ${HDF5_C_TARGET})
-    else()
-        target_link_libraries(silo ${HDF5_C_LIBRARIES})
-    endif()
-    target_include_directories(silo PRIVATE ${HDF5_INCLUDE_DIRS})
+    silo_target_link_hdf5(silo)
 endif()
 
 if(SILO_ENABLE_JSON AND JSONC_FOUND)

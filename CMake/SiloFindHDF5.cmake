@@ -89,11 +89,13 @@ endfunction()
 
 find_package(HDF5)
 
-# Prefer an imported HDF5 C target when one is available so transitive
-# link dependencies such as ZLIB::ZLIB are preserved.
+# Prefer the concrete imported HDF5 C library targets before HDF5::HDF5.
+# CMake's FindHDF5 module may synthesize HDF5::HDF5 with a flattened raw
+# libhdf5.a link interface even when the upstream package also exports
+# hdf5-static/hdf5-shared with the full transitive dependency set.
 unset(HDF5_C_TARGET)
 set(HDF5_HAS_IMPORTED_C_TARGET FALSE)
-foreach(_hdf5_c_target HDF5::HDF5 hdf5-shared hdf5-static hdf5::hdf5 hdf5::hdf5-shared hdf5::hdf5-static)
+foreach(_hdf5_c_target hdf5-shared hdf5-static hdf5::hdf5-shared hdf5::hdf5-static hdf5::hdf5 HDF5::HDF5)
     if(TARGET ${_hdf5_c_target})
         set(HDF5_C_TARGET ${_hdf5_c_target})
         set(HDF5_HAS_IMPORTED_C_TARGET TRUE)
