@@ -62,7 +62,44 @@ if(DEFINED SILO_HDF5_DIR AND EXISTS ${SILO_HDF5_DIR})
     set(HDF5_ROOT ${SILO_HDF5_DIR})
 endif()
 
+function(_silo_hdf5_detect_zlib_support_from_header out_var)
+    set(_header_candidates)
+    foreach(_include_dir ${HDF5_INCLUDE_DIRS} ${HDF5_INCLUDE_DIR})
+        if(_include_dir)
+            list(APPEND _header_candidates
+                "${_include_dir}/H5pubconf.h"
+                "${_include_dir}/hdf5/H5pubconf.h")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _header_candidates)
+
+    foreach(_header IN LISTS _header_candidates)
+        if(EXISTS "${_header}")
+            file(STRINGS "${_header}" _zlib_markers
+                 REGEX "^#define H5_HAVE_FILTER_DEFLATE 1$|^#define H5_HAVE_ZLIB_H 1$")
+            if(_zlib_markers)
+                set(${out_var} TRUE PARENT_SCOPE)
+                return()
+            endif()
+        endif()
+    endforeach()
+
+    set(${out_var} FALSE PARENT_SCOPE)
+endfunction()
+
 find_package(HDF5)
+
+# Prefer an imported HDF5 C target when one is available so transitive
+# link dependencies such as ZLIB::ZLIB are preserved.
+unset(HDF5_C_TARGET)
+set(HDF5_HAS_IMPORTED_C_TARGET FALSE)
+foreach(_hdf5_c_target HDF5::HDF5 hdf5-shared hdf5-static hdf5::hdf5 hdf5::hdf5-shared hdf5::hdf5-static)
+    if(TARGET ${_hdf5_c_target})
+        set(HDF5_C_TARGET ${_hdf5_c_target})
+        set(HDF5_HAS_IMPORTED_C_TARGET TRUE)
+        break()
+    endif()
+endforeach()
 
 if(NOT HDF5_FOUND)
     include(FindPackageHandleStandardArgs)
@@ -86,6 +123,7 @@ if(NOT HDF5_FOUND)
         set_target_properties(HDF5::HDF5 PROPERTIES
             IMPORTED_LOCATION "${HDF5_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${HDF5_INCLUDE_DIR}")
+        set(HDF5_C_TARGET HDF5::HDF5)
     endif()
     
 endif()
@@ -95,16 +133,21 @@ if(HDF5_FOUND)
     set(HAVE_HDF5_H 1)
     set(HAVE_HDF5_DRIVER 1)
     set(HAVE_LIBHDF5 1)
+    set(HDF5_PROVIDES_ZLIB_SUPPORT FALSE)
+
+    if(DEFINED HDF5_ENABLE_Z_LIB_SUPPORT)
+        set(HDF5_PROVIDES_ZLIB_SUPPORT ${HDF5_ENABLE_Z_LIB_SUPPORT})
+    elseif(NOT HDF5_HAS_IMPORTED_C_TARGET)
+        _silo_hdf5_detect_zlib_support_from_header(HDF5_PROVIDES_ZLIB_SUPPORT)
+    endif()
 
 
     # On Windows need to have hdf5's dll installed with browser/silex
     # in order for the executables to work
     if(WIN32)
-
-        get_target_property(HDF5_DLL ${HDF5_C_LIBRARIES} IMPORTED_LOCATION_RELEASE)
-
-        # DLL may also be needed by testing infrastructure
-        get_target_property(HDF5_DLL ${HDF5_C_LIBRARIES} IMPORTED_LOCATION_RELEASE )
+        if(HDF5_C_TARGET)
+            get_target_property(HDF5_DLL ${HDF5_C_TARGET} IMPORTED_LOCATION_RELEASE)
+        endif()
         if(HDF5_DLL AND (SILO_ENABLE_SILEX OR SILO_ENABLE_BROWSER))
             install(FILES ${HDF5_DLL} DESTINATION ${CMAKE_INSTALL_BINDIR}
                     PERMISSIONS OWNER_READ OWNER_WRITE
@@ -120,4 +163,3 @@ if(HDF5_FOUND)
 else()
     message(FATAL_ERROR "An explicit request for HDF5 was made but HDF5 was not found. You may want to try setting SILO_HDF5_DIR")
 endif()
-
