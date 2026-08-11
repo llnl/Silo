@@ -98,7 +98,7 @@ endif()
 target_link_libraries(browser ${CMAKE_DL_LIBS})
 
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    target_link_libraries(browser ${HDF5_C_LIBRARIES})
+    silo_target_link_hdf5(browser)
 endif()
 
 if(SILO_BUILD_FOR_ASAN)
@@ -122,5 +122,4 @@ if(NOT WIN32)
                         GROUP_READ GROUP_WRITE GROUP_EXECUTE
                         WORLD_READ             WORLD_EXECUTE)
 endif()
-
 

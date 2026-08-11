@@ -114,12 +114,10 @@ function(silo_add_test)
     set_target_properties(${sat_NAME} PROPERTIES FOLDER testing/tests)
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_link_libraries(${sat_NAME} ${HDF5_C_LIBRARIES})
-        target_include_directories(${sat_NAME} PRIVATE ${HDF5_INCLUDE_DIRS})
+        silo_target_link_hdf5(${sat_NAME})
     endif()
 
     if(WIN32)
         target_compile_definitions(${sat_NAME} PRIVATE PDB_LITE)
     endif()
 endfunction()
-
