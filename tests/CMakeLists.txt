@@ -471,8 +471,7 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
     endif()
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_link_libraries(${base} ${HDF5_C_LIBRARIES})
-        target_include_directories(${base} PRIVATE ${HDF5_INCLUDE_DIRS})
+        silo_target_link_hdf5(${base})
     endif()
 
     if(SILO_ENABLE_JSON AND JSONC_FOUND)
