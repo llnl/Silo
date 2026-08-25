@@ -372,6 +372,9 @@ db_FullyDeprecatedConvention(const char *name)
  * Modifications:
  *    Robb Matzke, Tue Dec 20 20:55:14 EST 1994
  *    If s is "" then we use the previous value of s.
+ *
+ *    Mark C. Miller, Tue Aug 25 14:55:51 PDT 2026
+ *    Include version in default error message.
  *-------------------------------------------------------------------------*/
 INTERNAL int
 db_perror(char const *s, int errorno, char const *fname)
@@ -455,7 +458,7 @@ db_perror(char const *s, int errorno, char const *fname)
     else {
         if (fname && *fname)
             fprintf(stderr, "%s: ", fname);
-        fprintf(stderr, "%s", db_strerror(errorno));
+        fprintf(stderr, "silo-%s: %s", DBVersion(), db_strerror(errorno));
         if (s && *s)
             fprintf(stderr, ": %s", s);
         putc('\n', stderr);
