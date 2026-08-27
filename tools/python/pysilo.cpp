@@ -101,7 +101,9 @@ std::vector<PyMethodDef> SiloMethods;
 void
 SiloErrorFunc(const char *errString)
 {
-    PyErr_SetString(SiloError, errString);
+    PyObject *args = Py_BuildValue("(is)", db_errno, errString);
+    PyErr_SetObject(SiloError, args);
+    Py_DECREF(args);
 }
 
 // ****************************************************************************
@@ -287,6 +289,45 @@ void SILOMODULE_API initSilo(void)
     SiloError = PyErr_NewException("Silo.SiloException", NULL, NULL);
     PyDict_SetItemString(d, "SiloException", SiloError);
     Py_DECREF(SiloError);
+
+    // Error codes
+    ADD_CONSTANT(E_NOERROR)
+    ADD_CONSTANT(E_BADFTYPE)
+    ADD_CONSTANT(E_NOTIMP)
+    ADD_CONSTANT(E_NOFILE)
+    ADD_CONSTANT(E_INTERNAL)
+    ADD_CONSTANT(E_NOMEM)
+    ADD_CONSTANT(E_BADARGS)
+    ADD_CONSTANT(E_CALLFAIL)
+    ADD_CONSTANT(E_NOTFOUND)
+    ADD_CONSTANT(E_TAURSTATE)
+    ADD_CONSTANT(E_MSERVER)
+    ADD_CONSTANT(E_PROTO)
+    ADD_CONSTANT(E_NOTDIR)
+    ADD_CONSTANT(E_MAXOPEN)
+    ADD_CONSTANT(E_NOTFILTER)
+    ADD_CONSTANT(E_MAXFILTERS)
+    ADD_CONSTANT(E_FEXIST)
+    ADD_CONSTANT(E_FILEISDIR)
+    ADD_CONSTANT(E_FILENOREAD)
+    ADD_CONSTANT(E_SYSTEMERR)
+    ADD_CONSTANT(E_FILENOWRITE)
+    ADD_CONSTANT(E_INVALIDNAME)
+    ADD_CONSTANT(E_NOOVERWRITE)
+    ADD_CONSTANT(E_CHECKSUM)
+    ADD_CONSTANT(E_COMPRESSION)
+    ADD_CONSTANT(E_GRABBED)
+    ADD_CONSTANT(E_NOTREG)
+    ADD_CONSTANT(E_CONCURRENT)
+    ADD_CONSTANT(E_DRVRCANTOPEN)
+    ADD_CONSTANT(E_BADOPTCLASS)
+    ADD_CONSTANT(E_NOTENABLEDINBUILD)
+    ADD_CONSTANT(E_MAXFILEOPTSETS)
+    ADD_CONSTANT(E_NOHDF5)
+    ADD_CONSTANT(E_EMPTYOBJECT)
+    ADD_CONSTANT(E_OBJBUFFULL)
+    ADD_CONSTANT(E_NOSILOHDF5)
+    ADD_CONSTANT(E_FILELOCKING)
 
     // Error Modes
     ADD_CONSTANT(DB_TOP);
