@@ -787,7 +787,8 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         set_tests_properties(test-write-py-hdf5 PROPERTIES RESOURCE_LOCK "sami.silo")
         set_tests_properties(test-write-py-hdf5 PROPERTIES LABELS "python;hdf5")
         add_test(NAME test-scale-quadvar-hdf5 COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/test_scale_quadvar")
-        set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0")
+        set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval}
+            ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0;SILO_TEST_SKIP_RETURN_CODE=${_silo_test_skip_retval}")
         set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES LABELS "python;hdf5")
     endif()
 
