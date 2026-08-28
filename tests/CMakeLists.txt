@@ -774,14 +774,10 @@ if(SILO_ENABLE_SILOCK AND NOT WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/testsilock
         ${silo_test_output_dir})
-    add_test(NAME testsilock
-        COMMAND ${CMAKE_COMMAND} -E env
-        "${silo_test_output_dir}/testsilock")
+    add_test(NAME testsilock COMMAND "${silo_test_output_dir}/testsilock")
     set_tests_properties(onehex PROPERTIES DEPENDS testsilock RESOURCE_LOCK onehex.silo)
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        add_test(NAME testsilock-hdf5
-            COMMAND ${CMAKE_COMMAND} -E env
-            "${silo_test_output_dir}/testsilock" DB_HDF5)
+        add_test(NAME testsilock-hdf5 COMMAND "${silo_test_output_dir}/testsilock" DB_HDF5)
         set_tests_properties(onehex-hdf5 PROPERTIES DEPENDS testsilock-hdf5)
         set_tests_properties(testsilock-hdf5 PROPERTIES DEPENDS testsilock RESOURCE_LOCK onehex.silo)
     endif()
@@ -822,7 +818,7 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
         set_tests_properties(test-write-py-hdf5 PROPERTIES DEPENDS sami-hdf5 REQUIRED_FILES sami.silo)
         set_tests_properties(test-write-py-hdf5 PROPERTIES RESOURCE_LOCK "sami.silo")
         set_tests_properties(test-write-py-hdf5 PROPERTIES LABELS "python;hdf5")
-        add_test(NAME test-scale-quadvar-hdf5 COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/test_scale_quadvar")
+        add_test(NAME test-scale-quadvar-hdf5 COMMAND "${silo_test_output_dir}/test_scale_quadvar")
         set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES SKIP_RETURN_CODE ${_silo_test_skip_retval}
             ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0;SILO_TEST_SKIP_RETURN_CODE=${_silo_test_skip_retval}")
         set_tests_properties(test-scale-quadvar-hdf5 PROPERTIES LABELS "python;hdf5")
@@ -852,14 +848,14 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
        set_tests_properties(multi_test-reset-hdf5 test-read-py-hdf5 PROPERTIES REQUIRED_FILES "multi_ucd3d.h5;multi_rect3d.h5")
     endif()
 
-    add_test(NAME testonehex COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/testonehex" DB_PDB)
+    add_test(NAME testonehex COMMAND "${silo_test_output_dir}/testonehex" DB_PDB)
     set_tests_properties(testonehex PROPERTIES DEPENDS onehex)
     set_tests_properties(testonehex PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0")
     set_tests_properties(testonehex PROPERTIES LABELS "python")
     set_tests_properties(testonehex onehex PROPERTIES RESOURCE_LOCK "onehex.silo")
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        add_test(NAME testonehex-hdf5 COMMAND ${CMAKE_COMMAND} -E env "${silo_test_output_dir}/testonehex" DB_HDF5)
+        add_test(NAME testonehex-hdf5 COMMAND "${silo_test_output_dir}/testonehex" DB_HDF5)
         set_tests_properties(testonehex-hdf5 PROPERTIES DEPENDS "onehex-hdf5;testonehex")
         set_tests_properties(testonehex-hdf5 PROPERTIES ENVIRONMENT "PYTHONPATH=$<TARGET_FILE_DIR:SiloPy>${_envvar_path_sep}$ENV{PYTHONPATH};LD_PRELOAD=${SILO_LIBASAN_PATH}:${SILO_LIBUBSAN_PATH};ASAN_OPTIONS=detect_leaks=0")
         set_tests_properties(testonehex-hdf5 PROPERTIES LABELS "python;hdf5")
