@@ -21,6 +21,7 @@ C     Case 3 intentionally demonstrates why a wrapper must not blindly
 C     apply FPTR() to a nullable data array when another argument (such
 C     as mixlen) can unambiguously say whether the array is present.
 C
+C     ChatGPT via Mark C. Miller, Thu Aug 27 20:24:53 PDT 2026
 C***********************************************************************
 
       program f77null
@@ -59,7 +60,7 @@ C...Create a tiny 1-D quad mesh.
       x(2) = 1.0
       dims(1) = 2
 
-      err = dbcreate("f77null.silo", 12, DB_CLOBBER, DB_LOCAL,
+      err = dbcreate("dbf77null.silo", 12, DB_CLOBBER, DB_LOCAL,
      .               "DB_F77NULL regression test", 26,
      .               driver, dbid)
       if (err .ne. 0) then
@@ -138,7 +139,7 @@ C...Exercise DB_F77NULL for optional facelist arrays.
 
 C...Read the -99 mixed data back.
 
-      err = dbopen("f77null.silo", 12, driver, DB_READ, dbid)
+      err = dbopen("dbf77null.silo", 12, driver, DB_READ, dbid)
       if (err .ne. 0) then
           print *, "dbopen failed"
           stop 1
