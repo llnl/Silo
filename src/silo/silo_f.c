@@ -854,7 +854,7 @@ DBPUTMSP_FC (int *dbid, FCD_DB name, int *lname, FCD_DB matname, int *lmatname,
 
         *status = DBPutMatspecies(dbfile, nm, mnm, *nmat, nmatspec,
                                   speclist, dims, *ndims, *nspecies_mf,
-                                  species_mf, mix_speclist, *mixlen,
+                                  FPTR(species_mf), FPTR(mix_speclist), *mixlen,
                                   *datatype, optlist);
 
         FREE(nm);
@@ -1412,7 +1412,7 @@ DBPUTFL_FC (int *dbid, FCD_DB name, int *lname, int *nfaces, int *ndims,
                                 nodelist, *lnodelist, *origin,
                                 FPTR(zoneno),
                                 shapesize, shapecnt, *nshapes,
-                                types, typelist, *ntypes);
+                                FPTR(types), FPTR(typelist), *ntypes);
 
         FREE(nm);
 
@@ -2485,7 +2485,7 @@ DBPUTQV1_FC (int *dbid, FCD_DB name,
 
         dbfile = (DBfile *) DBFortranAccessPointer(*dbid);
 
-        *status = DBPutQuadvar1(dbfile, nm, mnm, var, dims, *ndims, mixvar,
+        *status = DBPutQuadvar1(dbfile, nm, mnm, var, dims, *ndims, FPTR(mixvar),
                                 *mixlen, *datatype, *centering, optlist);
 
         FREE(nm);
@@ -2895,7 +2895,7 @@ DBPUTUV1_FC (int *dbid, FCD_DB name,
 
         dbfile = (DBfile *) DBFortranAccessPointer(*dbid);
 
-        *status = DBPutUcdvar1(dbfile, nm, mnm, var, *nels, mixvar, *mixlen,
+        *status = DBPutUcdvar1(dbfile, nm, mnm, var, *nels, FPTR(mixvar), *mixlen,
                                *datatype, *centering, optlist);
 
         FREE(nm);
