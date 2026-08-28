@@ -377,7 +377,8 @@ static PyObject *DBfile_DBGetVarInfo(PyObject *self, PyObject *args)
                 char msg[256];
                 snprintf(msg, sizeof(msg), "Unable to get component \"%s\" for object \"%s\"", compname.c_str(), str);
                 SiloErrorFunc(msg);
-                continue;
+                DBFreeObject(silo_obj);
+                return NULL;
             }
         }
 
@@ -851,8 +852,45 @@ static PyObject *DBfile_DBWriteObject(PyObject *self, PyObject *args)
 
     int ncomps = PyDict_Size((PyObject*)dictobj);
     if (!ncomps) return NULL;
-    int objtype = DBGetObjtypeTag(PyString_AsString(PyDict_GetItemString((PyObject*)dictobj, "type")));
+
+    PyObject *typeObj =
+        PyDict_GetItemString((PyObject*)dictobj, "type");
+    
+    if (!typeObj || !PyString_Check(typeObj))
+    {
+        PyErr_SetString(PyExc_TypeError,
+            "Object dictionary must contain a string-valued \"type\" entry");
+        return NULL;
+    }
+    
+    char const *typeName = PyString_AsString(typeObj);
+    int objtype = DBGetObjtypeTag(typeName);
+    
     DBobject *siloobj = DBMakeObject(objname, objtype, ncomps);
+    if (!siloobj)
+    {
+        SiloErrorFunc("DBMakeObject failed");
+        return NULL;
+    }
+    
+    /*
+     * DBGetObjtypeTag maps arbitrary user-defined object type names
+     * to DB_USERDEF, while DBMakeObject(DB_USERDEF) assigns the
+     * canonical type name "unknown". Preserve the original user-defined
+     * type name here.
+     */
+    if (objtype == DB_USERDEF && strcmp(typeName, "unknown"))
+    {
+        FREE(siloobj->type);
+        siloobj->type = strdup(typeName);
+        if (!siloobj->type)
+        {
+            DBFreeObject(siloobj);
+            PyErr_NoMemory();
+            return NULL;
+        }
+    }
+
     PyObject *key, *value;
 #if PY_VERSION_GE(2,5,0)
     Py_ssize_t pos = 0;
@@ -862,20 +900,20 @@ static PyObject *DBfile_DBWriteObject(PyObject *self, PyObject *args)
     while (PyDict_Next((PyObject*)dictobj, &pos, &key, &value))
     {
         // skip name and type values
-        if (!strncmp(PyString_AsString(key), "type", 4))
+        if (!strcmp(PyString_AsString(key), "type"))
             continue;
-        if (!strncmp(PyString_AsString(key), "name", 4))
+        if (!strcmp(PyString_AsString(key), "name"))
             continue;
 
         // handle some special cases Silo treats as either float or double explicitly
-        if (!strncmp(PyString_AsString(key), "time", 4))
+        if (!strcmp(PyString_AsString(key), "time"))
         {
             DBAddFltComponent(siloobj, PyString_AsString(key), (float) PyFloat_AS_DOUBLE(value));
             continue;
         }
-        if (!strncmp(PyString_AsString(key), "missing_value", 13) ||
-            !strncmp(PyString_AsString(key), "extents", 7) ||
-            !strncmp(PyString_AsString(key), "dtime", 5))
+        if (!strcmp(PyString_AsString(key), "missing_value") ||
+            !strcmp(PyString_AsString(key), "extents") ||
+            !strcmp(PyString_AsString(key), "dtime"))
         {
             DBAddDblComponent(siloobj, PyString_AsString(key), PyFloat_AS_DOUBLE(value));
             continue;
@@ -965,11 +1003,16 @@ static PyObject *DBfile_DBWriteObject(PyObject *self, PyObject *args)
         }
     }
 
-    // Ok, we've built up the object, now write it
-    DBWriteObject(db, siloobj, 1);
+
+    int err = DBWriteObject(db, siloobj, 1);
     DBFreeObject(siloobj);
 
-    PyErr_Clear();
+    if (err < 0)
+    {
+        SiloErrorFunc("DBWriteObject failed");
+        return NULL;
+    }
+
     Py_INCREF(Py_None);
     return Py_None;
 

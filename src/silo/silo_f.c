@@ -854,7 +854,7 @@ DBPUTMSP_FC (int *dbid, FCD_DB name, int *lname, FCD_DB matname, int *lmatname,
 
         *status = DBPutMatspecies(dbfile, nm, mnm, *nmat, nmatspec,
                                   speclist, dims, *ndims, *nspecies_mf,
-                                  species_mf, mix_speclist, *mixlen,
+                                  FPTR(species_mf), FPTR(mix_speclist), *mixlen,
                                   *datatype, optlist);
 
         FREE(nm);
@@ -1412,7 +1412,7 @@ DBPUTFL_FC (int *dbid, FCD_DB name, int *lname, int *nfaces, int *ndims,
                                 nodelist, *lnodelist, *origin,
                                 FPTR(zoneno),
                                 shapesize, shapecnt, *nshapes,
-                                types, typelist, *ntypes);
+                                FPTR(types), FPTR(typelist), *ntypes);
 
         FREE(nm);
 
@@ -2485,7 +2485,8 @@ DBPUTQV1_FC (int *dbid, FCD_DB name,
 
         dbfile = (DBfile *) DBFortranAccessPointer(*dbid);
 
-        *status = DBPutQuadvar1(dbfile, nm, mnm, var, dims, *ndims, mixvar,
+        *status = DBPutQuadvar1(dbfile, nm, mnm, var, dims, *ndims,
+                                *mixlen==0?NULL:mixvar,
                                 *mixlen, *datatype, *centering, optlist);
 
         FREE(nm);
@@ -2612,7 +2613,7 @@ DBPUTQV_FC (int *dbid, FCD_DB vname, int *lvname, FCD_DB mname, int *lmname,
 	} else {
 	  API_ERROR("vars", E_BADARGS);
 	}
-	if ((*(int *)mixvar) != DB_F77NULL) {
+	if (mixlen > 0) {
 	  /* Now convert the Fortran data array into a C array of data */
 	  cmixvar = (void **)malloc(sizeof(void*) * (*nvars));
 	  /* Make pointers to Fortran address in vars array */
@@ -2895,8 +2896,8 @@ DBPUTUV1_FC (int *dbid, FCD_DB name,
 
         dbfile = (DBfile *) DBFortranAccessPointer(*dbid);
 
-        *status = DBPutUcdvar1(dbfile, nm, mnm, var, *nels, mixvar, *mixlen,
-                               *datatype, *centering, optlist);
+        *status = DBPutUcdvar1(dbfile, nm, mnm, var, *nels, mixlen==0?NULL:mixvar,
+                               *mixlen, *datatype, *centering, optlist);
 
         FREE(nm);
         FREE(mnm);
@@ -4249,22 +4250,17 @@ DBGETQV1_FC (int *dbid, FCD_DB varname, int *lvarname, void *var, int *dims,
         *ndims = qv->ndims;
         *centering = (qv->align[0] == 0.) ? DB_NODECENT : DB_ZONECENT;
         *datatype = qv->datatype;
+        *mixlen = qv->mixlen;
         for (i = 0; i < qv->ndims; i++)
             dims[i] = qv->dims[i];
 
-      /*------------------------------------------------------------
-       *  If there was mixed data, copy that too.
-       *
-       *  Kludge city!!! I'm assuming name of mixed component is
-       *  'varname_mix'. This info should be kept in DBquadvar
-       *  somewhere.
-       *-----------------------------------------------------------*/
-        if ((*(int *)mixvar) != DB_F77NULL) {
-            strcpy(tmpstr, varnm);
-            strcat(tmpstr, "_mix");
-
-            *mixlen = DBGetVarLength(dbfile, tmpstr);
-            DBReadVar(dbfile, tmpstr, mixvar);
+      /*------------------------------
+       *  Copy the mixed vals of quad
+       *  var into the supplied space.
+       *-----------------------------*/
+        if (qv->mixlen > 0 && (FPTR(mixvar))) {
+            nbytes = qv->mixlen * db_GetMachDataSize(qv->datatype);
+            memcpy(mixvar, qv->mixvals[0], nbytes);
         }
 
         DBFreeQuadvar(qv);

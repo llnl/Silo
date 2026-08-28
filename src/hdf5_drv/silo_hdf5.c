@@ -2050,6 +2050,9 @@ T_str(char *s)
  *
  *   Mark C. Miller, Thu Jul 17 23:11:41 PDT 2008
  *   Added code to detect compression errors.
+ *
+ *   Mark C. Miller, Wed Aug 26 09:01:49 PDT 2026
+ *   Handle missing deflate compressor too.
  *-------------------------------------------------------------------------
  */
 PRIVATE herr_t
@@ -2065,6 +2068,8 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
     else if (strstr(err_desc->desc, "zip") != 0)
         *silo_error_code_p = E_COMPRESSION;
     else if (strstr(err_desc->desc, "Lindstrom-") != 0)
+        *silo_error_code_p = E_COMPRESSION;
+    else if (strstr(err_desc->desc, "deflate") != 0)
         *silo_error_code_p = E_COMPRESSION;
 #if HDF5_VERSION_GE(1,10,0)
     else if (err_desc->min_num == H5E_CANTLOCKFILE ||
