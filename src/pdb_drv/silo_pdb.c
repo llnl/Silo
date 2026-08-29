@@ -640,8 +640,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
             sprintf(err_str,"PJ_get_group: Probably no such object \"%s\".",objname);
             FREE(varname);
             FREE(filename);
-            db_perror(err_str, E_CALLFAIL, me);
-            return -1;
+            return db_perror(err_str, E_CALLFAIL, me);
         }
 
         /* Check object type before we do any allocations */
@@ -665,8 +664,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
                     cached_group->type, objname_in, DBGetObjtypeName(expected_dbtype));
                 FREE(varname);
                 FREE(filename);
-                db_perror(error, E_NOTFOUND, me);
-                return -1;
+                return db_perror(error, E_NOTFOUND, me);
             }
         }
 
@@ -706,7 +704,8 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
 
     /* Walk through the object, putting the data into the appropriate memory
      * locations.  */
-    for (i = 0; i < tobj->num; i++)
+    error = 0;
+    for (i = 0; i < tobj->num && error == 0; i++)
     {
         for (j = 0; j < cached_group->ncomponents; j++)
         {
@@ -719,12 +718,17 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
                  *  pointer (i.e., ptr[i]). If not alloced, address
                  *  is already in the ptr[i] element.
                  */
-                PJ_ReadVariable(file, cached_group->pdb_names[j],
-                                tobj->type[i], (int)tobj->alloced[i],
-                                (tobj->alloced[i]) ?
-                                (char **)&tobj->ptr[i] :
-                                (char **)tobj->ptr[i]);
-
+                if (!PJ_ReadVariable(file, cached_group->pdb_names[j],
+                                    tobj->type[i], (int)tobj->alloced[i],
+                                    tobj->nelmts[i],
+                                    (tobj->alloced[i]) ?
+                                    (char **)&tobj->ptr[i] :
+                                    (char **)tobj->ptr[i]))
+                {
+                    error = 1;
+                    db_perror(cached_group->pdb_names[j], E_CALLFAIL, me); 
+                    break;
+                }
             }
         }
     }
@@ -740,7 +744,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
 
     FREE (varname);
 
-    return 0;
+    return error==1?-1:0;
 }
 
 /*----------------------------------------------------------------------
@@ -974,7 +978,8 @@ INTERNAL int
 PJ_ReadVariable(PDBfile *file,
                 char    *name_in,     /*Name of variable to read */
                 int     req_datatype, /*Requested datatype for variable */
-                int     alloced,      /*has space already been allocated? */
+                int     alloced,      /*Has space already been allocated? */
+                int     nelmts,       /*Size of allocation in # elements */
                 char    **var)        /*Address of ptr to store data into */
 {
    int            num, size, i, okay;
@@ -1100,6 +1105,12 @@ PJ_ReadVariable(PDBfile *file,
        *-------------------------------------------------*/
 
       (void)pdb_getvarinfo(file, name, tname, &num, &size, 0);
+
+      if (alloced && nelmts >= 0 && num > nelmts)
+      {
+         FREE(name);
+         return FALSE;
+      }
 
       /* If not already allocated, and is not a pointered var, allocate */
       if (!alloced && num > 0) {
@@ -3302,7 +3313,7 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     INIT_OBJ(&tmp_obj);
 
     DEFINE_OBJ("ndims",       &tmpmm.ndims,       DB_INT);
-    DEFINE_OBJ("dims",         tmpmm.dims,        DB_INT);
+    DEFINE_OBN("dims",         tmpmm.dims,        DB_INT,   SZA(tmpmm.dims));
     DEFINE_OBJ("major_order", &tmpmm.major_order, DB_INT);
     DEFINE_OBJ("origin",      &tmpmm.origin,      DB_INT);
     DEFALL_OBJ("meshid",      &tmpmm.meshname,    DB_CHAR);
@@ -3338,6 +3349,13 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
         return NULL;
     }
     *mm = tmpmm;
+
+    if (mm->ndims < 0 || mm->ndims > SZA(mm->dims))
+    {
+        DBFreeMaterial(mm);
+        db_perror("ndims", E_BADARGS, me);
+        return NULL;
+    }
 
     _DBQQCalcStride(mm->stride, mm->dims, mm->ndims, mm->major_order);
 
