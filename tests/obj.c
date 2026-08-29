@@ -66,17 +66,17 @@ int main(int argc, char **argv)
 {  
     DBfile        *dbfile;
     int         i, driver = DB_PDB;
-    char        *filename = "userdef_obj.pdb";
+    char        *filename = "ucd.pdb";
     int          show_all_errors = FALSE;
     int          allow_long_str_components = FALSE;
 
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "DB_PDB", 6)) {
             driver = StringToDriver(argv[i]);
-            filename = "userdef_obj.pdb";
+            filename = "ucd.pdb";
         } else if (!strncmp(argv[i], "DB_HDF5", 7)) {
             driver = StringToDriver(argv[i]);
-            filename = "userdef_obj.h5";
+            filename = "ucd.h5";
         } else if (!strcmp(argv[i], "show-all-errors")) {
             show_all_errors = TRUE;
         } else if (!strcmp(argv[i], "allow-long-str-components")) {
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
     DBSetAllowLongStrComponents(allow_long_str_components);
 
-    dbfile = DBCreate(filename, 0, DB_LOCAL, "user defined objects file", driver);
+    dbfile = DBCreate(filename, 0, DB_LOCAL, "ucd test file", driver);
     printf("Creating file: '%s'...\n", filename);
     build_objs(dbfile);
     DBClose(dbfile);
