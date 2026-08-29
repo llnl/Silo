@@ -121,6 +121,13 @@ fi
 # Use python module to create data with no special features 
 #
 env PYTHONPATH=$(dirname $silo_pyso) $pycmd $scale_quadvar_py 1>/dev/null 2>&1
+py_status=$?
+if [ -n "$SILO_TEST_SKIP_RETURN_CODE" ] && [ "$py_status" -eq "$SILO_TEST_SKIP_RETURN_CODE" ]; then
+    exit $SILO_TEST_SKIP_RETURN_CODE
+fi
+if [ "$py_status" -ne 0 ]; then
+    exit "$py_status"
+fi
 
 #
 # Now, run browser and make sure we don't get any errors in the diff
