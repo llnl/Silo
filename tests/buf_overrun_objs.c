@@ -66,30 +66,26 @@ int main(int argc, char **argv)
 {  
     DBfile        *dbfile;
     int         i, driver = DB_PDB;
-    char        *filename = "userdef_obj.pdb";
+    char        *filename = "buf_overrun_objs.pdb";
     int          show_all_errors = FALSE;
-    int          allow_long_str_components = FALSE;
 
     for (i=1; i<argc; i++) {
         if (!strncmp(argv[i], "DB_PDB", 6)) {
             driver = StringToDriver(argv[i]);
-            filename = "userdef_obj.pdb";
+            filename = "buf_overrun_objs.pdb";
         } else if (!strncmp(argv[i], "DB_HDF5", 7)) {
             driver = StringToDriver(argv[i]);
-            filename = "userdef_obj.h5";
+            filename = "buf_overrun_objs.h5";
         } else if (!strcmp(argv[i], "show-all-errors")) {
             show_all_errors = TRUE;
-        } else if (!strcmp(argv[i], "allow-long-str-components")) {
-            allow_long_str_components = TRUE;
 	} else if (argv[i][0] != '\0') {
             fprintf(stderr, "%s: ignored argument `%s'\n", argv[0], argv[i]);
         }
     }
 
     DBShowErrors(show_all_errors?DB_ALL_AND_DRVR:DB_ALL, NULL);
-    DBSetAllowLongStrComponents(allow_long_str_components);
 
-    dbfile = DBCreate(filename, 0, DB_LOCAL, "user defined objects file", driver);
+    dbfile = DBCreate(filename, 0, DB_LOCAL, "objects causing buf overruns if read", driver);
     printf("Creating file: '%s'...\n", filename);
     build_objs(dbfile);
     DBClose(dbfile);
@@ -102,82 +98,16 @@ void
 build_objs(DBfile *dbfile)
 {  DBobject *o;
 
-   if (dbfile != NULL)
-   {
-      if ((o=DBMakeObject("first",DB_USERDEF,12)) != NULL)
-      {  int got;
+    if (!dbfile) return;
 
-	 DBAddIntComponent(o,"member_0",0);
-	 DBAddIntComponent(o,"member_1",1);
-	 DBAddStrComponent(o,"member_2","two");
-	 DBAddIntComponent(o,"member_3",3);
-	 DBAddFltComponent(o,"member_4",4.4);
-	 DBAddVarComponent(o,"member_5","five");
-	 DBAddIntComponent(o,"member_6",6);
-	 DBAddFltComponent(o,"member_7",7.7);
-	 DBAddVarComponent(o,"member_8","eight");
-	 DBAddIntComponent(o,"member_9",9);
-         DBAddDblComponent(o,"member_10",10.10101010101010);
-         DBAddStrComponent(o,"member_11",
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "VeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVery"
-             "LongString");
-	 got = DBWriteObject(dbfile,o,0);
-	 DBFreeObject(o);
-	 if (got < 0)
-	    goto punt;
-	 if ((o=DBMakeObject("second",DB_USERDEF,8)) != NULL)
-	 {  DBAddStrComponent(o,"field_0","zero");
-	    DBAddStrComponent(o,"field_1","one");
-	    DBAddStrComponent(o,"field_2","two");
-	    DBAddIntComponent(o,"field_3",3);
-	    DBAddIntComponent(o,"field_4",4);
-	    DBAddDblComponent(o,"field_5",55555.5555555555);
-	    DBAddFltComponent(o,"field_6",6.6);
-	    DBAddIntComponent(o,"field_7",7);
-	    got = DBWriteObject(dbfile,o,0);
-	    DBFreeObject(o);
-	    if (got < 0)
-	       goto punt;
-	    if ((o=DBMakeObject("third",DB_USERDEF,4)) != NULL)
-	    {  DBAddIntComponent(o,"component_0",0);
-	       DBAddVarComponent(o,"component_1","one");
-	       DBAddIntComponent(o,"component_2",2);
-	       DBAddIntComponent(o,"component_3",3);
-	       got = DBWriteObject(dbfile,o,0);
-	       DBFreeObject(o);
-	       if (got < 0)
-		  goto punt;
-	       if ((o=DBMakeObject("third",DB_USERDEF,5)) != NULL)
-	       {  DBAddStrComponent(o,"part_0","zero");
-		  DBAddVarComponent(o,"part_1","one");
-		  DBAddStrComponent(o,"part_2","two");
-		  DBAddIntComponent(o,"part_3",3);
-		  DBAddFltComponent(o,"part_4",4.4);
-		  got = DBWriteObject(dbfile,o,0);
-		  DBFreeObject(o);
-		  if (got < 0)
-		     goto punt;
-	       }
-	    }
-	 }
-      }
-punt:
-    ; 
-   }
+    /* Write wild material with ndims of 1000. Use this object to ensure 
+       attempts to read it won't buf overrun */
+    {
+        int dims[1000]; for (int i=0;i<1000;i++) dims[i]=1;
+        int matnos[1] = {5}, matlist[1] = {7};
+        DBPutMaterial(dbfile,"mat","mesh",1,matnos,matlist,dims,1000,
+              NULL,NULL,NULL,NULL,0,DB_FLOAT,NULL);   /* returns 0 */
+
+    }
 }
 

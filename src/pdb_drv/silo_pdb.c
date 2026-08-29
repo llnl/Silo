@@ -3294,15 +3294,17 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     PJcomplist tmp_obj;
     char *tmpnames = NULL;
     char *tmpcolors = NULL;
+    int *tmpdims = NULL;
     DBmaterial tmpmm;
     PJcomplist *_tcl;
+    int pjget;
 
     /* Comp. Name        Comp. Address     Data Type     */
     memset(&tmpmm, 0, sizeof(DBmaterial));
     INIT_OBJ(&tmp_obj);
 
     DEFINE_OBJ("ndims",       &tmpmm.ndims,       DB_INT);
-    DEFINE_OBJ("dims",         tmpmm.dims,        DB_INT);
+    DEFALL_OBJ("dims",        &tmpdims,           DB_INT);
     DEFINE_OBJ("major_order", &tmpmm.major_order, DB_INT);
     DEFINE_OBJ("origin",      &tmpmm.origin,      DB_INT);
     DEFALL_OBJ("meshid",      &tmpmm.meshname,    DB_CHAR);
@@ -3329,17 +3331,34 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
         DEFALL_OBJ("mix_vf",      &tmpmm.mix_vf,      DB_FLOAT);
     }
 
-    if (PJ_GetObject(dbfile->pdb, name, &tmp_obj, DB_MATERIAL) < 0)
-        return NULL;
-
     if (NULL == (mm = DBAllocMaterial()))
     {
         db_perror("DBAllocMaterial", E_CALLFAIL, me);
         return NULL;
     }
+
+    pjget = PJ_GetObject(dbfile->pdb, name, &tmp_obj, DB_MATERIAL);
     *mm = tmpmm;
+    if ((pjget < 0) ||
+        (mm->ndims < 0 || mm->ndims > 3))
+
+    {
+        FREE(tmpdims);
+        FREE(tmpnames);
+        FREE(tmpcolors);
+        DBFreeMaterial(mm);
+        db_perror("PJ_GetObject", E_CALLFAIL, me);
+        return NULL;
+    }
 
     _DBQQCalcStride(mm->stride, mm->dims, mm->ndims, mm->major_order);
+
+    if (tmpdims != NULL)
+    {
+        for (int i = 0; i < mm->ndims; i++)
+            mm->dims[i] = tmpdims[i];
+    }
+    FREE(tmpdims);
 
     /* If we have material names, restore it to an array of names.  In the
      * file, it's stored as one string, with individual names separated by
