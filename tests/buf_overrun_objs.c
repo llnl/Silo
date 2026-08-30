@@ -135,6 +135,11 @@ build_objs(DBfile *dbfile)
         DBPutGroupelmap(dbfile, "glmap", numsegs, segTypes, segLens,
             0, (int const * const *) segData, 0, 0, 0);
 
+        for (i = 0; i < numsegs; i++)
+        {
+            if (segData[i]) free(segData[i]);
+        }
+
         free(segTypes);
         free(segLens);
         free(segData);
