@@ -16829,7 +16829,7 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         intArray = (int *)db_hdf5_comprd(dbfile, m.segment_data, 1);
 
         /* Acquire actual file size of segment_data */
-        intArray_size = db_hdf5_GetVarLength(dbfile, m.segment_data);
+        intArray_size = db_hdf5_GetVarLength(_dbfile, m.segment_data);
 
         n = 0;
         for (i = 0; (i < m.num_segments) && intArray && gm->segment_lengths; i++)
@@ -16860,7 +16860,7 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
             fracsArray = db_hdf5_comprd(dbfile, m.segment_fracs, 1);
 
             /* Acquire actual file size of segment_data */
-            fracsArray_size = db_hdf5_GetVarLength(dbfile, m.segment_fracs);
+            fracsArray_size = db_hdf5_GetVarLength(_dbfile, m.segment_fracs);
             n = 0;
             for (i = 0; (i < m.num_segments) && fracsArray; i++)
             {
