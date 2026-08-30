@@ -96,8 +96,7 @@ int main(int argc, char **argv)
 
 void
 build_objs(DBfile *dbfile)
-{  DBobject *o;
-
+{
     if (!dbfile) return;
 
     /* Write wild material with ndims of 1000. Use this object to ensure 
@@ -131,7 +130,7 @@ build_objs(DBfile *dbfile)
         }
 
         DBPutGroupelmap(dbfile, "glmap", numsegs, segTypes, segLens,
-            0, segData, 0, 0, 0);
+            0, (int const * const *) segData, 0, 0, 0);
 
         free(segTypes);
         free(segLens);
