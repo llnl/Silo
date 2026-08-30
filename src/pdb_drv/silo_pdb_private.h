@@ -327,7 +327,6 @@ PRIVATE void db_InitDefvars (DBoptlist const *);
  *-------------------------------------------------------------------------
  */
 #define MAXNAME         256
-#define SZA(A)          ((int)(sizeof(A)/sizeof((A)[0])))
 #define INIT_OBJ(A)     (_tcl=(A),_tcl->num=0)
 #define DEFINE_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,1,1)
 #define DEFALL_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,0,0)

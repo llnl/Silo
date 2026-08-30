@@ -109,5 +109,38 @@ build_objs(DBfile *dbfile)
               NULL,NULL,NULL,NULL,0,DB_FLOAT,NULL);   /* returns 0 */
 
     }
-}
 
+    /* Write groupel map */
+    {
+        int i;
+        int numsegs = 5;
+        int *segTypes = (int *) malloc(numsegs * sizeof(int));
+        int *segLens = (int *) malloc(numsegs * sizeof(int));
+        int **segData = (int **) malloc(numsegs * sizeof(int*));
+
+        segLens[0] = 1;
+        segLens[1] = 1;
+        segLens[2] = 100;
+        segLens[3] = 1;
+        segLens[4] = -100;
+
+        segLens[0] = -1;
+        segLens[1] = -1;
+        segLens[2] = -1;
+        segLens[3] = -1;
+        segLens[4] = 5;
+
+        for (i = 0; i < numsegs; i++)
+        {
+            segTypes[i] = DB_BLOCKCENT;
+            segData[i] = (int *) calloc(segLens[i], sizeof(int));
+        }
+
+        DBPutGroupelmap(dbfile, "glmap", numsegs, segTypes, segLens,
+            0, segData, 0, 0, 0);
+
+        free(segTypes);
+        free(segLens);
+        free(segData);
+    }
+}

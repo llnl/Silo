@@ -3313,7 +3313,7 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     INIT_OBJ(&tmp_obj);
 
     DEFINE_OBJ("ndims",       &tmpmm.ndims,       DB_INT);
-    DEFINE_OBN("dims",         tmpmm.dims,        DB_INT,   SZA(tmpmm.dims));
+    DEFINE_OBN("dims",         tmpmm.dims,        DB_INT,   NELMTS(tmpmm.dims));
     DEFINE_OBJ("major_order", &tmpmm.major_order, DB_INT);
     DEFINE_OBJ("origin",      &tmpmm.origin,      DB_INT);
     DEFALL_OBJ("meshid",      &tmpmm.meshname,    DB_CHAR);
@@ -3350,7 +3350,7 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     }
     *mm = tmpmm;
 
-    if (mm->ndims < 0 || mm->ndims > SZA(mm->dims))
+    if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims))
     {
         DBFreeMaterial(mm);
         db_perror("ndims", E_BADARGS, me);
@@ -3470,7 +3470,7 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
 
    DEFALL_OBJ("matname", &tmpmm.matname, DB_CHAR);
    DEFINE_OBJ("ndims", &tmpmm.ndims, DB_INT);
-   DEFINE_OBJ("dims", tmpmm.dims, DB_INT);
+   DEFINE_OBN("dims", tmpmm.dims, DB_INT, NELMTS(tmpmm.dims));
    DEFINE_OBJ("major_order", &tmpmm.major_order, DB_INT);
    DEFINE_OBJ("datatype", &tmpmm.datatype, DB_INT);
    DEFINE_OBJ("nmat", &tmpmm.nmat, DB_INT);
@@ -4790,8 +4790,8 @@ db_pdb_GetPointmesh (DBfile *_dbfile, char const *objname)
    DEFINE_OBJ("origin", &tmppm.origin, DB_INT);
    DEFINE_OBJ("gnznodtype", &tmppm.gnznodtype, DB_INT);
 
-   DEFINE_OBJ("min_extents", tmppm.min_extents, DB_FLOAT);
-   DEFINE_OBJ("max_extents", tmppm.max_extents, DB_FLOAT);
+   DEFINE_OBN("min_extents", tmppm.min_extents, DB_FLOAT, NELMTS(tmppm.min_extents));
+   DEFINE_OBN("max_extents", tmppm.max_extents, DB_FLOAT, NELMTS(tmppm.max_extents));
 
    DEFINE_OBJ("guihide", &tmppm.guihide, DB_INT);
    DEFALL_OBJ("mrgtree_name", &tmppm.mrgtree_name, DB_CHAR);
@@ -4952,6 +4952,13 @@ db_pdb_GetPointvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *mv = tmpmv;
 
+    if (mv->nvals < 0 || (mv->nvals > 1 && (mv->nvals > NELMTS(_ptvalstr))))
+    {
+        DBFreeMeshvar(mv);
+        db_perror("nvals", E_MALFORMED, me);
+        return NULL;
+    }
+
    /*
     *  Read the remainder of the object: loop over all values
     *  associated with this variable.
@@ -5102,12 +5109,12 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     DEFALL_OBJ("units1", &tmpqm.units[1], DB_CHAR);
     DEFALL_OBJ("units2", &tmpqm.units[2], DB_CHAR);
 
-    DEFINE_OBJ("dims", tmpqm.dims, DB_INT);
-    DEFINE_OBJ("min_index", tmpqm.min_index, DB_INT);
-    DEFINE_OBJ("max_index", tmpqm.max_index, DB_INT);
-    DEFINE_OBJ("min_extents", tmpqm.min_extents, DB_FLOAT);
-    DEFINE_OBJ("max_extents", tmpqm.max_extents, DB_FLOAT);
-    DEFINE_OBJ("baseindex", tmpqm.base_index, DB_INT);
+    DEFINE_OBN("dims", tmpqm.dims, DB_INT, NELMTS(tmpqm.dims));
+    DEFINE_OBN("min_index", tmpqm.min_index, DB_INT, NELMTS(tmpqm.min_index));
+    DEFINE_OBN("max_index", tmpqm.max_index, DB_INT, NELMTS(tmpqm.max_index));
+    DEFINE_OBN("min_extents", tmpqm.min_extents, DB_FLOAT, NELMTS(tmpqm.min_extents));
+    DEFINE_OBN("max_extents", tmpqm.max_extents, DB_FLOAT, NELMTS(tmpqm.max_extents));
+    DEFINE_OBN("baseindex", tmpqm.base_index, DB_INT, NELMTS(tmpqm.base_index));
     DEFINE_OBJ("guihide", &tmpqm.guihide, DB_INT);
     DEFALL_OBJ("mrgtree_name", &tmpqm.mrgtree_name, DB_CHAR);
 
@@ -5125,6 +5132,12 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     if ((qm = DBAllocQuadmesh()) == NULL)
        return NULL;
     *qm = tmpqm;
+
+    if (qm->ndims < 0 || qm->ndims > NELMTS(qm->dims))
+    {
+        DBFreeQuadmesh(qm);
+        return NULL;
+    }
 
     if (tmpannum)
     {
@@ -5257,10 +5270,10 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
    DEFINE_OBJ("missing_value", &tmpqv.missing_value, DB_DOUBLE);
 
    /* Arrays */
-   DEFINE_OBJ("min_index", tmpqv.min_index, DB_INT);
-   DEFINE_OBJ("max_index", tmpqv.max_index, DB_INT);
-   DEFINE_OBJ("dims", tmpqv.dims, DB_INT);
-   DEFINE_OBJ("align", tmpqv.align, DB_FLOAT);
+   DEFINE_OBN("min_index", tmpqv.min_index, DB_INT, NELMTS(tmpqv.min_index));
+   DEFINE_OBN("max_index", tmpqv.max_index, DB_INT, NELMTS(tmpqv.max_index));
+   DEFINE_OBN("dims", tmpqv.dims, DB_INT, NELMTS(tmpqv.dims));
+   DEFINE_OBN("align", tmpqv.align, DB_FLOAT, NELMTS(tmpqv.align));
    DEFALL_OBJ("region_pnames", &rpnames, DB_CHAR);
 
    /* Arrays that PJ_GetObject must allocate. */
@@ -5277,6 +5290,20 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
    if ((qv = DBAllocQuadvar()) == NULL)
       return NULL;
    *qv = tmpqv;
+
+   if (qv->ndims < 0 || qv->ndims > NELMTS(qv->dims))
+   {
+       DBFreeQuadvar(qv);
+       db_perror("ndims", E_MALFORMED, me);
+       return NULL;
+   }
+
+   if (qv->nvals < 0 || qv->nvals > NELMTS(_valstr))
+   {
+       DBFreeQuadvar(qv);
+       db_perror("nvals", E_MALFORMED, me);
+       return NULL;
+   }
 
    /*
     *  Read the remainder of the object: loop over all values
@@ -5304,7 +5331,7 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
       if (PJ_InqForceSingle())
          qv->datatype = DB_FLOAT;
 
-      for (i = 0; i < qv->nvals; i++) {
+      for (i = 0; i < MIN(NELMTS(_valstr),qv->nvals); i++) {
          DEFALL_OBJ(_valstr[i], &qv->vals[i], DB_FLOAT);
 
          if (qv->mixlen > 0) {
@@ -5428,8 +5455,8 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
    DEFINE_OBJ("nnodes", &tmpum.nnodes, DB_INT);
    DEFINE_OBJ("origin", &tmpum.origin, DB_INT);
 
-   DEFINE_OBJ("min_extents", tmpum.min_extents, DB_FLOAT);
-   DEFINE_OBJ("max_extents", tmpum.max_extents, DB_FLOAT);
+   DEFINE_OBN("min_extents", tmpum.min_extents, DB_FLOAT, NELMTS(tmpum.min_extents));
+   DEFINE_OBN("max_extents", tmpum.max_extents, DB_FLOAT, NELMTS(tmpum.max_extents));
 
    if (DBGetDataReadMask2File(_dbfile) & DBUMCoords)
    {
@@ -5765,6 +5792,13 @@ db_pdb_GetUcdvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *uv = tmpuv;
 
+   if (uv->nvals < 0 || uv->nvals > NELMTS(_valstr))
+   {
+       DBFreeUcdvar(uv);
+       db_perror("nvals", E_MALFORMED, me);
+       return NULL;
+   }
+
    /*
     *  Read the remainder of the object: loop over all values
     *  associated with this variable.
@@ -5864,8 +5898,8 @@ db_pdb_GetCsgmesh (DBfile *_dbfile, char const *meshname)
    DEFINE_OBJ("ndims", &tmpcsgm.ndims, DB_INT);
    DEFINE_OBJ("nbounds", &tmpcsgm.nbounds, DB_INT);
    DEFINE_OBJ("origin", &tmpcsgm.origin, DB_INT);
-   DEFINE_OBJ("min_extents", tmpcsgm.min_extents, DB_DOUBLE);
-   DEFINE_OBJ("max_extents", tmpcsgm.max_extents, DB_DOUBLE);
+   DEFINE_OBN("min_extents", tmpcsgm.min_extents, DB_DOUBLE, NELMTS(tmpcsgm.min_extents));
+   DEFINE_OBN("max_extents", tmpcsgm.max_extents, DB_DOUBLE, NELMTS(tmpcsgm.max_extents));
    DEFALL_OBJ("label0", &tmpcsgm.labels[0], DB_CHAR);
    DEFALL_OBJ("label1", &tmpcsgm.labels[1], DB_CHAR);
    DEFALL_OBJ("label2", &tmpcsgm.labels[2], DB_CHAR);
@@ -5953,9 +5987,9 @@ db_pdb_GetCsgvar (DBfile *_dbfile, char const *objname)
    DBfile_pdb    *dbfile = (DBfile_pdb *) _dbfile;
    PJcomplist     tmp_obj;
    char           tmp[256];
-   static char *me = "db_pdb_GetCsgvar";
+   static char   *me = "db_pdb_GetCsgvar";
    char          *rpnames = NULL;
-   DBcsgvar tmpcsgv;
+   DBcsgvar       tmpcsgv;
    PJcomplist    *_tcl;
 
    memset(&tmpcsgv, 0, sizeof(DBcsgvar));
@@ -5978,30 +6012,40 @@ db_pdb_GetCsgvar (DBfile *_dbfile, char const *objname)
 
    if (PJ_GetObject(dbfile->pdb, (char*) objname, &tmp_obj, DB_CSGVAR) < 0)
       return NULL;
+   if ((csgv = DBAllocCsgvar()) == NULL)
+      return NULL;
+   *csgv = tmpcsgv;
+
+   if (csgv->nvals < 0 || csgv->nvals > NELMTS(_valstr))
+   {
+       DBFreeCsgvar(csgv);
+       db_perror("nvals", E_MALFORMED, me);
+       return NULL;
+   }
 
    /*
     *  Read the remainder of the object: loop over all values
     *  associated with this variable.
     */
-   if ((tmpcsgv.nvals > 0) && (DBGetDataReadMask2File(_dbfile) & DBCSGVData)) {
+   if ((csgv->nvals > 0) && (DBGetDataReadMask2File(_dbfile) & DBCSGVData)) {
       INIT_OBJ(&tmp_obj);
 
-      tmpcsgv.vals = ALLOC_N(void *, tmpcsgv.nvals);
+      csgv->vals = ALLOC_N(void *, csgv->nvals);
 
-      if (tmpcsgv.datatype == 0) {
+      if (csgv->datatype == 0) {
           strcpy(tmp, objname);
           strcat(tmp, "_data");
-          if ((tmpcsgv.datatype = db_pdb_GetVarDatatype(dbfile->pdb, tmp)) < 0) {
+          if ((csgv->datatype = db_pdb_GetVarDatatype(dbfile->pdb, tmp)) < 0) {
               /* Not found. Assume float. */
-              tmpcsgv.datatype = DB_FLOAT;
+              csgv->datatype = DB_FLOAT;
           }
       }
 
-      if ((tmpcsgv.datatype == DB_DOUBLE) && PJ_InqForceSingle())
-          tmpcsgv.datatype = DB_FLOAT;
+      if ((csgv->datatype == DB_DOUBLE) && PJ_InqForceSingle())
+          csgv->datatype = DB_FLOAT;
 
-      for (i = 0; i < tmpcsgv.nvals; i++) {
-         DEFALL_OBJ(_valstr[i], &tmpcsgv.vals[i], tmpcsgv.datatype);
+      for (i = 0; i < csgv->nvals; i++) {
+         DEFALL_OBJ(_valstr[i], &csgv->vals[i], csgv->datatype);
       }
 
       PJ_GetObject(dbfile->pdb, (char*) objname, &tmp_obj, 0);
@@ -6009,20 +6053,16 @@ db_pdb_GetCsgvar (DBfile *_dbfile, char const *objname)
 
    if (rpnames != NULL)
    {
-      tmpcsgv.region_pnames = DBStringListToStringArray(rpnames, 0, !skipFirstSemicolon);
+      csgv->region_pnames = DBStringListToStringArray(rpnames, 0, !skipFirstSemicolon);
       FREE(rpnames);
    }
 
-   if      (tmpcsgv.missing_value == DB_MISSING_VALUE_NOT_SET)
-       tmpcsgv.missing_value = 0.0;
-   else if (tmpcsgv.missing_value == 0.0)
-       tmpcsgv.missing_value = DB_MISSING_VALUE_NOT_SET;
+   if      (csgv->missing_value == DB_MISSING_VALUE_NOT_SET)
+       csgv->missing_value = 0.0;
+   else if (csgv->missing_value == 0.0)
+       csgv->missing_value = DB_MISSING_VALUE_NOT_SET;
 
-   if ((csgv = DBAllocCsgvar()) == NULL)
-      return NULL;
-
-   tmpcsgv.name = STRDUP(objname);
-   *csgv = tmpcsgv;
+   csgv->name = STRDUP(objname);
 
    return (csgv);
 }
@@ -7414,6 +7454,8 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     void *fracsArray = NULL;
     DBgroupelmap tmpgm;
     PJcomplist *_tcl;
+    int segData_size = 0;
+    int fracsArray_size = 0;
 
     memset(&tmpgm, 0, sizeof(DBgroupelmap));
     INIT_OBJ(&tmp_obj);
@@ -7432,18 +7474,36 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     gm = (DBgroupelmap*) calloc(1,sizeof(DBgroupelmap));
     *gm = tmpgm;
 
+    /* Independently acquire size of segment_data */
+    if (gm->num_segments > 0)
+    {
+        char compname[256];
+        snprintf(compname, sizeof(compname), "%s_%s", name, "segment_data");
+        segData_size = db_pdb_GetVarLength(_dbfile, compname);
+    }
+
     /* unflatten the segment data */
-    gm->segment_data = (int **) malloc(gm->num_segments * sizeof(int*));
+    gm->segment_data = (int **) calloc(gm->num_segments, sizeof(int*));
     n = 0;
     for (i = 0; i < gm->num_segments; i++)
     {
         int sl = gm->segment_lengths[i];
-        gm->segment_data[i] = 0;
         if (sl > 0)
         {
             gm->segment_data[i] = (int*) malloc(sl * sizeof(int));
             for (j = 0; j < sl; j++)
+            {
+                if (n >= segData_size)
+                {
+                    db_perror("segment_data", E_MALFORMED, me);
+                    DBFreeGroupelmap(gm);
+                    FREE(segData);
+                    FREE(fracLengths);
+                    FREE(fracsArray);
+                    return NULL; 
+                }
                 gm->segment_data[i][j] = segData[n++];
+            }
         }
     }
     FREE(segData);
@@ -7451,21 +7511,29 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     /* unflatten frac data if we have it */
     if (fracLengths != NULL)
     {
-        gm->segment_fracs = (void **)malloc(gm->num_segments * sizeof(void*));
+        /* Independently acquire size of segment_fracs */
+        char compname[256];
+        snprintf(compname, sizeof(compname), "%s_%s", name, "segment_fracs");
+        fracsArray_size = db_pdb_GetVarLength(_dbfile, compname);
+
+        gm->segment_fracs = (void **)calloc(gm->num_segments, sizeof(void*));
         n = 0;
         for (i = 0; i < gm->num_segments; i++)
         {
             int len = fracLengths[i];
 
-            if (len <= 0)
-            {
-                gm->segment_fracs[i] = 0;
-                continue;
-            }
-
             gm->segment_fracs[i] = malloc(len * ((gm->fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
             for (j = 0; j < len; j++)
             {
+                if (n >= fracsArray_size)
+                {
+                    db_perror("segment_fracs", E_MALFORMED, me);
+                    DBFreeGroupelmap(gm);
+                    FREE(fracLengths);
+                    FREE(fracsArray);
+                    return NULL; 
+                }
+
                 if (gm->fracs_data_type == DB_FLOAT)
                 {
                     float *pfa = (float *) fracsArray;
@@ -7541,6 +7609,13 @@ db_pdb_GetMrgvar(DBfile *_dbfile, char const *objname)
       return NULL;
    mrgv = (DBmrgvar *) calloc(1, sizeof(DBmrgvar));
    *mrgv = tmpmrgv;
+
+   if (mrgv->ncomps < 0 || mrgv->ncomps > NELMTS(_valstr))
+   {
+       DBFreeMrgvar(mrgv);
+       db_perror("ncomps", E_MALFORMED, me);
+       return NULL;
+   }
 
    INIT_OBJ(&tmp_obj);
 
@@ -12228,7 +12303,7 @@ db_pdb_PutGroupelmap(DBfile *dbfile, char const *name,
    }
 
    /*-------------------------------------------------------------
-    *  Write material object to output file. Request that underlying
+    *  Write object to output file. Request that underlying
     *  memory be freed (the 'TRUE' argument.)
     *-------------------------------------------------------------*/
    DBWriteObject(dbfile, obj, TRUE);

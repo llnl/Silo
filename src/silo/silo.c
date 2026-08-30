@@ -212,7 +212,8 @@ PUBLIC char   *_db_err_list[] =
     "Although this appears to be an HDF5 file,\n"
     "it does not appear to be one produced by Silo\n"
     "and so cannot be open and read by Silo.", /* 36 */
-    "File locking has prevented an operation." /* 37 */
+    "File locking has prevented an operation.", /* 37 */
+    "Object read from file is malformed." /* 38 */
 };
 
 /* Table of contents object count */
@@ -9515,6 +9516,8 @@ DBPutMaterial(
 {
     int i, retval, is_empty = 1;
     int const zdims[10] = {0,0,0,0,0,0,0,0,0,0};
+    DBmaterial dummy_mat;
+    char emsg[64];
 
     API_BEGIN2("DBPutMaterial", int, -1, name) {
         if (!dbfile)
@@ -9529,8 +9532,14 @@ DBPutMaterial(
             API_ERROR("overwrite not allowed", E_NOOVERWRITE);
         if (nmat < 0)
             API_ERROR("nmat<0", E_BADARGS);
-        if (ndims < 0)
-            API_ERROR("ndims<0", E_BADARGS);
+        if (ndims < 0 || ndims > NELMTS(dummy_mat.dims))
+        {
+            snprintf(emsg, sizeof(emsg), "ndims (%d) out of range [0...%d]",
+                ndims, NELMTS(dummy_mat.dims));
+            API_ERROR(emsg, E_BADARGS);
+        }
+        if (ndims > NELMTS(dummy_mat.dims))
+            API_ERROR("ndims>max", E_BADARGS);
         if (!dims)
             API_ERROR("dims=0", E_BADARGS);
         for (i = 0; i < ndims; i++)

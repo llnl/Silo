@@ -13014,7 +13014,7 @@ db_hdf5_PutMaterial(
         m.guihide = _ma._guihide;
         m.datatype = (DB_FLOAT==datatype || DB_DOUBLE==datatype)?0:datatype;
         strcpy(m.meshid, OPT(mname));
-        for (nels=1, i=0; i<ndims; i++) {
+        for (nels=1, i=0; i<MIN(NELMTS(m.dims),ndims); i++) {
             m.dims[i] = dims[i];
         }
         
