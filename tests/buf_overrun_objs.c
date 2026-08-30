@@ -120,15 +120,9 @@ build_objs(DBfile *dbfile)
 
         segLens[0] = 1;
         segLens[1] = 1;
-        segLens[2] = 100;
+        segLens[2] = -100;
         segLens[3] = 1;
-        segLens[4] = -100;
-
-        segLens[0] = -1;
-        segLens[1] = -1;
-        segLens[2] = -1;
-        segLens[3] = -1;
-        segLens[4] = 5;
+        segLens[4] = 100;
 
         for (i = 0; i < numsegs; i++)
         {

@@ -16671,7 +16671,7 @@ db_hdf5_PutGroupelmap(DBfile *_dbfile, char const *name,
 
         tot_len = 0;
         for (i = 0; i < num_segments; i++)
-            tot_len += segment_lengths[i];
+            tot_len += (segment_lengths[i]>0?segment_lengths[i]:0);
         if (tot_len)
         {
             intArray = (int *) malloc(tot_len * sizeof(int));
@@ -16694,7 +16694,11 @@ db_hdf5_PutGroupelmap(DBfile *_dbfile, char const *name,
             intArray = (int *) malloc(num_segments * sizeof(int));
             for (i = 0; i < num_segments; i++)
             {
-                int len = segment_fracs[i] == 0 ? 0 : segment_lengths[i];
+                int len;
+                if (segment_fracs[i] == 0)
+                    len = 0;
+                else
+                    len = (segment_lengths[i]>0?segment_lengths[i]:0);
                 intArray[i] = len;
                 tot_len += len; 
             }
@@ -16703,7 +16707,7 @@ db_hdf5_PutGroupelmap(DBfile *_dbfile, char const *name,
             FREE(intArray);
 
             /* build and write out fractional data array */
-            fracsArray = (void *) malloc(tot_len * ((fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double))); 
+            fracsArray = (void *) calloc(tot_len, ((fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double))); 
             tot_len = 0;
             for (i = 0; i < num_segments; i++)
             {
@@ -16774,7 +16778,9 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
     hid_t               o=-1, attr=-1;
     int                 _objtype, i, j, n;
     int                *intArray = 0;
+    int                 intArray_size;
     void               *fracsArray = 0;
+    int                 fracsArray_size;
     DBgroupelmap        *gm=NULL;
     DBgroupelmap_mt      m;
     
@@ -16819,18 +16825,30 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         gm->segment_ids = (int *)db_hdf5_comprd(dbfile, m.segment_ids, 1);
 
         /* read the map segment data */
-        gm->segment_data = (int **) malloc(m.num_segments * sizeof(int*));
+        gm->segment_data = (int **) calloc(m.num_segments, sizeof(int*));
         intArray = (int *)db_hdf5_comprd(dbfile, m.segment_data, 1);
+
+        /* Acquire actual file size of segment_data */
+        intArray_size = db_hdf5_GetVarLength(dbfile, m.segment_data);
+
         n = 0;
         for (i = 0; (i < m.num_segments) && intArray && gm->segment_lengths; i++)
         {
             int sl = gm->segment_lengths[i];
-            gm->segment_data[i] = 0;
             if (sl > 0)
             {
                 gm->segment_data[i] = (int*) malloc(sl * sizeof(int));
                 for (j = 0; j < sl; j++)
+                {
+                    if (n >= intArray_size)
+                    {
+                        FREE(intArray);
+                        DBFreeGroupelmap(gm);
+                        db_perror("segment_lengths", E_MALFORMED, me);
+                        return NULL;
+                    }
                     gm->segment_data[i][j] = intArray[n++];
+                }
             }
         }
         FREE(intArray);
@@ -16838,22 +16856,29 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         intArray = (int *)db_hdf5_comprd(dbfile, m.frac_lengths, 1);
         if (intArray)
         {
-            gm->segment_fracs = (void **)malloc(m.num_segments * sizeof(void*));
+            gm->segment_fracs = (void **)calloc(m.num_segments, sizeof(void*));
             fracsArray = db_hdf5_comprd(dbfile, m.segment_fracs, 1);
+
+            /* Acquire actual file size of segment_data */
+            fracsArray_size = db_hdf5_GetVarLength(dbfile, m.segment_fracs);
             n = 0;
             for (i = 0; (i < m.num_segments) && fracsArray; i++)
             {
                 int len = intArray[i];
-
                 if (len <= 0)
-                {
-                    gm->segment_fracs[i] = 0;
                     continue;
-                }
 
                 gm->segment_fracs[i] = malloc(len * ((gm->fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
                 for (j = 0; j < len; j++)
                 {
+                    if (n >= fracsArray_size)
+                    {
+                        FREE(intArray);
+                        FREE(fracsArray);
+                        DBFreeGroupelmap(gm);
+                        db_perror("segment_fracs", E_MALFORMED, me);
+                        return NULL;
+                    }
                     if (gm->fracs_data_type == DB_FLOAT)
                     {
                         float *pfa = (float *) fracsArray;

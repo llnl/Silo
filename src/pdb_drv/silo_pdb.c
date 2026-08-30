@@ -12233,7 +12233,7 @@ db_pdb_PutGroupelmap(DBfile *dbfile, char const *name,
 
    tot_len = 0;
    for (i = 0; i < num_segments; i++)
-       tot_len += segment_lengths[i];
+       tot_len += (segment_lengths[i]>0?segment_lengths[i]:0);
    if (tot_len)
    {
        intArray = (int *) malloc(tot_len * sizeof(int));
@@ -12258,7 +12258,11 @@ db_pdb_PutGroupelmap(DBfile *dbfile, char const *name,
        intArray = (int *) malloc(num_segments * sizeof(int));
        for (i = 0; i < num_segments; i++)
        {
-           int len = segment_fracs[i] == 0 ? 0 : segment_lengths[i];
+           int len;
+           if (segment_fracs[i] == 0)
+               len = 0;
+           else
+               len = (segment_lengths[i]>0?segment_lengths[i]:0);
            intArray[i] = len;
            tot_len += len;
        }
@@ -12270,7 +12274,7 @@ db_pdb_PutGroupelmap(DBfile *dbfile, char const *name,
        /* build and write out fractional data array */
        if (tot_len)
        {
-           fracsArray = (void *) malloc(tot_len * ((fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
+           fracsArray = (void *) calloc(tot_len, ((fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
            tot_len = 0;
            for (i = 0; i < num_segments; i++)
            {
