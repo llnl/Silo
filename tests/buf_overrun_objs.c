@@ -126,7 +126,10 @@ build_objs(DBfile *dbfile)
         for (i = 0; i < numsegs; i++)
         {
             segTypes[i] = DB_BLOCKCENT;
-            segData[i] = (int *) calloc(segLens[i], sizeof(int));
+            if (segLens[i] > 0)
+                segData[i] = (int *) calloc(segLens[i], sizeof(int));
+            else
+                segData[i] = 0;
         }
 
         DBPutGroupelmap(dbfile, "glmap", numsegs, segTypes, segLens,
