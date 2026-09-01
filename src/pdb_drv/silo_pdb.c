@@ -721,6 +721,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
                 if (!PJ_ReadVariable(file, cached_group->pdb_names[j],
                                     tobj->type[i], (int)tobj->alloced[i],
                                     tobj->nelmts[i],
+                                    tobj->nelmts_out[i],
                                     (tobj->alloced[i]) ?
                                     (char **)&tobj->ptr[i] :
                                     (char **)tobj->ptr[i]))
@@ -980,6 +981,7 @@ PJ_ReadVariable(PDBfile *file,
                 int     req_datatype, /*Requested datatype for variable */
                 int     alloced,      /*Has space already been allocated? */
                 int     nelmts,       /*Size of allocation in # elements */
+                int    *nelmts_out,   /*Size of actual read from file */
                 char    **var)        /*Address of ptr to store data into */
 {
    int            num, size, i, okay;
@@ -993,6 +995,8 @@ PJ_ReadVariable(PDBfile *file,
    char          *name=0;
 
    okay = TRUE;
+
+   if (nelmts_out) *nelmts_out = 0;
 
    name = ALLOC_N(char, strlen(name_in)+1);
    reduce_path(name_in, name);
@@ -1104,9 +1108,7 @@ PJ_ReadVariable(PDBfile *file,
        *  pointered array.
        *-------------------------------------------------*/
 
-      (void)pdb_getvarinfo(file, name, tname, &num, &size, 0);
-
-      if (alloced && nelmts >= 0 && num > nelmts)
+      if (pdb_getvarinfo(file, name, tname, &num, &size, 0) < 0)
       {
          FREE(name);
          return FALSE;
@@ -1172,6 +1174,9 @@ PJ_ReadVariable(PDBfile *file,
          *var = local_c;
       }
    }
+
+   if (okay && nelmts_out)
+       *nelmts_out = num;
 
    /*--------------------------------------------------
     *  Map values to float if
@@ -3494,6 +3499,13 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    }
    *mm = tmpmm;
 
+   if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims))
+   {
+      DBFreeMatspecies(mm);
+      db_perror("ndims", E_MALFORMED, me);
+      return NULL;
+   }
+
    /* Now read in species_mf per its datatype. */
    INIT_OBJ(&tmp_obj);
 
@@ -3807,6 +3819,7 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
    DBfile_pdb    *dbfile = (DBfile_pdb *) _dbfile;
    PJcomplist     tmp_obj;
    static char   *me = "db_pdb_GetDefvars";
+   int            types_size, guihides_size, names_size, defns_size;
 
    db_pdb_getobjinfo(dbfile->pdb, (char *) objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -3819,17 +3832,38 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
 
        memset(&tmpdefv, 0, sizeof(DBdefvars));
        INIT_OBJ(&tmp_obj);
-       DEFINE_OBJ("ndefs", &tmpdefv.ndefs, DB_INT);
-       DEFALL_OBJ("types", &tmpdefv.types, DB_INT);
-       DEFALL_OBJ("guihide", &tmpdefv.guihides, DB_INT);
-       DEFALL_OBJ("names", &tmpnames, DB_CHAR);
-       DEFALL_OBJ("defns", &tmpdefns, DB_CHAR);
+       DEFINE_OBJ("ndefs",   &tmpdefv.ndefs,    DB_INT);
+       DEFALL_OBN("types",   &tmpdefv.types,    DB_INT, &types_size);
+       DEFALL_OBN("guihide", &tmpdefv.guihides, DB_INT, &guihides_size);
+       DEFALL_OBN("names",   &tmpnames,         DB_CHAR, &names_size);
+       DEFALL_OBN("defns",   &tmpdefns,         DB_CHAR, &defns_size);
 
        if (PJ_GetObject(dbfile->pdb, (char *) objname, &tmp_obj, DB_DEFVARS) < 0)
            return NULL;
        if ((defv = DBAllocDefvars(0)) == NULL)
            return NULL;
        *defv = tmpdefv;
+
+       if (defv->ndefs < 0)
+       {
+           db_perror("negative ndefs", E_MALFORMED, me);
+           DBFreeDefvars(defv);
+           FREE(tmpnames);
+           FREE(tmpdefns);
+           return NULL;
+       }
+
+       if (defv->ndefs != types_size ||
+           defv->ndefs != names_size ||
+           defv->ndefs != defns_size ||
+           (guihides_size > 0 && defv->ndefs != guihides_size))
+       {
+           db_perror("array not of size ndefs", E_MALFORMED, me);
+           DBFreeDefvars(defv);
+           FREE(tmpnames);
+           FREE(tmpdefns);
+           return NULL;
+       }
 
        if ((tmpnames != NULL) && (defv->ndefs > 0))
        {
@@ -5283,6 +5317,12 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
    if (PJ_GetObject(dbfile->pdb, objname, &tmp_obj, DB_QUADVAR) < 0)
       return NULL;
 
+   if (tmpqv.ndims < 0 || tmpqv.ndims > NELMTS(tmpqv.dims))
+   {
+       db_perror("ndims", E_MALFORMED, me);
+       return NULL;
+   }
+
    /* Patch up "centering" if it wasn't present in file but align is.
       Align only worked for node/zone centering. */
    tmpqv.centering = db_fix_obsolete_centering(tmpqv.ndims, tmpqv.align, tmpqv.centering);
@@ -5290,13 +5330,6 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
    if ((qv = DBAllocQuadvar()) == NULL)
       return NULL;
    *qv = tmpqv;
-
-   if (qv->ndims < 0 || qv->ndims > NELMTS(qv->dims))
-   {
-       DBFreeQuadvar(qv);
-       db_perror("ndims", E_MALFORMED, me);
-       return NULL;
-   }
 
    if (qv->nvals < 0 || qv->nvals > NELMTS(_valstr))
    {
@@ -5331,7 +5364,7 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
       if (PJ_InqForceSingle())
          qv->datatype = DB_FLOAT;
 
-      for (i = 0; i < MIN(NELMTS(_valstr),qv->nvals); i++) {
+      for (i = 0; i < qv->nvals; i++) {
          DEFALL_OBJ(_valstr[i], &qv->vals[i], DB_FLOAT);
 
          if (qv->mixlen > 0) {
@@ -7454,19 +7487,19 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     void *fracsArray = NULL;
     DBgroupelmap tmpgm;
     PJcomplist *_tcl;
-    int segData_size = 0;
-    int fracsArray_size = 0;
+    int seglens_size, segids_size, segdata_size, fraclens_size, segfracs_size;
+    int tot_len;
 
     memset(&tmpgm, 0, sizeof(DBgroupelmap));
     INIT_OBJ(&tmp_obj);
-    DEFINE_OBJ("num_segments",    &tmpgm.num_segments, DB_INT);
+    DEFINE_OBJ("num_segments",    &tmpgm.num_segments,    DB_INT);
     DEFINE_OBJ("fracs_data_type", &tmpgm.fracs_data_type, DB_INT);
-    DEFALL_OBJ("groupel_types",   &tmpgm.groupel_types, DB_INT);
-    DEFALL_OBJ("segment_lengths", &tmpgm.segment_lengths, DB_INT);
-    DEFALL_OBJ("segment_ids",     &tmpgm.segment_ids, DB_INT);
-    DEFALL_OBJ("segment_data",    &segData, DB_INT);
-    DEFALL_OBJ("frac_lengths",    &fracLengths, DB_INT);
-    DEFALL_OBJ("segment_fracs",   &fracsArray, DB_FLOAT);
+    DEFALL_OBJ("groupel_types",   &tmpgm.groupel_types,   DB_INT);
+    DEFALL_OBN("segment_lengths", &tmpgm.segment_lengths, DB_INT,   &seglens_size);
+    DEFALL_OBN("segment_ids",     &tmpgm.segment_ids,     DB_INT,   &segids_size);
+    DEFALL_OBN("segment_data",    &segData,               DB_INT,   &segdata_size);
+    DEFALL_OBN("frac_lengths",    &fracLengths,           DB_INT,   &fraclens_size);
+    DEFALL_OBN("segment_fracs",   &fracsArray,            DB_FLOAT, &segfracs_size);
 
     if (PJ_GetObject(dbfile->pdb, (char*)name, &tmp_obj, DB_GROUPELMAP) < 0)
         return NULL;
@@ -7474,12 +7507,40 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     gm = (DBgroupelmap*) calloc(1,sizeof(DBgroupelmap));
     *gm = tmpgm;
 
-    /* Independently acquire size of segment_data */
-    if (gm->num_segments > 0)
+    if (gm->num_segments < 0)
     {
-        char compname[256];
-        snprintf(compname, sizeof(compname), "%s_%s", name, "segment_data");
-        segData_size = db_pdb_GetVarLength(_dbfile, compname);
+        db_perror("negative num_segments", E_MALFORMED, me);
+        DBFreeGroupelmap(gm);
+        FREE(segData);
+        FREE(fracLengths);
+        FREE(fracsArray);
+        return NULL;
+    }
+
+    if (gm->num_segments != seglens_size ||
+        gm->num_segments != segids_size ||
+        (fraclens_size > 0 && gm->num_segments != fraclens_size))
+    {
+        db_perror("array not of size num_segements", E_MALFORMED, me);
+        DBFreeGroupelmap(gm);
+        FREE(segData);
+        FREE(fracLengths);
+        FREE(fracsArray);
+        return NULL;
+    }
+
+    tot_len = 0;
+    for (i = 0; i < gm->num_segments; i++)
+        tot_len += (gm->segment_lengths[i]>0?gm->segment_lengths[i]:0);
+
+    if (segdata_size > 0 && tot_len != segdata_size)
+    {
+        db_perror("seg_data size not sum of segment_lengths", E_MALFORMED, me);
+        DBFreeGroupelmap(gm);
+        FREE(segData);
+        FREE(fracLengths);
+        FREE(fracsArray);
+        return NULL;
     }
 
     /* unflatten the segment data */
@@ -7492,18 +7553,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         {
             gm->segment_data[i] = (int*) malloc(sl * sizeof(int));
             for (j = 0; j < sl; j++)
-            {
-                if (n >= segData_size)
-                {
-                    db_perror("segment_data", E_MALFORMED, me);
-                    DBFreeGroupelmap(gm);
-                    FREE(segData);
-                    FREE(fracLengths);
-                    FREE(fracsArray);
-                    return NULL; 
-                }
                 gm->segment_data[i][j] = segData[n++];
-            }
         }
     }
     FREE(segData);
@@ -7511,10 +7561,20 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     /* unflatten frac data if we have it */
     if (fracLengths != NULL)
     {
-        /* Independently acquire size of segment_fracs */
-        char compname[256];
-        snprintf(compname, sizeof(compname), "%s_%s", name, "segment_fracs");
-        fracsArray_size = db_pdb_GetVarLength(_dbfile, compname);
+
+        tot_len = 0;
+        for (i = 0; i < gm->num_segments; i++)
+            tot_len += (fracLengths[i]>0?fracLengths[i]:0);
+
+        if (segfracs_size > 0 && tot_len != segfracs_size)
+        {
+            db_perror("seg_fracs size not sum of frac_lengths", E_MALFORMED, me);
+            DBFreeGroupelmap(gm);
+            FREE(segData);
+            FREE(fracLengths);
+            FREE(fracsArray);
+            return NULL;
+        }
 
         gm->segment_fracs = (void **)calloc(gm->num_segments, sizeof(void*));
         n = 0;
@@ -7522,18 +7582,11 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         {
             int len = fracLengths[i];
 
+            if (len <= 0 ) continue;
+
             gm->segment_fracs[i] = malloc(len * ((gm->fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
             for (j = 0; j < len; j++)
             {
-                if (n >= fracsArray_size)
-                {
-                    db_perror("segment_fracs", E_MALFORMED, me);
-                    DBFreeGroupelmap(gm);
-                    FREE(fracLengths);
-                    FREE(fracsArray);
-                    return NULL; 
-                }
-
                 if (gm->fracs_data_type == DB_FLOAT)
                 {
                     float *pfa = (float *) fracsArray;

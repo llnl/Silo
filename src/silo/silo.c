@@ -9538,8 +9538,6 @@ DBPutMaterial(
                 ndims, NELMTS(dummy_mat.dims));
             API_ERROR(emsg, E_BADARGS);
         }
-        if (ndims > NELMTS(dummy_mat.dims))
-            API_ERROR("ndims>max", E_BADARGS);
         if (!dims)
             API_ERROR("dims=0", E_BADARGS);
         for (i = 0; i < ndims; i++)

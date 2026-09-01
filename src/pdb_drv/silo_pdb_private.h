@@ -100,6 +100,7 @@ typedef struct {
     int            type[80];    /* Datatype of component */
     unsigned char  alloced[80]; /* Sentinel: 1 == space already alloc'd */
     int            nelmts[80];  /* Size of allocation in # of elements */
+    int           *nelmts_out[80]; /* Size of actual read in # of elements */
     int            num;         /* Number of components */
 } PJcomplist;
 
@@ -328,15 +329,17 @@ PRIVATE void db_InitDefvars (DBoptlist const *);
  */
 #define MAXNAME         256
 #define INIT_OBJ(A)     (_tcl=(A),_tcl->num=0)
-#define DEFINE_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,1,1)
-#define DEFALL_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,0,0)
-#define DEFINE_OBN(NM,PP,TYP,N) DEF_OBJ(NM,PP,TYP,1,N)
-#define DEF_OBJ(NM,PP,TYP,AL,N) {                                       \
+#define DEFINE_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,1,1,NULL)
+#define DEFALL_OBJ(NM,PP,TYP) DEF_OBJ(NM,PP,TYP,0,0,NULL)
+#define DEFINE_OBN(NM,PP,TYP,N) DEF_OBJ(NM,PP,TYP,1,N,NULL)
+#define DEFALL_OBN(NM,PP,TYP,NO) DEF_OBJ(NM,PP,TYP,0,0,NO)
+#define DEF_OBJ(NM,PP,TYP,AL,N,NO) {                                    \
      (_tcl->name[_tcl->num]=(NM),                                       \
       _tcl->ptr[_tcl->num]=(void*)(PP),                                 \
       _tcl->type[_tcl->num]=(TYP),                                      \
       _tcl->alloced[_tcl->num]=(AL),                                    \
-      _tcl->nelmts[_tcl->num]=(N));                                     \
+      _tcl->nelmts[_tcl->num]=(N),                                      \
+      _tcl->nelmts_out[_tcl->num]=(NO));                                \
       _tcl->num++;}
 
 /*-------------------------------------------------------------------------
@@ -360,7 +363,7 @@ PRIVATE int PJ_InqForceSingle (void);
 PRIVATE void PJ_NoCache ( void );
 PRIVATE void *PJ_GetComponent (PDBfile *, char const *, char const *);
 PRIVATE int PJ_GetComponentType (PDBfile *, char const *, char const *);
-PRIVATE int PJ_ReadVariable (PDBfile *, char *, int, int, int, char **);
+PRIVATE int PJ_ReadVariable (PDBfile *, char *, int, int, int, int*, char **);
 
 PRIVATE int PJ_get_group (PDBfile *, char const *, PJgroup **);
 PRIVATE PJgroup *PJ_make_group (char *, char *, char **, char **, int);
