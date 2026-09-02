@@ -13891,7 +13891,8 @@ db_StringListToStringArrayMBOpt(char *strList, char ***retArray, char **alloc_fl
     if (n != nblocks)
     {
         free(strArray);
-        return db_perror("incorrect number of block names", E_INTERNAL, me);
+        /*return db_perror("incorrect number of block names", E_INTERNAL, me);*/
+        return -1;
     }
 
     /* ensure we store the originally allocated pointer for later free's */

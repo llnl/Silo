@@ -3358,7 +3358,7 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims))
     {
         DBFreeMaterial(mm);
-        db_perror("ndims", E_BADARGS, me);
+        db_perror("ndims", E_MALFORMED, me);
         return NULL;
     }
 
@@ -4032,6 +4032,9 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
    PJcomplist     tmp_obj;
    static char   *me = "db_pdb_GetMultimesh";
    PJcomplist    *_tcl;
+   int           meshids_size, meshtypes_size, meshnames_size,
+                 dirids_size, extents_size, extzones_size, zncnts_size,
+                 groupings_size, grpnames_size, emptylist_size;
 
    db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -4048,23 +4051,23 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
       DEFINE_OBJ("blockorigin", &tmpmm.blockorigin, DB_INT);
       DEFINE_OBJ("grouporigin", &tmpmm.grouporigin, DB_INT);
       DEFINE_OBJ("guihide", &tmpmm.guihide, DB_INT);
-      DEFALL_OBJ("meshids", &tmpmm.meshids, DB_INT);
+      DEFALL_OBN("meshids", &tmpmm.meshids, DB_INT, &meshids_size);
       if (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes)
       {
-          DEFALL_OBJ("meshtypes", &tmpmm.meshtypes, DB_INT);
-          DEFALL_OBJ("meshnames", &tmpnames, DB_CHAR);
+          DEFALL_OBN("meshtypes", &tmpmm.meshtypes, DB_INT, &meshtypes_size);
+          DEFALL_OBN("meshnames", &tmpnames, DB_CHAR, &meshnames_size);
       }
-      DEFALL_OBJ("meshdirs", &tmpmm.dirids, DB_INT);
+      DEFALL_OBN("meshdirs", &tmpmm.dirids, DB_INT, &dirids_size);
       if (DBGetDataReadMask2File(_dbfile) & DBMBOptions)
       {
           DEFINE_OBJ("extentssize", &tmpmm.extentssize, DB_INT);
-          DEFALL_OBJ("extents", &tmpmm.extents, DB_DOUBLE);
-          DEFALL_OBJ("zonecounts", &tmpmm.zonecounts, DB_INT);
-          DEFALL_OBJ("has_external_zones", &tmpmm.has_external_zones, DB_INT);
+          DEFALL_OBN("extents", &tmpmm.extents, DB_DOUBLE, &extents_size);
+          DEFALL_OBN("zonecounts", &tmpmm.zonecounts, DB_INT, &zncnts_size);
+          DEFALL_OBN("has_external_zones", &tmpmm.has_external_zones, DB_INT, &extzones_size);
       }
       DEFINE_OBJ("lgroupings", &tmpmm.lgroupings, DB_INT);
-      DEFALL_OBJ("groupings", &tmpmm.groupings, DB_INT);
-      DEFALL_OBJ("groupnames", &tmpgnames, DB_CHAR);
+      DEFALL_OBN("groupings", &tmpmm.groupings, DB_INT, &groupings_size);
+      DEFALL_OBN("groupnames", &tmpgnames, DB_CHAR, &grpnames_size);
       DEFALL_OBJ("mrgtree_name", &tmpmm.mrgtree_name, DB_CHAR);
       DEFINE_OBJ("tv_connectivity", &tmpmm.tv_connectivity, DB_INT);
       DEFINE_OBJ("disjoint_mode", &tmpmm.disjoint_mode, DB_INT);
@@ -4072,7 +4075,7 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
       DEFALL_OBJ("file_ns", &tmpmm.file_ns, DB_CHAR);
       DEFALL_OBJ("block_ns", &tmpmm.block_ns, DB_CHAR);
       DEFINE_OBJ("block_type", &tmpmm.block_type, DB_INT);
-      DEFALL_OBJ("empty_list", &tmpmm.empty_list, DB_INT);
+      DEFALL_OBN("empty_list", &tmpmm.empty_list, DB_INT, &emptylist_size);
       DEFINE_OBJ("empty_cnt", &tmpmm.empty_cnt, DB_INT);
       DEFINE_OBJ("repr_block_idx", &tmpmm.repr_block_idx, DB_INT);
 
@@ -4081,6 +4084,25 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
       if ((mm = DBAllocMultimesh(0)) == NULL)
          return NULL;
       *mm = tmpmm;
+
+      if ((mm->nblocks < 0) ||
+          (mm->dirids && (mm->nblocks != dirids_size)) ||
+          (mm->meshids && (mm->nblocks != meshids_size)) ||
+          (mm->meshtypes && (mm->nblocks != meshtypes_size)) ||
+          (mm->zonecounts && (mm->nblocks != zncnts_size)) ||
+          (mm->has_external_zones && (mm->nblocks != extzones_size)) ||
+          (mm->extents && ((mm->nblocks * mm->extentssize) != extents_size)) ||
+          (mm->lgroupings < 0) ||
+          (mm->groupings && (mm->lgroupings != groupings_size)) ||
+          (mm->empty_cnt < 0) ||
+          (mm->empty_list && (mm->empty_cnt != emptylist_size)))
+      {
+          db_perror(objname, E_MALFORMED, me);
+          DBFreeMultimesh(mm);
+          FREE(tmpnames);
+          FREE(tmpgnames);
+          return NULL;
+      }
 
       /* The value we store to the file for 'topo_dim' member is
          designed such that zero indicates a value that was NOT
@@ -4100,12 +4122,26 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
        *----------------------------------------*/
 
       if (tmpnames != NULL) {
-         if (mm->nblocks > 0)
-             db_StringListToStringArrayMBOpt(tmpnames, &(mm->meshnames), &(mm->meshnames_alloc), mm->nblocks);
+          if (db_StringListToStringArrayMBOpt(tmpnames, &(mm->meshnames), &(mm->meshnames_alloc), mm->nblocks) < 0)
+          {
+              db_perror(objname, E_MALFORMED, me);
+              DBFreeMultimesh(mm);
+              FREE(tmpnames);
+              FREE(tmpgnames);
+              return NULL;
+          }
        /*FREE(tmpnames); We don't free this here because the MBOpt routine creates pointers into it. */
       }
       if ((tmpgnames != NULL) && (mm->lgroupings > 0)) {
          mm->groupnames = DBStringListToStringArray(tmpgnames, &(mm->lgroupings), !skipFirstSemicolon);
+         if (mm->groupnames == 0)
+         {
+             db_perror(objname, E_MALFORMED, me);
+             DBFreeMultimesh(mm);
+             FREE(tmpnames);
+             FREE(tmpgnames);
+             return NULL;
+         }
          FREE(tmpgnames);
       }
    }
