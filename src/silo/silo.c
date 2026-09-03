@@ -213,7 +213,7 @@ PUBLIC char   *_db_err_list[] =
     "it does not appear to be one produced by Silo\n"
     "and so cannot be open and read by Silo.", /* 36 */
     "File locking has prevented an operation.", /* 37 */
-    "Object read from file is malformed." /* 38 */
+    "Malformed file object" /* 38 */
 };
 
 /* Table of contents object count */
