@@ -652,7 +652,7 @@ check_version (const char *filename) {
       out_errorn ("check_version: The initialization file `%s' seems to "
                   "be lacking version information and may be out of date. "
                   "Please update your initialization file or add the "
-                  "statement `$browser_version=%3.1f' after checking that "
+                  "statement `$browser_version=%4.2f' after checking that "
                   "the file contains valid initialization statements. Type "
                   "`help' for the latest documentation.  Or use the `-f FILE' "
                   "command-line option to specify some other startup file or "
@@ -675,8 +675,8 @@ check_version (const char *filename) {
 
    if (vers<browser_version()) {
       out_errorn ("check_version: The initialization file `%s' was written "
-                  "for version %3.1f of the browser (the current browser version "
-                  "is %3.1f).  Please obtain the latest version of that file "
+                  "for version %4.2f of the browser (the current browser version "
+                  "is %4.2f).  Please obtain the latest version of that file "
                   "or verify that the commands in that file still apply "
                   "to this version of the browser.  Or use the `-f FILE' "
                   "command-line option to specify some other startup file or "
@@ -688,8 +688,8 @@ check_version (const char *filename) {
    if (vers>=browser_version()+1) {
       out_errorn ("check_version: Based on the contents of the initialization "
                   "file `%s', you appear to be running an old version of the "
-                  "browser.  The file was written for version %3.1f, but this "
-                  "is browser version %3.1f.  Or use the `-f FILE' command-line "
+                  "browser.  The file was written for version %4.2f, but this "
+                  "is browser version %4.2f.  Or use the `-f FILE' command-line "
                   "option to specify some other startup file or say `-f "
                   "/dev/null' for no file.",
                   filename, vers, browser_version());
