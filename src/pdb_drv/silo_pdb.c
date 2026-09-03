@@ -3312,6 +3312,9 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     char *tmpcolors = NULL;
     DBmaterial tmpmm;
     PJcomplist *_tcl;
+    int matnos_size, matlist_size;
+    int mixm_size, mixn_size, mixz_size, mixvf_size;
+    int nzones;
 
     /* Comp. Name        Comp. Address     Data Type     */
     memset(&tmpmm, 0, sizeof(DBmaterial));
@@ -3330,19 +3333,19 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     DEFINE_OBJ("datatype",    &tmpmm.datatype,    DB_INT);
 
     if (DBGetDataReadMask2File(_dbfile) & DBMatMatnos)
-        DEFALL_OBJ("matnos",      &tmpmm.matnos,      DB_INT);
+        DEFALL_OBN("matnos",      &tmpmm.matnos,      DB_INT, &matnos_size);
     if (DBGetDataReadMask2File(_dbfile) & DBMatMatnames)
         DEFALL_OBJ("matnames",    &tmpnames,        DB_CHAR);
     if (DBGetDataReadMask2File(_dbfile) & DBMatMatcolors)
         DEFALL_OBJ("matcolors",    &tmpcolors,        DB_CHAR);
     if (DBGetDataReadMask2File(_dbfile) & DBMatMatlist)
-        DEFALL_OBJ("matlist",     &tmpmm.matlist,     DB_INT);
+        DEFALL_OBN("matlist",     &tmpmm.matlist,     DB_INT, &matlist_size);
     if (DBGetDataReadMask2File(_dbfile) & DBMatMixList)
     {
-        DEFALL_OBJ("mix_mat",     &tmpmm.mix_mat,     DB_INT);
-        DEFALL_OBJ("mix_next",    &tmpmm.mix_next,    DB_INT);
-        DEFALL_OBJ("mix_zone",    &tmpmm.mix_zone,    DB_INT);
-        DEFALL_OBJ("mix_vf",      &tmpmm.mix_vf,      DB_FLOAT);
+        DEFALL_OBN("mix_mat",     &tmpmm.mix_mat,     DB_INT, &mixm_size);
+        DEFALL_OBN("mix_next",    &tmpmm.mix_next,    DB_INT, &mixn_size);
+        DEFALL_OBN("mix_zone",    &tmpmm.mix_zone,    DB_INT, &mixz_size);
+        DEFALL_OBN("mix_vf",      &tmpmm.mix_vf,      DB_FLOAT, &mixvf_size);
     }
 
     if (PJ_GetObject(dbfile->pdb, name, &tmp_obj, DB_MATERIAL) < 0)
@@ -3355,49 +3358,65 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     }
     *mm = tmpmm;
 
-    if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims))
+    if (mm->ndims < 0 || (mm->ndims > NELMTS(mm->dims)))
     {
+        db_perror(name, E_MALFORMED, me);
         DBFreeMaterial(mm);
-        db_perror("ndims", E_MALFORMED, me);
+        FREE(tmpnames);
+        FREE(tmpcolors);
         return NULL;
     }
 
     _DBQQCalcStride(mm->stride, mm->dims, mm->ndims, mm->major_order);
+    nzones = 1;
+    for (int i = 0; i < mm->ndims; i++) nzones *= mm->dims[i];
+
+    /* validate sizing */
+    if ((nzones > 0 && nzones != matlist_size) ||
+        (mm->nmat < 0) || (mm->nmat > 0 && mm->nmat != matnos_size) ||
+        (mm->mixlen < 0) ||
+        (mm->mixlen > 0 && mm->mixlen != mixm_size) ||
+        (mm->mixlen > 0 && mm->mixlen != mixn_size) ||
+        (mm->mixlen > 0 && mm->mixlen != mixvf_size) ||
+        (mm->mixlen > 0 && mm->mix_zone && mm->mixlen != mixz_size))
+    {
+        db_perror(name, E_MALFORMED, me);
+        DBFreeMaterial(mm);
+        FREE(tmpnames);
+        FREE(tmpcolors);
+        return NULL;
+    }
 
     /* If we have material names, restore it to an array of names.  In the
      * file, it's stored as one string, with individual names separated by
      * semicolons. */
-    if ((tmpnames != NULL) && (mm->nmat > 0))
+    if (tmpnames)
     {
-        char *s, *name;
-        int i;
-        char error[256];
+        int cnt = mm->nmat;
 
-        mm->matnames = ALLOC_N(char *, mm->nmat);
-
-        s = &tmpnames[0];
-        name = (char *)strtok(s, ";");
-
-        for (i = 0; i < mm->nmat; i++)
-        {
-            mm->matnames[i] = STRDUP(name);
-
-            if (i + 1 < mm->nmat)
-            {
-                name = (char *)strtok(NULL, ";");
-                if (name == NULL)
-                {
-                    sprintf(error, "(%s) Not enough material names found\n", me);
-                    db_perror(error, E_INTERNAL, me);
-                }
-            }
-        }
+        mm->matnames = DBStringListToStringArray(tmpnames, &cnt, !skipFirstSemicolon);
         FREE(tmpnames);
+
+        if (!mm->matnames || cnt != mm->nmat)
+        {
+            db_perror(name, E_MALFORMED, me);
+            DBFreeMaterial(mm);
+            FREE(tmpcolors);
+            return NULL;
+        }
     }
-    if ((tmpcolors != NULL) && (mm->nmat > 0))
+    if (tmpcolors)
     {
-        mm->matcolors = DBStringListToStringArray(tmpcolors, &(mm->nmat), !skipFirstSemicolon);
+        int cnt = mm->nmat;
+        mm->matcolors = DBStringListToStringArray(tmpcolors, &cnt, !skipFirstSemicolon);
         FREE(tmpcolors);
+
+        if (!mm->matcolors || cnt != mm->nmat)
+        {
+            db_perror(name, E_MALFORMED, me);
+            DBFreeMaterial(mm);
+            return NULL;
+        }
     }
 
     mm->id = 0;
@@ -4133,8 +4152,9 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
        /*FREE(tmpnames); We don't free this here because the MBOpt routine creates pointers into it. */
       }
       if ((tmpgnames != NULL) && (mm->lgroupings > 0)) {
-         mm->groupnames = DBStringListToStringArray(tmpgnames, &(mm->lgroupings), !skipFirstSemicolon);
-         if (mm->groupnames == 0)
+         int cnt = mm->lgroupings;
+         mm->groupnames = DBStringListToStringArray(tmpgnames, &cnt, !skipFirstSemicolon);
+         if (!mm->groupnames || cnt != mm->lgroupings)
          {
              db_perror(objname, E_MALFORMED, me);
              DBFreeMultimesh(mm);
