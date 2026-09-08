@@ -87,7 +87,6 @@ multi_test=$(find_file -x tests/bin/multi_test tests/multi_test ./multi_test ../
 browser=$(find_file -x bin/browser tools/browser/browser tools/browser/.libs/browser ../tools/browser/browser ../../../tools/browser/browser)
 [ $? -eq 0 ] || exit 1
 
-set -x
 #
 # Get error code for E_MALFORMED from silo header
 #
@@ -96,13 +95,19 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 [ $? -eq 0 ] || exit 1
 
 #
+# Find input file to be used
+#
+all_objs_file=$(find_file -r tests/all_objects.$ext)
+
+#
 # Test various corruptions of a material object (block17/mat1)
 #
+set -x
 testcases="material,ndims=5 material,nmat=7 material_mix,mixlen=4495 material,matnos=\"ed\" material,matlist=\"ed\" material_mix,mix_next=\"ed\""
 for tc in $testcases; do
     objname=$(echo $tc | cut -d',' -f1)
     cname_assign=$(echo $tc | cut -d',' -f2)
-    cp all_objects.$ext malformed.$ext
+    cp $all_objs_file malformed.$ext
     $browser -q -W -l 2 -e "cd material_objects" -e "$objname.$cname_assign" malformed.$ext
     $browser --proper-exit-code -e "cd material_objects" -e "$objname" malformed.$ext
     [ $? -eq $e_malformed_code ] || exit 1
