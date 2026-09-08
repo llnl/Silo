@@ -746,7 +746,7 @@ if(NOT WIN32)
     set_tests_properties(malformed PROPERTIES DEPENDS all_silo_objects)
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         add_test(NAME malformed-hdf5 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5)
-        set_tests_properties(malformed PROPERTIES DEPENDS all_silo_objects-hdf5)
+        set_tests_properties(malformed-hdf5 PROPERTIES DEPENDS all_silo_objects-hdf5)
     endif()
 
 endif()

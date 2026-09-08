@@ -97,7 +97,7 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 #
 # Find input file to be used
 #
-all_objs_file=$(find_file -r tests/all_objects.$ext)
+all_objs_file=$(find_file -r ./all_objects.$ext ./tests/all_objects.$ext)
 
 #
 # Test various corruptions of a material object (block17/mat1)
