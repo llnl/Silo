@@ -943,7 +943,7 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
    char         *b_obj = (char*)mem;
    DBobject     *obj = *((DBobject**)b_obj);
    int          i, n, offset, nerrors=0, nchanges=0;
-   char         *s, buf[1024];
+   char         buf[1024];
    double       d;
    obj_t        comp_name;
 
@@ -1004,17 +1004,20 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
          }
 
       } else if (!strncmp ("'<s>", obj->pdb_names[i], 4)) {
-         s = *((char**)(b_obj+offset));
-         if (strncmp(obj->pdb_names[i]+4, s, strlen(s))) {
+         char *s = *((char**)(b_obj+offset));
+         int slen = strlen(s);
+         if (strncmp(obj->pdb_names[i]+4, s, slen)) {
             free (obj->pdb_names[i]);
-            obj->pdb_names[i] = (char *)malloc (strlen(s)+5);
+            obj->pdb_names[i] = (char *)malloc (slen+6);
             strcpy (obj->pdb_names[i], "'<s>");
             strcpy (obj->pdb_names[i]+4, s);
+            obj->pdb_names[i][slen+4] = '\'';
+            obj->pdb_names[i][slen+5] = '\0';
             nchanges++;
          }
 
       } else {
-         s = *((char**)(b_obj+offset));
+         char *s = *((char**)(b_obj+offset));
          if (strcmp(obj->pdb_names[i], s)) {
             free (obj->pdb_names[i]);
             obj->pdb_names[i] = safe_strdup (s);
