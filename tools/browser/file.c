@@ -637,6 +637,62 @@ fix_objdups(DBobject *obj)
 }
 
 /*-------------------------------------------------------------------------
+ * Purpose: Scan a candidate pdb_names string, confirm it is correct format
+ * and count and confirm the format of the value(s) it holds.
+ *-------------------------------------------------------------------------
+ */
+static int
+browser_obj_immediate_nvals(char const *s, void *vbuf)
+{
+    char const *p;
+    int n=0;
+    char c;
+
+    if (!s)
+        return 0;
+
+    /* confirm string starts with '<X> where X is i, f, d or s */
+    if (1 != sscanf(s, "'<%c>", &c) || !strchr("ifds", c))
+        return 0;
+
+    /* if s=='<s>', the string "value" is empty */
+    if (c == 's') return strlen(s)>5?1:0;
+
+    p = &s[4]; /* first char after '<X> */
+    while (1)
+    {
+        char *ep;
+        long double ld;
+        errno = 0;
+        ld = strtold(p, &ep);
+        if (errno != 0) break;                       /* error occurred */
+        if (ld == 0 && *ep == p) { errno=1; break; } /* no conversion occurred */
+        if (vbuf)
+        {
+            int ival;
+            double dval;
+            switch (c) {
+            case 'i':
+                ival = (int) ld;
+                *(((int*)vbuf)+n)=ival;
+                break;
+            case 'f':
+            case 'd':
+                dval = (double) ld;
+                *(((double*)vbuf)+n)=dval;
+                break;
+            }
+        }
+        n++;
+        if (*ep == '\'' && *(ep+1) == '\0') break;   /* end of string reached, so done */
+        if (*ep != ',') { errno=1; break; }          /* must be at a comma or error */
+        p = ep+1;
+    }
+
+    return errno == 0 ? n : 0;
+}
+
+/*-------------------------------------------------------------------------
  * Function:    browser_DBGetObject
  *
  * Purpose:     Reads a SILO DBobject from the specified database and
@@ -693,7 +749,7 @@ browser_DBGetObject (DBfile *file, char *name, obj_t *type_ptr)
 {
     DBobject    *obj=NULL;
     char        *b_obj=NULL, *s=NULL;
-    int         i, need, offset, *flags=NULL, field_size;
+    int         i, need, offset, *flags=NULL, field_size, field_align;
     obj_t       type=NIL;
     int         lowlevel;
 
@@ -716,19 +772,25 @@ browser_DBGetObject (DBfile *file, char *name, obj_t *type_ptr)
     if (lowlevel<3) {
         obj = fix_objdups(obj);
         for (i=0; i<obj->ncomponents; i++) {
+            int nvals = browser_obj_immediate_nvals(obj->pdb_names[i],0);
             if (!strncmp("'<i>", obj->pdb_names[i], 4)) {
-                field_size = sizeof(int);
+                field_align = sizeof(int);
+                field_size = nvals * sizeof(int);
             } else if (!strncmp("'<f>", obj->pdb_names[i], 4)) {
-                field_size = sizeof(double);
+                field_align = sizeof(double);
+                field_size = nvals * sizeof(double);
             } else if (!strncmp("'<d>", obj->pdb_names[i], 4)) {
-                field_size = sizeof(double);
+                field_align = sizeof(double);
+                field_size = nvals * sizeof(double);
             } else if (!strncmp ("'<s>", obj->pdb_names[i], 4)) {
+                field_align = sizeof(char*);
                 field_size = sizeof(char*);
             } else {
+                field_align = sizeof(char*);
                 field_size = sizeof(char*);
             }
 
-            while (need % field_size) need++;
+            while (need % field_align) need++;
             need += field_size;
         }
     }
@@ -763,6 +825,8 @@ browser_DBGetObject (DBfile *file, char *name, obj_t *type_ptr)
      */
     if (lowlevel<3) {
         for (i=0; i<obj->ncomponents; i++) {
+            int nvals = browser_obj_immediate_nvals(obj->pdb_names[i],0);
+            char const *p = obj->pdb_names[i] + 4;
 
             if (!strncmp("'<i>", obj->pdb_names[i], 4)) {
                 /*
@@ -771,12 +835,23 @@ browser_DBGetObject (DBfile *file, char *name, obj_t *type_ptr)
                  * `typeof x.y' and get `int' instead of `string'.  Even at
                  * the low level, Eric would like this hidden.
                  */
+                int *vals;
+
                 flags[i] = 0;
                 while (offset % sizeof(int)) offset++;
-                *((int*)(b_obj+offset)) = strtol(obj->pdb_names[i]+4, NULL, 0);
-                stc_add(type, obj_new(C_PRIM, "int"), offset,
-                        obj->comp_names[i]);
-                offset += sizeof(int);
+                vals = (int *)(b_obj + offset);
+                browser_obj_immediate_nvals(obj->pdb_names[i],vals);
+
+                if (nvals == 1) {
+                    stc_add(type, obj_new(C_PRIM, "int"), offset, obj->comp_names[i]);
+                } else {
+                    char dims[32];
+                    obj_t base = obj_new(C_PRIM, "int");
+                    sprintf(dims, "%d", nvals);
+                    stc_add(type, obj_new(C_ARY, dims, base), offset, obj->comp_names[i]);
+                }
+
+                offset += nvals * sizeof(int);
 
             } else if (!strncmp("'<f>", obj->pdb_names[i], 4) ||
                        !strncmp("'<d>", obj->pdb_names[i], 4)) {
@@ -784,12 +859,23 @@ browser_DBGetObject (DBfile *file, char *name, obj_t *type_ptr)
                  * The value is a float or double.  We store it as double for
                  * the same reasons as <i> above.
                  */
+                double *vals;
+
                 flags[i] = 0;
                 while (offset % sizeof(double)) offset++;
-                *((double*)(b_obj+offset)) = strtod(obj->pdb_names[i]+4, NULL);
-                stc_add(type, obj_new(C_PRIM, "double"), offset,
-                        obj->comp_names[i]);
-                offset += sizeof(double);
+                vals = (double *)(b_obj + offset);
+                browser_obj_immediate_nvals(obj->pdb_names[i],vals);
+
+                if (nvals == 1) {
+                    stc_add(type, obj_new(C_PRIM, "double"), offset, obj->comp_names[i]);
+                } else {
+                    char dims[32];
+                    obj_t base = obj_new(C_PRIM, "double");
+                    sprintf(dims, "%d", nvals);
+                    stc_add(type, obj_new(C_ARY, dims, base), offset, obj->comp_names[i]);
+                }
+
+                offset += nvals * sizeof(double);
 
             } else if (!strncmp ("'<s>", obj->pdb_names[i], 4)) {
                 /*
@@ -857,7 +943,7 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
    char         *b_obj = (char*)mem;
    DBobject     *obj = *((DBobject**)b_obj);
    int          i, n, offset, nerrors=0, nchanges=0;
-   char         *s, buf[64];
+   char         *s, buf[1024];
    double       d;
    obj_t        comp_name;
 
@@ -879,8 +965,12 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
       }
 
       if (!strncmp ("'<i>", obj->pdb_names[i], 4)) {
-         n = *((int*)(b_obj+offset));
-         sprintf (buf, "'<i>%d'", n);
+         int nvals = browser_obj_immediate_nvals(obj->pdb_names[i],0);
+         int *vals = (int *)(b_obj + offset);
+         char *p = buf + sprintf (buf, "'<i>%d", vals[0]);
+         for (int j = 1; j < nvals; j++)
+             p += sprintf (p, ",%d", vals[j]);
+         p += sprintf (p, "'");
          if (strcmp (obj->pdb_names[i], buf)) {
             free (obj->pdb_names[i]);
             obj->pdb_names[i] = safe_strdup (buf);
@@ -888,8 +978,12 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
          }
 
       } else if (!strncmp ("'<f>", obj->pdb_names[i], 4)) {
-         d = *((double*)(b_obj+offset));
-         sprintf (buf, "'<f>%g'", d);
+         int nvals = browser_obj_immediate_nvals(obj->pdb_names[i],0);
+         double *vals = (double*)(b_obj + offset);
+         char *p = buf + sprintf (buf, "'<f>%g'", vals[0]);
+         for (int j = 1; j < nvals; j++)
+             p += sprintf (p, ",%g", vals[j]);
+         p += sprintf (p, "'");
          if (strcmp (obj->pdb_names[i], buf)) {
             free (obj->pdb_names[i]);
             obj->pdb_names[i] = safe_strdup (buf);
@@ -897,8 +991,12 @@ browser_DBSaveObject (obj_t _self, char *unused, void *mem, obj_t type) {
          }
 
       } else if (!strncmp ("'<d>", obj->pdb_names[i], 4)) {
-         d = *((double*)(b_obj+offset));
-         sprintf (buf, "'<d>%.30g'", d);
+         int nvals = browser_obj_immediate_nvals(obj->pdb_names[i],0);
+         double *vals = (double*)(b_obj + offset);
+         char *p = buf + sprintf (buf, "'<d>%.30g'", vals[0]);
+         for (int j = 1; j < nvals; j++)
+             p += sprintf (p, ",%.30g", vals[j]);
+         p += sprintf (p, "'");
          if (strcmp (obj->pdb_names[i], buf)) {
             free (obj->pdb_names[i]);
             obj->pdb_names[i] = safe_strdup (buf);

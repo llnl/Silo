@@ -4745,7 +4745,7 @@ db_hdf5_compckz(DBfile_hdf5 *dbfile, char *name)
  *-------------------------------------------------------------------------
  */
 PRIVATE void *
-db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single)
+_db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single, int *size)
 {
     static char *me = "db_hdf5_comprd";
     void        *buf = NULL;
@@ -4861,7 +4861,14 @@ db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single)
         FREE(buf);
     } END_PROTECT;
 
+    if (size) *size = nelmts;
     return retval;
+}
+
+PRIVATE void *
+db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single)
+{
+    return _db_hdf5_comprd(dbfile, name, ignore_force_single, 0);
 }
 
 /*-------------------------------------------------------------------------
@@ -7576,6 +7583,12 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
         for (i=0, msize=fsize=0; i<obj->ncomponents; i++) {
             int nvals = count_commas(obj->pdb_names[i]) + 1;
             if (!strncmp(obj->pdb_names[i], "'<i>", 4)) {
+                if (!strcmp(obj->comp_names[i], "datatype"))
+                {
+                    DBdatatype dtype = (DBdatatype) strtol(&obj->pdb_names[i][4],0,0);
+                    if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
+                        continue; /* skip this component */
+                }
                 msize = ALIGN(msize, sizeof(int)) + nvals * sizeof(int);
                 fsize += (nvals * H5Tget_size(dbfile->T_int));
             } else if (!strncmp(obj->pdb_names[i], "'<f>", 4)) {
@@ -7685,12 +7698,18 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
             UNWIND();
         }
         for (i=0, moffset=foffset=0; i<obj->ncomponents; i++) {
-            int scnvals, nvals = count_commas(obj->pdb_names[i]) + 1;
+            int nvals = count_commas(obj->pdb_names[i]) + 1;
             hsize_t hsnvals = (hsize_t) nvals;
             if (!strncmp(obj->pdb_names[i], "'<i>", 4)) {
                 int *mi;
                 hid_t _matype = (nvals == 1) ? H5T_NATIVE_INT : H5Tarray_create(H5T_NATIVE_INT, 1, &hsnvals);
                 hid_t _fatype = (nvals == 1) ?  dbfile->T_int : H5Tarray_create( dbfile->T_int, 1, &hsnvals);
+                if (!strcmp(obj->comp_names[i], "datatype"))
+                {
+                    DBdatatype dtype = (DBdatatype) strtol(&obj->pdb_names[i][4],0,0);
+                    if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
+                        continue; /* skip this datatype component */
+                }
                 moffset = ALIGN(moffset, sizeof(int));
                 mi = (int *)(object+moffset);
                 if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
@@ -7701,7 +7720,7 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
                     UNWIND();
                 }
                 if (nvals > 1) { H5Tclose(_matype); H5Tclose(_fatype);}
-                scnvals = sscanf(obj->pdb_names[i]+4, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                sscanf(obj->pdb_names[i]+4, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
                     mi+0,mi+1,mi+2,mi+3,mi+4,mi+5,mi+6,mi+7,mi+8,mi+9);
                 moffset += (nvals * sizeof(int));
                 foffset += (nvals * H5Tget_size(dbfile->T_int));
@@ -9044,10 +9063,11 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
     hid_t       o=-1, attr=-1, atype=-1, h5str=-1;
     char        *file_value=NULL, *mem_value=NULL, *bkg=NULL, bigname[1024];
     DBObjectType objtype;
-    int         _objtype, nmembs, i, j, added_datatype_member;
+    int         _objtype, nmembs, i, j, already_added_datatype = 0;
     hsize_t     memb_size[4];
     DBobject    *obj=NULL;
     size_t      asize, nelmts, msize;
+    DBdatatype datatype_to_add = DB_NOTYPE;
 
     PROTECT {
         /* Open the object as a named data type */
@@ -9096,14 +9116,13 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
         }
 
         /* Add members to the DBobject */
-        added_datatype_member = 0;
         for (i=0; i<nmembs; i++) {
             int ndims = 0;
             hid_t member_type = db_hdf5_get_cmemb(atype, i, &ndims, memb_size);
             char *memname = H5Tget_member_name(atype, i);
             hid_t mtype = H5Tcreate(H5T_COMPOUND, msize);
             for (nelmts=1, j=0; j<ndims; j++) nelmts *= memb_size[j];
-            
+
             switch (H5Tget_class(member_type)) {
             case H5T_INTEGER:
                 db_hdf5_put_cmemb(mtype, memname, 0, ndims, memb_size,
@@ -9111,6 +9130,7 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
                 memcpy(mem_value, file_value, H5Tget_size(atype));
                 H5Tconvert(atype, mtype, 1, mem_value, bkg, H5P_DEFAULT);
                 DBAddIntNComponent(obj, memname, nelmts, (int*)mem_value);
+                if (!strcmp("datatype", memname)) already_added_datatype = 1;
                 break;
 
             case H5T_FLOAT:
@@ -9139,18 +9159,15 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
                    Integer data in Silo has always been integer but floating point data can be either
                    single or double precision and HDF5 driver DOES NOT store a 'datatype' member to
                    remember and instead just knows the data type of the underlying HDF5 datasets. */
-                if (!added_datatype_member && !strncmp((const char *)mem_value, "/.silo/#", 8) &&
+                if (datatype_to_add == DB_NOTYPE && !strncmp((const char *)mem_value, "/.silo/#", 8) &&
                     (objtype == DB_QUADRECT || objtype == DB_QUADCURV || objtype == DB_QUADMESH || objtype == DB_QUADVAR ||
                      objtype == DB_UCDMESH || objtype == DB_UCDVAR || objtype == DB_MATERIAL || objtype == DB_MATSPECIES ||
                      objtype == DB_CSGMESH || objtype == DB_CSGVAR || objtype == DB_CURVE ||
                      objtype == DB_POINTMESH || objtype == DB_POINTVAR || objtype == DB_ARRAY || objtype == DB_MRGVAR))
                 {
-                    int type = db_hdf5_GetVarType(_dbfile, (const char *)mem_value);
+                    DBdatatype type = (DBdatatype) db_hdf5_GetVarType(_dbfile, (const char *)mem_value);
                     if (type == DB_FLOAT || type == DB_DOUBLE)
-                    {
-                        DBAddIntComponent(obj, "datatype", type);
-                        added_datatype_member = 1;
-                    }
+                        datatype_to_add = type;
                 } 
 
                 if (1==nelmts) {
@@ -9176,6 +9193,9 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
             H5Tclose(mtype);
             H5Tclose(member_type);
         }
+
+        if (!already_added_datatype && datatype_to_add != DB_NOTYPE)
+            DBAddIntComponent(obj, "datatype", datatype_to_add);
 
         /* Cleanup */
         H5Tclose(atype);
@@ -13084,6 +13104,8 @@ db_hdf5_GetMaterial(DBfile *_dbfile, char const *name)
     DBmaterial_mt       m;
     DBmaterial          *ma=NULL;
     char                *s=NULL;
+    int                 matlist_size, matnos_size, mvf_size, mm_size,
+                        mn_size, mz_size;
     
     PROTECT {
         /* Open object and make sure it's a material */
@@ -13127,6 +13149,13 @@ db_hdf5_GetMaterial(DBfile *_dbfile, char const *name)
         else if ((ma->datatype = db_hdf5_GetVarType(_dbfile, m.mix_vf)) < 0)
             ma->datatype = DB_NOTYPE;
         if (force_single_g) ma->datatype = DB_FLOAT;
+
+        if (ma->ndims < 0 || ma->ndims > 3 || ma->mixlen < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         for (nels=1, i=0; i<m.ndims; i++) {
             ma->dims[i] = m.dims[i];
             ma->stride[i] = nels;
@@ -13135,26 +13164,62 @@ db_hdf5_GetMaterial(DBfile *_dbfile, char const *name)
 
         /* Read the raw data */
         if (DBGetDataReadMask2File(_dbfile) & DBMatMatlist)
-            ma->matlist = (int *)db_hdf5_comprd(dbfile, m.matlist, 1);
-        if (DBGetDataReadMask2File(_dbfile) & DBMatMatnos)
-            ma->matnos = (int *)db_hdf5_comprd(dbfile, m.matnos, 1);
-        if (DBGetDataReadMask2File(_dbfile) & DBMatMixList)
         {
-            ma->mix_vf = db_hdf5_comprd(dbfile, m.mix_vf, 0);
-            ma->mix_next = (int *)db_hdf5_comprd(dbfile, m.mix_next, 1);
-            ma->mix_mat = (int *)db_hdf5_comprd(dbfile, m.mix_mat, 1);
-            ma->mix_zone = (int *)db_hdf5_comprd(dbfile, m.mix_zone, 1);
+            ma->matlist = (int *)_db_hdf5_comprd(dbfile, m.matlist, 1, &matlist_size);
+            if (ma->matlist && matlist_size > 0 && matlist_size != nels)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
+
+        if (DBGetDataReadMask2File(_dbfile) & DBMatMatnos)
+        {
+            ma->matnos = (int *)_db_hdf5_comprd(dbfile, m.matnos, 1, &matnos_size);
+            if (ma->matnos && matnos_size > 0 && matnos_size != ma->nmat)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
+
+        if (ma->mixlen > 0 && (DBGetDataReadMask2File(_dbfile) & DBMatMixList))
+        {
+            ma->mix_vf = _db_hdf5_comprd(dbfile, m.mix_vf, 0, &mvf_size);
+            ma->mix_next = (int *)_db_hdf5_comprd(dbfile, m.mix_next, 1, &mn_size);
+            ma->mix_mat = (int *)_db_hdf5_comprd(dbfile, m.mix_mat, 1, &mm_size);
+            ma->mix_zone = (int *)_db_hdf5_comprd(dbfile, m.mix_zone, 1, &mz_size);
+            if (mvf_size != ma->mixlen || mn_size != ma->mixlen || mm_size != ma->mixlen ||
+                (ma->mix_zone && mz_size != ma->mixlen))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
+
         if (DBGetDataReadMask2File(_dbfile) & DBMatMatnames)
         {
+            int cnt = ma->nmat;
             s = (char *)db_hdf5_comprd(dbfile, m.matnames, 1);
-            if (s) ma->matnames = DBStringListToStringArray(s, &(ma->nmat), !skipFirstSemicolon);
+            if (s) ma->matnames = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+            if ((s && !ma->matnames) || cnt != ma->nmat)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             FREE(s);
         }
+
         if (DBGetDataReadMask2File(_dbfile) & DBMatMatcolors)
         {
+            int cnt = ma->nmat;
             s = (char *)db_hdf5_comprd(dbfile, m.matcolors, 1);
-            if (s) ma->matcolors = DBStringListToStringArray(s, &(ma->nmat), !skipFirstSemicolon);
+            if (s) ma->matcolors = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+            if ((s && !ma->matcolors ) || cnt != ma->nmat)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             FREE(s);
         }
 
