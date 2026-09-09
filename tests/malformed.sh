@@ -97,6 +97,7 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 #
 # Find text executable to generate data
 #
+set -x
 all_objs=$(find_file -x ./all_silo_objects ./tests/bin/all_silo_objects)
 [ $? -eq 0 ] || exit 1
 $all_objs $1
@@ -107,7 +108,6 @@ all_objs_file=$(find_file -x ./all_objects.$ext ./tests/all_objects.$ext)
 #
 # Test various corruptions of a material object (block17/mat1)
 #
-set -x
 testcases="material,ndims=5 material,nmat=7 material_mix,mixlen=4495 material,matnos=\"ed\" material,matlist=\"ed\" material_mix,mix_next=\"ed\""
 for tc in $testcases; do
     objname=$(echo $tc | cut -d',' -f1)
