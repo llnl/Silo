@@ -98,11 +98,14 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 # Find text executable to generate data
 #
 set -x
-all_objs=$(find_file -x ./all_silo_objects ./tests/bin/all_silo_objects)
+pwd
+ls -R | grep all
+ls -R
+all_objs=$(find_file -x all_silo_objects tests/bin/all_silo_objects)
 [ $? -eq 0 ] || exit 1
 $all_objs $1
 [ $? -eq 0 ] || exit 1
-all_objs_file=$(find_file -x ./all_objects.$ext ./tests/all_objects.$ext)
+all_objs_file=$(find_file -x all_objects.$ext tests/all_objects.$ext)
 [ $? -eq 0 ] || exit 1
 
 #

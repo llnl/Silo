@@ -738,7 +738,7 @@ if(NOT WIN32)
     # malformed (shell script wrapped test)
     #
     add_custom_target(malformed ALL)
-    add_custom_command(TARGET copy_test_data POST_BUILD
+    add_custom_command(TARGET malformed POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/malformed.sh
         ${silo_test_output_dir})
