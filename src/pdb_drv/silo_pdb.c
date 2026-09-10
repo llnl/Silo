@@ -3360,10 +3360,10 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
 
     if (mm->ndims < 0 || (mm->ndims > NELMTS(mm->dims)))
     {
-        db_perror(name, E_MALFORMED, me);
         DBFreeMaterial(mm);
         FREE(tmpnames);
         FREE(tmpcolors);
+        db_perror(name, E_MALFORMED, me);
         return NULL;
     }
 
@@ -3372,18 +3372,20 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
     for (int i = 0; i < mm->ndims; i++) nzones *= mm->dims[i];
 
     /* validate sizing */
-    if ((nzones > 0 && nzones != matlist_size) ||
-        (mm->nmat < 0) || (mm->nmat > 0 && mm->nmat != matnos_size) ||
+    if ((nzones < 0) ||
+        (nzones > 0 && (DBGetDataReadMask2File(_dbfile) & DBMatMatlist) && nzones != matlist_size) ||
+        (mm->nmat < 0) || 
+        (mm->nmat > 0 && (DBGetDataReadMask2File(_dbfile) & DBMatMatnos) && mm->nmat != matnos_size) ||
         (mm->mixlen < 0) ||
-        (mm->mixlen > 0 && mm->mixlen != mixm_size) ||
-        (mm->mixlen > 0 && mm->mixlen != mixn_size) ||
-        (mm->mixlen > 0 && mm->mixlen != mixvf_size) ||
-        (mm->mixlen > 0 && mm->mix_zone && mm->mixlen != mixz_size))
+        (mm->mixlen > 0 && (DBGetDataReadMask2File(_dbfile) & DBMatMixList) && (mm->mixlen != mixm_size ||
+                                                                                mm->mixlen != mixn_size ||
+                                                                                mm->mixlen != mixvf_size ||
+                                                               (mm->mix_zone && mm->mixlen != mixz_size))))
     {
-        db_perror(name, E_MALFORMED, me);
         DBFreeMaterial(mm);
         FREE(tmpnames);
         FREE(tmpcolors);
+        db_perror(name, E_MALFORMED, me);
         return NULL;
     }
 
@@ -3399,9 +3401,9 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
 
         if (!mm->matnames || cnt != mm->nmat)
         {
-            db_perror(name, E_MALFORMED, me);
             DBFreeMaterial(mm);
             FREE(tmpcolors);
+            db_perror(name, E_MALFORMED, me);
             return NULL;
         }
     }
@@ -3413,8 +3415,8 @@ db_pdb_GetMaterial(DBfile *_dbfile,     /*DB file pointer */
 
         if (!mm->matcolors || cnt != mm->nmat)
         {
-            db_perror(name, E_MALFORMED, me);
             DBFreeMaterial(mm);
+            db_perror(name, E_MALFORMED, me);
             return NULL;
         }
     }

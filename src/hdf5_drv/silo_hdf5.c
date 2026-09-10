@@ -7702,14 +7702,15 @@ db_hdf5_WriteObject(DBfile *_dbfile,    /*File to write into */
             hsize_t hsnvals = (hsize_t) nvals;
             if (!strncmp(obj->pdb_names[i], "'<i>", 4)) {
                 int *mi;
-                hid_t _matype = (nvals == 1) ? H5T_NATIVE_INT : H5Tarray_create(H5T_NATIVE_INT, 1, &hsnvals);
-                hid_t _fatype = (nvals == 1) ?  dbfile->T_int : H5Tarray_create( dbfile->T_int, 1, &hsnvals);
+                hid_t _matype, _fatype;
                 if (!strcmp(obj->comp_names[i], "datatype"))
                 {
                     DBdatatype dtype = (DBdatatype) strtol(&obj->pdb_names[i][4],0,0);
                     if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
                         continue; /* skip this datatype component */
                 }
+                _matype = (nvals == 1) ? H5T_NATIVE_INT : H5Tarray_create(H5T_NATIVE_INT, 1, &hsnvals);
+                _fatype = (nvals == 1) ?  dbfile->T_int : H5Tarray_create( dbfile->T_int, 1, &hsnvals);
                 moffset = ALIGN(moffset, sizeof(int));
                 mi = (int *)(object+moffset);
                 if (H5Tinsert(mtype, obj->comp_names[i], moffset, _matype)<0 ||
