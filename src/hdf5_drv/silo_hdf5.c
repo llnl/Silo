@@ -5137,6 +5137,8 @@ db_hdf5_process_file_options(int opts_set_id, int mode, hid_t *fcpl)
 
 #if HDF5_VERSION_GE(1,10,1)
     H5Pset_evict_on_close(retval, (hbool_t)1);
+#endif
+#if HDF5_VERSION_GE(1,10,7)
     H5Pset_file_locking(retval, FALSE, FALSE); /* disable file locking */
 #endif
 
