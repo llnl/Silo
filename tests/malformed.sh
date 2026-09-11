@@ -97,10 +97,6 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 #
 # Find text executable to generate data
 #
-set -x
-pwd
-ls -R | grep all
-ls -R
 all_objs=$(find_file -x all_silo_objects tests/bin/all_silo_objects)
 [ $? -eq 0 ] || exit 1
 $all_objs $1
@@ -116,7 +112,7 @@ for tc in $testcases; do
     objname=$(echo $tc | cut -d',' -f1)
     cname_assign=$(echo $tc | cut -d',' -f2)
     cp $all_objs_file malformed.$ext
-    $browser -q -W -l 2 -e "cd material_objects" -e "$objname.$cname_assign" malformed.$ext
+    $browser -q -W -l 1 -e "cd material_objects" -e "$objname.$cname_assign" malformed.$ext
     $browser --proper-exit-code -e "cd material_objects" -e "$objname" malformed.$ext
     [ $? -eq $e_malformed_code ] || exit 1
 done
