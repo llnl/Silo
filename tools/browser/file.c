@@ -633,6 +633,7 @@ fix_objdups(DBobject *obj)
         }
     }
 
+    free(new_names);
     return obj;
 }
 
@@ -666,7 +667,7 @@ browser_obj_immediate_nvals(char const *s, void *vbuf)
         errno = 0;
         ld = strtold(p, &ep);
         if (errno != 0) break;                       /* error occurred */
-        if (ld == 0 && *ep == p) { errno=1; break; } /* no conversion occurred */
+        if (ld == 0 && ep == p) { errno=1; break; }  /* no conversion occurred */
         if (vbuf)
         {
             int ival;
@@ -1066,6 +1067,7 @@ browser_DBFreeObject (void *mem, obj_t type) {
       if (0 == (flags[i] & 0x01)) continue; /*no memory to free*/
       comp_name = obj_new (C_SYM, obj->comp_names[i]);
       offset = stc_offset (type, comp_name);
+      comp_name = obj_dest(comp_name);
       if (offset<0) continue; /*field doesn't exist!*/
       comp_mem = *((void**)(b_obj+offset));
       if (comp_mem) free (comp_mem);
@@ -1073,6 +1075,7 @@ browser_DBFreeObject (void *mem, obj_t type) {
 
    free (flags);
    DBFreeObject (obj);
+   free (b_obj);
 }
 
 /*-------------------------------------------------------------------------
