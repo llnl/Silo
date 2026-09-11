@@ -2071,7 +2071,7 @@ silo_walk_cb(unsigned n, const H5E_error2_t *err_desc, void *client_data)
         *silo_error_code_p = E_COMPRESSION;
     else if (strstr(err_desc->desc, "deflate") != 0)
         *silo_error_code_p = E_COMPRESSION;
-#if HDF5_VERSION_GE(1,10,0)
+#if HDF5_VERSION_GE(1,10,7)
     else if (err_desc->min_num == H5E_CANTLOCKFILE ||
             (strstr(err_desc->desc, "lock") != 0))
         *silo_error_code_p = E_FILELOCKING;
