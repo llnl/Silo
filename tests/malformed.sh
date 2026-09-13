@@ -105,17 +105,69 @@ all_objs_file=$(find_file -r all_objects.$ext tests/all_objects.$ext)
 [ $? -eq 0 ] || exit 1
 
 #
-# Test various corruptions of a material object (block17/mat1)
+# Corrupt one object at a time with browser's low-level write mode, then
+# confirm that the corresponding high-level DBGetXxx path reports
+# E_MALFORMED.
 #
-testcases="material,ndims=5 material,nmat=7 material_mix,mixlen=4495 material,matnos=\"ed\" material,matlist=\"ed\" material_mix,mix_next=\"ed\""
-for tc in $testcases; do
-    objname=$(echo $tc | cut -d',' -f1)
-    cname_assign=$(echo $tc | cut -d',' -f2)
-    cp $all_objs_file malformed.$ext
-    $browser -q -W -l 1 -e "cd material_objects" -e "$objname.$cname_assign" malformed.$ext
-    $browser --proper-exit-code -e "cd material_objects" -e "$objname" malformed.$ext
-    [ $? -eq $e_malformed_code ] || exit 1
-done
+check_malformed()
+{
+    dirname=$1
+    objname=$2
+    cname_assign=$3
+
+    cp $all_objs_file malformed.$ext || return 1
+    $browser -q -W -l 1 -e "cd $dirname" -e "$objname.$cname_assign" malformed.$ext
+    [ $? -eq 0 ] || return 1
+
+    $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" malformed.$ext
+    [ $? -eq $e_malformed_code ] || {
+        echo "expected E_MALFORMED for $dirname/$objname after $cname_assign" >&2
+        return 1
+    }
+}
+
+# Existing material coverage.
+check_malformed material_objects material 'ndims=5' || exit 1
+check_malformed material_objects material 'nmat=7' || exit 1
+check_malformed material_objects material_mix 'mixlen=4495' || exit 1
+check_malformed material_objects material 'matnos="ed"' || exit 1
+check_malformed material_objects material 'matlist="ed"' || exit 1
+check_malformed material_objects material_mix 'mix_next="ed"' || exit 1
+
+# Material species and simple objects.
+check_malformed material_objects matspecies 'ndims=5' || exit 1
+check_malformed material_objects matspecies 'nmat=-1' || exit 1
+check_malformed simple_objects curve 'npts=-1' || exit 1
+check_malformed simple_objects compound 'nelems=-1' || exit 1
+check_malformed simple_objects compound 'nvalues=-1' || exit 1
+check_malformed simple_objects defvars 'ndefs=-1' || exit 1
+
+# Multi-block objects.
+check_malformed multi_objects multimesh 'nblocks=-1' || exit 1
+check_malformed multi_objects multimeshadj 'nblocks=-1' || exit 1
+check_malformed multi_objects multimeshadj 'lneighbors=-1' || exit 1
+check_malformed multi_objects multivar 'nvars=-1' || exit 1
+check_malformed multi_objects multimat 'nmats=-1' || exit 1
+check_malformed multi_objects multimatspecies 'nspec=-1' || exit 1
+
+# Point, quad, UCD and list objects.
+check_malformed point_objects pointmesh 'ndims=5' || exit 1
+check_malformed point_objects pointvar 'nvals=99' || exit 1
+check_malformed quad_objects quadmesh 'ndims=5' || exit 1
+check_malformed quad_objects quadvar 'nvals=99' || exit 1
+check_malformed ucd_objects ucdmesh 'ndims=5' || exit 1
+check_malformed ucd_objects ucdvar 'nvals=99' || exit 1
+check_malformed ucd_objects zl2 'nzones=-1' || exit 1
+check_malformed flphzl_objects facelist 'nfaces=-1' || exit 1
+check_malformed flphzl_objects phzl 'nfaces=-1' || exit 1
+
+# CSG and MRG objects.
+check_malformed csg_objects csgmesh 'ndims=5' || exit 1
+check_malformed csg_objects csgzl 'nregs=-1' || exit 1
+check_malformed csg_objects csgvar 'nvals=99' || exit 1
+check_malformed mrg_objects groupelmap 'num_segments=-1' || exit 1
+check_malformed mrg_objects mrgtree 'num_nodes=-1' || exit 1
+check_malformed mrg_objects mrgvar 'ncomps=99' || exit 1
 
 #
 # Cleanup
