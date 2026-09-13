@@ -9384,6 +9384,12 @@ db_hdf5_GetCurve(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.npts < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a curve object and initialize meta data */
         if (NULL==(cu=DBAllocCurve())) return NULL;
         cu->npts = m.npts;
@@ -9622,6 +9628,12 @@ db_hdf5_GetCsgmesh(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndims < 0 || m.ndims > NELMTS(m.labels) || m.nbounds < 0 || m.lcoeffs < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a ucdmesh object and initialize meta data */
         if (NULL==(csgm=DBAllocCsgmesh())) return NULL;
         csgm->name = BASEDUP(name);
@@ -9855,6 +9867,12 @@ db_hdf5_GetCsgvar(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nvals < 0 || m.nvals > MAX_VARS || m.nels < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a ucdvar object and initialize meta data */
         if (NULL==(csgv=DBAllocCsgvar())) return NULL;
         csgv->name = BASEDUP(name);
@@ -10073,6 +10091,12 @@ db_hdf5_GetCSGZonelist(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nregs < 0 || m.nzones < 0 || m.lxform < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a zonelist object and initialize meta data */
         if (NULL==(zl=DBAllocCSGZonelist())) return NULL;
         zl->nregs = m.nregs;
@@ -10258,7 +10282,7 @@ db_hdf5_GetDefvars(DBfile *_dbfile, char const *name)
     DBdefvars           *defv = NULL;
     DBdefvars_mt         m;
     hid_t               o=-1, attr=-1;
-    int                 _objtype;
+    int                 _objtype, types_size = 0, guihides_size = 0;
     char               *s;
 
     PROTECT {
@@ -10287,21 +10311,57 @@ db_hdf5_GetDefvars(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndefs < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a defvars object and initialize meta data */
         if (NULL==(defv=DBAllocDefvars(0))) return NULL;
         defv->ndefs = m.ndefs;
 
         s = (char *)db_hdf5_comprd(dbfile, m.names, 1);
-        if (s) defv->names = DBStringListToStringArray(s, &(defv->ndefs), !skipFirstSemicolon);
+        if (s)
+        {
+            int cnt = defv->ndefs;
+            defv->names = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+            if (cnt != defv->ndefs)
+            {
+                FREE(s);
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
         FREE(s);
 
-        defv->types = (int *)db_hdf5_comprd(dbfile, m.types, 1);
+        defv->types = (int *)_db_hdf5_comprd(dbfile, m.types, 1, &types_size);
+        if (defv->types && types_size != defv->ndefs)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
         s = (char *)db_hdf5_comprd(dbfile, m.defns, 1);
-        if (s) defv->defns = DBStringListToStringArray(s, &(defv->ndefs), !skipFirstSemicolon);
+        if (s)
+        {
+            int cnt = defv->ndefs;
+            defv->defns = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+            if (cnt != defv->ndefs)
+            {
+                FREE(s);
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
         FREE(s);
 
-        defv->guihides = (int *)db_hdf5_comprd(dbfile, m.guihides, 1);
+        defv->guihides = (int *)_db_hdf5_comprd(dbfile, m.guihides, 1, &guihides_size);
+        if (defv->guihides && guihides_size != defv->ndefs)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
         H5Tclose(o);
         
@@ -10660,6 +10720,12 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBquadmesh_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.ndims < 0 || m.ndims > NELMTS(m.dims))
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 
@@ -11090,6 +11156,12 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBquadvar_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.ndims < 0 || m.ndims > NELMTS(m.dims) || m.nvals < 0 || m.nvals > MAX_VARS || m.nels < 0 || m.mixlen < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 
@@ -11621,6 +11693,12 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndims < 0 || m.ndims > NELMTS(m.coord) || m.nnodes < 0 || m.nzones < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a ucdmesh object and initialize meta data */
         if (NULL==(um=DBAllocUcdmesh())) return NULL;
         um->name = BASEDUP(name);
@@ -12073,6 +12151,12 @@ db_hdf5_GetUcdvar(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndims < 0 || m.ndims > 3 || m.nvals < 0 || m.nvals > MAX_VARS || m.nels < 0 || m.mixlen < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a ucdvar object and initialize meta data */
         if (NULL==(uv=DBAllocUcdvar())) return NULL;
         uv->name = BASEDUP(name);
@@ -12283,6 +12367,12 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBfacelist_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.ndims < 0 || m.ndims > 3 || m.nfaces < 0 || m.lnodelist < 0 || m.nshapes < 0 || m.ntypes < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 
@@ -12774,6 +12864,12 @@ db_hdf5_GetZonelist(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndims < 0 || m.ndims > 3 || m.nzones < 0 || m.lnodelist < 0 || m.nshapes < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create a zonelist object and initialize meta data */
         if (NULL==(zl=DBAllocZonelist())) return NULL;
         zl->ndims = m.ndims;
@@ -12877,6 +12973,12 @@ db_hdf5_GetPHZonelist(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBphzonelist_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.nfaces < 0 || m.lnodelist < 0 || m.nzones < 0 || m.lfacelist < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 
@@ -13405,6 +13507,8 @@ db_hdf5_GetMatspecies(DBfile *_dbfile, char const *name)
     static char         *me = "db_hdf5_GetMatspecies";
     hid_t               o=-1, attr=-1;
     int                 _objtype, i, nels, nstrs = 0;
+    int                 nmatspec_size = 0, species_mf_size = 0;
+    int                 speclist_size = 0, mix_speclist_size = 0;
     DBmatspecies_mt     m;
     DBmatspecies        *ms=NULL;
     char                *s=NULL;
@@ -13435,6 +13539,13 @@ db_hdf5_GetMatspecies(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.ndims < 0 || m.ndims > NELMTS(m.dims) ||
+            m.nmat < 0 || m.nspecies_mf < 0 || m.mixlen < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(ms=DBAllocMatspecies())) return NULL;
         ms->name = BASEDUP(name);
@@ -13449,20 +13560,40 @@ db_hdf5_GetMatspecies(DBfile *_dbfile, char const *name)
             ms->datatype = silo2silo_type(m.datatype);
         if (force_single_g) ms->datatype = DB_FLOAT;
         for (i=0, nels=1; i<m.ndims; i++) {
+            if (m.dims[i] < 0 || (m.dims[i] && nels > INT_MAX/m.dims[i]))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             ms->dims[i] = m.dims[i];
             ms->stride[i] = nels;
             nels *= m.dims[i];
         }
 
         /* Read the raw data */
-        ms->nmatspec = (int *)db_hdf5_comprd(dbfile, m.nmatspec, 1);
-        ms->species_mf = db_hdf5_comprd(dbfile, m.species_mf, 0);
-        ms->speclist = (int *)db_hdf5_comprd(dbfile, m.speclist, 1);
-        ms->mix_speclist = (int *)db_hdf5_comprd(dbfile, m.mix_speclist, 1);
+        ms->nmatspec = (int *)_db_hdf5_comprd(dbfile, m.nmatspec, 1, &nmatspec_size);
+        ms->species_mf = _db_hdf5_comprd(dbfile, m.species_mf, 0, &species_mf_size);
+        ms->speclist = (int *)_db_hdf5_comprd(dbfile, m.speclist, 1, &speclist_size);
+        ms->mix_speclist = (int *)_db_hdf5_comprd(dbfile, m.mix_speclist, 1, &mix_speclist_size);
+        if ((ms->nmatspec && nmatspec_size != ms->nmat) ||
+            (ms->species_mf && species_mf_size != ms->nspecies_mf) ||
+            (ms->speclist && speclist_size != nels) ||
+            (ms->mix_speclist && mix_speclist_size != ms->mixlen))
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         if (ms->nmatspec && (DBGetDataReadMask2File(_dbfile) & DBMatMatnames))
         {
             for (i=0; i < ms->nmat; i++)
+            {
+                if (ms->nmatspec[i] < 0 || nstrs > INT_MAX-ms->nmatspec[i])
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
                 nstrs += ms->nmatspec[i];
+            }
             s = (char *)db_hdf5_comprd(dbfile, m.specnames, 1);
             if (s) ms->specnames = DBStringListToStringArray(s, &nstrs, !skipFirstSemicolon);
             FREE(s);
@@ -13472,7 +13603,14 @@ db_hdf5_GetMatspecies(DBfile *_dbfile, char const *name)
             if (nstrs == 0)
             {
                 for (i=0; i < ms->nmat; i++)
+                {
+                    if (ms->nmatspec[i] < 0 || nstrs > INT_MAX-ms->nmatspec[i])
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                     nstrs += ms->nmatspec[i];
+                }
             }
             s = (char *)db_hdf5_comprd(dbfile, m.speccolors, 1);
             if (s) ms->speccolors = DBStringListToStringArray(s, &nstrs, !skipFirstSemicolon);
@@ -13734,6 +13872,8 @@ db_hdf5_GetMultimesh(DBfile *_dbfile, char const *name)
     static char         *me = "db_hdf5_GetMultimesh";
     hid_t               o=-1, attr=-1;
     int                 _objtype;
+    int                 meshtypes_size = 0, extents_size = 0, zonecounts_size = 0;
+    int                 extzones_size = 0, groupings_size = 0, empty_size = 0;
     DBmultimesh_mt      m;
     DBmultimesh         *mm=NULL;
     char                *t=NULL;
@@ -13765,6 +13905,12 @@ db_hdf5_GetMultimesh(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nblocks < 0 || m.lgroupings < 0 || m.empty_cnt < 0 || m.extentssize < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(mm=DBAllocMultimesh(0))) return NULL;
         mm->nblocks = m.nblocks;
@@ -13790,7 +13936,12 @@ db_hdf5_GetMultimesh(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         if (mm->nblocks>0 && (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes))
         {
-            mm->meshtypes = (int *)db_hdf5_comprd(dbfile, m.meshtypes, 1);
+            mm->meshtypes = (int *)_db_hdf5_comprd(dbfile, m.meshtypes, 1, &meshtypes_size);
+            if (mm->meshtypes && meshtypes_size != m.nblocks)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             meshnames = (char *)db_hdf5_comprd(dbfile, m.meshnames, 1);
             db_StringListToStringArrayMBOpt(meshnames, &(mm->meshnames), &(mm->meshnames_alloc), m.nblocks);
         }
@@ -13799,10 +13950,26 @@ db_hdf5_GetMultimesh(DBfile *_dbfile, char const *name)
         if (mm->nblocks>0 && (DBGetDataReadMask2File(_dbfile) & DBMBOptions))
         {
             if (mm->extentssize>0)
-               mm->extents = (double*)db_hdf5_comprd(dbfile, m.extents, 1);
-            mm->zonecounts =  (int *)db_hdf5_comprd(dbfile, m.zonecounts, 1);
-            mm->has_external_zones =  (int *)db_hdf5_comprd(dbfile, m.has_external_zones, 1);
-            mm->groupings =  (int *)db_hdf5_comprd(dbfile, m.groupings, 1);
+            {
+               mm->extents = (double*)_db_hdf5_comprd(dbfile, m.extents, 1, &extents_size);
+               if (mm->extents &&
+                   (m.nblocks != 0 && m.extentssize > INT_MAX/m.nblocks ||
+                    extents_size != m.nblocks*m.extentssize))
+               {
+                   db_perror(name, E_MALFORMED, me);
+                   UNWIND();
+               }
+            }
+            mm->zonecounts =  (int *)_db_hdf5_comprd(dbfile, m.zonecounts, 1, &zonecounts_size);
+            mm->has_external_zones =  (int *)_db_hdf5_comprd(dbfile, m.has_external_zones, 1, &extzones_size);
+            mm->groupings =  (int *)_db_hdf5_comprd(dbfile, m.groupings, 1, &groupings_size);
+            if ((mm->zonecounts && zonecounts_size != m.nblocks) ||
+                (mm->has_external_zones && extzones_size != m.nblocks) ||
+                (mm->groupings && groupings_size != m.lgroupings))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             t = (char *)db_hdf5_comprd(dbfile, m.groupnames, 1);
             if (t) mm->groupnames = DBStringListToStringArray(t, &(mm->lgroupings), !skipFirstSemicolon);
             FREE(t);
@@ -13812,8 +13979,13 @@ db_hdf5_GetMultimesh(DBfile *_dbfile, char const *name)
         mm->file_ns =  (char *)db_hdf5_comprd(dbfile, m.file_ns_name, 1);
         mm->block_ns =  (char *)db_hdf5_comprd(dbfile, m.block_ns_name, 1);
         mm->block_type = m.block_type;
-        mm->empty_list =  (int* )db_hdf5_comprd(dbfile, m.empty_list, 1);
+        mm->empty_list =  (int* )_db_hdf5_comprd(dbfile, m.empty_list, 1, &empty_size);
         mm->empty_cnt = m.empty_cnt;
+        if (mm->empty_list && empty_size != mm->empty_cnt)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         
         /* alternate node number variables */
         {
@@ -14166,6 +14338,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
     int                 i, j, tmpnmesh, _objtype;
     int                 *offsetmap=0, *offsetmapn=0, *offsetmapz=0, lneighbors, tmpoff;
     int                 blockno;
+    int                 meshtypes_size = 0, nneighbors_size = 0;
+    int                 neighbors_size = 0, back_size = 0;
+    int                 lnodelists_size = 0, lzonelists_size = 0;
 
     PROTECT {
         /* Open object and make sure it's a multimesh */
@@ -14194,8 +14369,9 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         }
 
         /* Create object and initialize meta data */
-        if (m.nblocks < 0 || m.lneighbors < 0) {
-            db_perror((char*)name, E_CALLFAIL, me);
+        if (m.nblocks < 0 || m.lneighbors < 0 ||
+            m.totlnodelists < 0 || m.totlzonelists < 0) {
+            db_perror((char*)name, E_MALFORMED, me);
             UNWIND();
         }
         if (NULL==(mmadj=DBAllocMultimeshadj(0))) return NULL;
@@ -14204,10 +14380,16 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         mmadj->lneighbors = m.lneighbors;
 
         /* Read the raw data */
-        mmadj->meshtypes = (int *)db_hdf5_comprd(dbfile, m.meshtypes, 1);
-        mmadj->nneighbors = (int *)db_hdf5_comprd(dbfile, m.nneighbors, 1);
-        mmadj->neighbors = (int *)db_hdf5_comprd(dbfile, m.neighbors, 1);
-        mmadj->back = (int *)db_hdf5_comprd(dbfile, m.back, 1);
+        mmadj->meshtypes = (int *)_db_hdf5_comprd(dbfile, m.meshtypes, 1, &meshtypes_size);
+        mmadj->nneighbors = (int *)_db_hdf5_comprd(dbfile, m.nneighbors, 1, &nneighbors_size);
+        mmadj->neighbors = (int *)_db_hdf5_comprd(dbfile, m.neighbors, 1, &neighbors_size);
+        mmadj->back = (int *)_db_hdf5_comprd(dbfile, m.back, 1, &back_size);
+        if ((mmadj->meshtypes && meshtypes_size != m.nblocks) ||
+            (mmadj->nneighbors && nneighbors_size != m.nblocks))
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
         if ((DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists) ||
             (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
@@ -14226,14 +14408,26 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                 offsetmap[i] = lneighbors;
                 lneighbors += mmadj->nneighbors[i];
             }
+            if (lneighbors != m.lneighbors ||
+                (mmadj->neighbors && neighbors_size != lneighbors) ||
+                (mmadj->back && back_size != lneighbors))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
  
         if (offsetmap && mmadj->nneighbors &&
             (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
         {
-           mmadj->lnodelists = (int *)db_hdf5_comprd(dbfile, m.lnodelists, 1);
+           mmadj->lnodelists = (int *)_db_hdf5_comprd(dbfile, m.lnodelists, 1, &lnodelists_size);
            if (mmadj->lnodelists)
            {
+               if (lnodelists_size != lneighbors)
+               {
+                   db_perror(name, E_MALFORMED, me);
+                   UNWIND();
+               }
                mmadj->nodelists = ALLOC_N(int *, lneighbors); 
                offsetmapn = ALLOC_N(int, mmadj->nblocks);
                tmpoff = 0;
@@ -14260,9 +14454,14 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         if (offsetmap && mmadj->nneighbors &&
             (DBGetDataReadMask2File(_dbfile) & DBMMADJZonelists))
         {
-           mmadj->lzonelists = (int *)db_hdf5_comprd(dbfile, m.lzonelists, 1);
+           mmadj->lzonelists = (int *)_db_hdf5_comprd(dbfile, m.lzonelists, 1, &lzonelists_size);
            if (mmadj->lzonelists)
            {
+               if (lzonelists_size != lneighbors)
+               {
+                   db_perror(name, E_MALFORMED, me);
+                   UNWIND();
+               }
                mmadj->zonelists = ALLOC_N(int *, lneighbors); 
                offsetmapz = ALLOC_N(int, mmadj->nblocks);
                tmpoff = 0;
@@ -14697,7 +14896,7 @@ db_hdf5_GetMultivar(DBfile *_dbfile, char const *name)
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     static char         *me = "db_hdf5_GetMultivar";
     hid_t               o=-1, attr=-1;
-    int                 _objtype;
+    int                 _objtype, vartypes_size = 0, extents_size = 0, empty_size = 0;
     DBmultivar_mt       m;
     DBmultivar          *mv=NULL;
     char                *s=NULL;
@@ -14729,6 +14928,12 @@ db_hdf5_GetMultivar(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nvars < 0 || m.extentssize < 0 || m.empty_cnt < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(mv=DBAllocMultivar(0))) return NULL;
         mv->nvars = m.nvars;
@@ -14746,13 +14951,27 @@ db_hdf5_GetMultivar(DBfile *_dbfile, char const *name)
         /* Read the raw data variable names */
         if (mv->nvars>0 && (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes))
         {
-            mv->vartypes = (int *)db_hdf5_comprd(dbfile, m.vartypes, 1);
+            mv->vartypes = (int *)_db_hdf5_comprd(dbfile, m.vartypes, 1, &vartypes_size);
+            if (mv->vartypes && vartypes_size != m.nvars)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             mvnames = (char *)db_hdf5_comprd(dbfile, m.varnames, 1);
             db_StringListToStringArrayMBOpt(mvnames, &(mv->varnames), &(mv->varnames_alloc), m.nvars);
         }
 
         if (mv->extentssize>0 && (DBGetDataReadMask2File(_dbfile) & DBMBOptions))
-           mv->extents = (double *)db_hdf5_comprd(dbfile, m.extents, 1);
+        {
+           mv->extents = (double *)_db_hdf5_comprd(dbfile, m.extents, 1, &extents_size);
+           if (mv->extents &&
+               (m.nvars != 0 && m.extentssize > INT_MAX/m.nvars ||
+                extents_size != m.nvars*m.extentssize))
+           {
+               db_perror(name, E_MALFORMED, me);
+               UNWIND();
+           }
+        }
 
         s = (char *)db_hdf5_comprd(dbfile, m.region_pnames, 1);
         if (s) mv->region_pnames = DBStringListToStringArray(s, 0, !skipFirstSemicolon);
@@ -14761,8 +14980,13 @@ db_hdf5_GetMultivar(DBfile *_dbfile, char const *name)
         mv->file_ns =  (char *)db_hdf5_comprd(dbfile, m.file_ns_name, 1);
         mv->block_ns =  (char *)db_hdf5_comprd(dbfile, m.block_ns_name, 1);
         mv->block_type = m.block_type;
-        mv->empty_list =  (int *)db_hdf5_comprd(dbfile, m.empty_list, 1);
+        mv->empty_list =  (int *)_db_hdf5_comprd(dbfile, m.empty_list, 1, &empty_size);
         mv->empty_cnt = m.empty_cnt;
+        if (mv->empty_list && empty_size != mv->empty_cnt)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         mv->repr_block_idx = m.repr_block_idx - 1;
         
         H5Tclose(o);
@@ -15002,6 +15226,8 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
     static char         *me = "db_hdf5_GetMultimat";
     hid_t               o=-1, attr=-1;
     int                 _objtype;
+    int                 matnos_size = 0, mixlens_size = 0, matcounts_size = 0;
+    int                 matlists_size = 0, empty_size = 0;
     DBmultimat_mt       m;
     DBmultimat          *mm=NULL;
     char                *matnames=NULL;
@@ -15032,6 +15258,12 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nmats < 0 || m.nmatnos < 0 || m.empty_cnt < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(mm=DBAllocMultimat(0))) return NULL;
         mm->nmats = m.nmats;
@@ -15042,7 +15274,12 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
         mm->guihide = m.guihide;
         mm->nmatnos = m.nmatnos;
         mm->mmesh_name = OPTDUP(m.mmesh_name);
-        mm->matnos = (int *)db_hdf5_comprd(dbfile, m.matnos, 1);
+        mm->matnos = (int *)_db_hdf5_comprd(dbfile, m.matnos, 1, &matnos_size);
+        if (mm->matnos && matnos_size != m.nmatnos)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
         /* Read the raw data */
         if (mm->nmats>0 && (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes))
@@ -15053,9 +15290,33 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
 
         if (mm->nmats>0 && (DBGetDataReadMask2File(_dbfile) & DBMBOptions))
         {
-            mm->mixlens = (int *)db_hdf5_comprd(dbfile, m.mixlens, 1);
-            mm->matcounts = (int *)db_hdf5_comprd(dbfile, m.matcounts, 1);
-            mm->matlists = (int *)db_hdf5_comprd(dbfile, m.matlists, 1);
+            int ii, total = 0;
+            mm->mixlens = (int *)_db_hdf5_comprd(dbfile, m.mixlens, 1, &mixlens_size);
+            mm->matcounts = (int *)_db_hdf5_comprd(dbfile, m.matcounts, 1, &matcounts_size);
+            mm->matlists = (int *)_db_hdf5_comprd(dbfile, m.matlists, 1, &matlists_size);
+            if ((mm->mixlens && mixlens_size != m.nmats) ||
+                (mm->matcounts && matcounts_size != m.nmats))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+            if (mm->matcounts)
+            {
+                for (ii = 0; ii < m.nmats; ii++)
+                {
+                    if (mm->matcounts[ii] < 0 || total > INT_MAX-mm->matcounts[ii])
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
+                    total += mm->matcounts[ii];
+                }
+                if (mm->matlists && matlists_size != total)
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
+            }
         }
 
         if (m.nmatnos > 0) {
@@ -15073,8 +15334,13 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
 
         mm->file_ns =  (char *)db_hdf5_comprd(dbfile, m.file_ns_name, 1);
         mm->block_ns =  (char *)db_hdf5_comprd(dbfile, m.block_ns_name, 1);
-        mm->empty_list =  (int *)db_hdf5_comprd(dbfile, m.empty_list, 1);
+        mm->empty_list =  (int *)_db_hdf5_comprd(dbfile, m.empty_list, 1, &empty_size);
         mm->empty_cnt = m.empty_cnt;
+        if (mm->empty_list && empty_size != mm->empty_cnt)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         mm->repr_block_idx = m.repr_block_idx - 1;
         
         H5Tclose(o);
@@ -15292,7 +15558,7 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     static char         *me = "db_hdf5_GetMultimatspecies";
     hid_t               o=-1, attr=-1;
-    int                 _objtype, i, nstrs=0;
+    int                 _objtype, i, nstrs=0, nmatspec_size = 0, empty_size = 0;
     DBmultimatspecies_mt m;
     DBmultimatspecies   *mm=NULL;
     char                *specnames=NULL;
@@ -15323,6 +15589,12 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nspec < 0 || m.nmat < 0 || m.empty_cnt < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(mm=DBAllocMultimatspecies(0))) return NULL;
         mm->matname = OPTDUP(m.matname);
@@ -15332,7 +15604,12 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
         mm->grouporigin = m.grouporigin;
         mm->guihide = m.guihide;
         mm->nmat = m.nmat;
-        mm->nmatspec = (int *)db_hdf5_comprd(dbfile, m.nmatspec, 1);
+        mm->nmatspec = (int *)_db_hdf5_comprd(dbfile, m.nmatspec, 1, &nmatspec_size);
+        if (mm->nmatspec && nmatspec_size != m.nmat)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
         /* Read the raw data */
         if (mm->nspec>0 && (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes))
@@ -15348,7 +15625,14 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
             if (tmpspecies_names)
             {
                 for (i = 0; i < mm->nmat; i++)
+                {
+                    if (mm->nmatspec[i] < 0 || nstrs > INT_MAX-mm->nmatspec[i])
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                     nstrs += mm->nmatspec[i];
+                }
                 mm->species_names = DBStringListToStringArray(tmpspecies_names, &nstrs, !skipFirstSemicolon);
             }
             if (tmpspeccolors)
@@ -15356,7 +15640,14 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
                 if (nstrs == 0)
                 {
                     for (i = 0; i < mm->nmat; i++)
+                    {
+                        if (mm->nmatspec[i] < 0 || nstrs > INT_MAX-mm->nmatspec[i])
+                        {
+                            db_perror(name, E_MALFORMED, me);
+                            UNWIND();
+                        }
                         nstrs += mm->nmatspec[i];
+                    }
                 }
                 mm->speccolors = DBStringListToStringArray(tmpspeccolors, &nstrs, !skipFirstSemicolon);
             }
@@ -15366,8 +15657,13 @@ db_hdf5_GetMultimatspecies(DBfile *_dbfile, char const *name)
 
         mm->file_ns =  (char *)db_hdf5_comprd(dbfile, m.file_ns_name, 1);
         mm->block_ns =  (char *)db_hdf5_comprd(dbfile, m.block_ns_name, 1);
-        mm->empty_list =  (int *)db_hdf5_comprd(dbfile, m.empty_list, 1);
+        mm->empty_list =  (int *)_db_hdf5_comprd(dbfile, m.empty_list, 1, &empty_size);
         mm->empty_cnt = m.empty_cnt;
+        if (mm->empty_list && empty_size != mm->empty_cnt)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         mm->repr_block_idx = m.repr_block_idx - 1;
 
         H5Tclose(o);
@@ -15606,6 +15902,12 @@ db_hdf5_GetPointmesh(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBpointmesh_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.ndims < 0 || m.ndims > NELMTS(m.coord) || m.nels < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 
@@ -15865,6 +16167,12 @@ db_hdf5_GetPointvar(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nvals < 0 || m.nvals > MAX_VARS || m.nels < 0 || m.ndims < 0 || m.ndims > 3)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(pv=DBAllocMeshvar())) return NULL;
         pv->name = BASEDUP(name);
@@ -16028,7 +16336,7 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     static char         *me = "db_hdf5_GetCompoundarray";
     hid_t               o=-1, attr=-1;
-    int                 _objtype, i;
+    int                 _objtype, i, elemlengths_size = 0, values_size = 0, nsum = 0;
     DBcompoundarray_mt m;
     DBcompoundarray     *ca=NULL;
     char                *s=NULL;
@@ -16059,6 +16367,12 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.nelems <= 0 || m.nvalues <= 0)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         /* Create object and initialize meta data */
         if (NULL==(ca=DBAllocCompoundarray())) return NULL;
         ca->name = BASEDUP(name);
@@ -16069,12 +16383,37 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
         if (force_single_g) ca->datatype = DB_FLOAT;
         
         /* Read the raw data */
-        ca->elemlengths = (int *)db_hdf5_comprd(dbfile, m.elemlengths, 1);
-        ca->values = db_hdf5_comprd(dbfile, m.values, 1);
+        ca->elemlengths = (int *)_db_hdf5_comprd(dbfile, m.elemlengths, 1, &elemlengths_size);
+        ca->values = _db_hdf5_comprd(dbfile, m.values, 1, &values_size);
+        if (!ca->elemlengths || elemlengths_size != m.nelems ||
+            (ca->values && values_size != m.nvalues))
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+        for (i = 0; i < m.nelems; i++)
+        {
+            if (ca->elemlengths[i] < 0 || nsum > INT_MAX-ca->elemlengths[i])
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+            nsum += ca->elemlengths[i];
+        }
+        if (nsum != m.nvalues)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
         ca->elemnames = (char **)calloc(m.nelems, sizeof(char*));
         s = (char *)db_hdf5_comprd(dbfile, m.elemnames, 1);
         for (i=0; i<m.nelems; i++) {
             char *tok = strtok(i?NULL:s, ";");
+            if (!tok)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
             ca->elemnames[i] = STRDUP(tok);
         }
         
@@ -16506,7 +16845,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     static char         *me = "db_hdf5_GetMrgtree";
     hid_t               o=-1, attr=-1;
-    int                 _objtype, i, j, n, num_nodes;
+    int                 _objtype, i, j, n, num_nodes, scalars_size = 0;
     DBmrgtree_mt         m;
     int                 *intArray = 0;
     char               **strArray = 0;
@@ -16551,22 +16890,49 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         tree->root = 0;
         tree->cwr = 0;
 
+        if (num_nodes < 0 || (num_nodes > 0 && (m.root < 0 || m.root >= num_nodes)))
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
+        /* Read and validate nodal scalar data before allocating nodes. */
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.n_scalars, 1, &scalars_size);
+        if (num_nodes > INT_MAX/6 ||
+            (num_nodes > 0 && (!intArray || scalars_size != num_nodes*6)))
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+        for (i = 0; i < num_nodes; i++)
+        {
+            int narray = intArray[i*6+0];
+            int nsegs = intArray[i*6+3];
+            int nchildren = intArray[i*6+4];
+            int parent = intArray[i*6+5];
+            if (narray < 0 || nsegs < 0 || nchildren < 0 ||
+                parent < -1 || parent >= num_nodes ||
+                (narray && nsegs > INT_MAX/narray))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
+
         /* allocate all the nodes of the tree and a linear list of pointers
            to them */
         ltree = (DBmrgtnode **) malloc(num_nodes * sizeof(DBmrgtnode*));
         for (i = 0; i < num_nodes; i++)
             ltree[i] = (DBmrgtnode *) calloc(1,sizeof(DBmrgtnode));
 
-        /* Read the nodal scalar data */
-        intArray = (int *)db_hdf5_comprd(dbfile, m.n_scalars, 1);
-        for (i = 0; (i < num_nodes) && intArray; i++)
+        for (i = 0; i < num_nodes; i++)
         {
             ltree[i]->narray           = intArray[i*6+0];
             ltree[i]->type_info_bits   = intArray[i*6+1];
             ltree[i]->max_children     = intArray[i*6+2];
             ltree[i]->nsegs            = intArray[i*6+3];
             ltree[i]->num_children     = intArray[i*6+4];
-            ltree[i]->parent           = intArray[i*6+5] >= 0 ? ltree[intArray[i*6+5]] : 0;
+            ltree[i]->parent = intArray[i*6+5] >= 0 ? ltree[intArray[i*6+5]] : 0;
         }
         FREE(intArray);
 
@@ -16878,6 +17244,12 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
+        if (m.num_segments < 0)
+        {
+            db_perror("num_segments<0", E_MALFORMED, me);
+            return NULL;
+        }
+
         /* Create object and initialize meta data */
         gm = (DBgroupelmap *) malloc(sizeof(DBgroupelmap));
         gm->name = BASEDUP(name);
@@ -17116,6 +17488,12 @@ db_hdf5_GetMrgvar(DBfile *_dbfile, char const *name)
             H5Aread(attr, DBmrgvar_mt5, &m)<0 ||
             H5Aclose(attr)<0) {
             db_perror(name, E_CALLFAIL, me);
+            UNWIND();
+        }
+
+        if (m.ncomps < 0 || m.ncomps > MAX_VARS || m.nregns < 0)
+        {
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
 

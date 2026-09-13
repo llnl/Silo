@@ -3485,7 +3485,9 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    char           tmpstr[256];
    PJcomplist     tmp_obj;
    DBmatspecies   tmpmm;
-   int            i, nstrs = 0;
+   int            i, nstrs = 0, nzones = 1;
+   int            nmatspec_size = 0, speclist_size = 0;
+   int            mix_speclist_size = 0, species_mf_size = 0;
    PJcomplist    *_tcl;
 
    /*------------------------------------------------------------*/
@@ -3500,11 +3502,11 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    DEFINE_OBJ("major_order", &tmpmm.major_order, DB_INT);
    DEFINE_OBJ("datatype", &tmpmm.datatype, DB_INT);
    DEFINE_OBJ("nmat", &tmpmm.nmat, DB_INT);
-   DEFALL_OBJ("nmatspec", &tmpmm.nmatspec, DB_INT);
+   DEFALL_OBN("nmatspec", &tmpmm.nmatspec, DB_INT, &nmatspec_size);
    DEFINE_OBJ("nspecies_mf", &tmpmm.nspecies_mf, DB_INT);
-   DEFALL_OBJ("speclist", &tmpmm.speclist, DB_INT);
+   DEFALL_OBN("speclist", &tmpmm.speclist, DB_INT, &speclist_size);
    DEFINE_OBJ("mixlen", &tmpmm.mixlen, DB_INT);
-   DEFALL_OBJ("mix_speclist", &tmpmm.mix_speclist, DB_INT);
+   DEFALL_OBN("mix_speclist", &tmpmm.mix_speclist, DB_INT, &mix_speclist_size);
    DEFINE_OBJ("guihide", &tmpmm.guihide, DB_INT);
    if (DBGetDataReadMask2File(_dbfile) & DBMatMatnames)
        DEFALL_OBJ("species_names",    &tmpnames,        DB_CHAR);
@@ -3520,10 +3522,37 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    }
    *mm = tmpmm;
 
-   if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims))
+   if (mm->ndims < 0 || mm->ndims > NELMTS(mm->dims) ||
+       mm->nmat < 0 || mm->nspecies_mf < 0 || mm->mixlen < 0)
    {
       DBFreeMatspecies(mm);
-      db_perror("ndims", E_MALFORMED, me);
+      FREE(tmpnames);
+      FREE(tmpcolors);
+      db_perror(objname, E_MALFORMED, me);
+      return NULL;
+   }
+
+   for (i = 0; i < mm->ndims; i++)
+   {
+      if (mm->dims[i] < 0 || (mm->dims[i] && nzones > INT_MAX / mm->dims[i]))
+      {
+         DBFreeMatspecies(mm);
+         FREE(tmpnames);
+         FREE(tmpcolors);
+         db_perror(objname, E_MALFORMED, me);
+         return NULL;
+      }
+      nzones *= mm->dims[i];
+   }
+
+   if ((mm->nmat > 0 && (!mm->nmatspec || nmatspec_size != mm->nmat)) ||
+       (mm->speclist && speclist_size != nzones) ||
+       (mm->mix_speclist && mix_speclist_size != mm->mixlen))
+   {
+      DBFreeMatspecies(mm);
+      FREE(tmpnames);
+      FREE(tmpcolors);
+      db_perror(objname, E_MALFORMED, me);
       return NULL;
    }
 
@@ -3542,8 +3571,16 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    if (mm->datatype == DB_DOUBLE && PJ_InqForceSingle())
       mm->datatype = DB_FLOAT;
 
-   DEFALL_OBJ("species_mf", &mm->species_mf, mm->datatype);
-   PJ_GetObject(dbfile->pdb, objname, &tmp_obj, 0);
+   DEFALL_OBN("species_mf", &mm->species_mf, mm->datatype, &species_mf_size);
+   if (PJ_GetObject(dbfile->pdb, objname, &tmp_obj, 0) < 0 ||
+       (mm->species_mf && species_mf_size != mm->nspecies_mf))
+   {
+      DBFreeMatspecies(mm);
+      FREE(tmpnames);
+      FREE(tmpcolors);
+      db_perror(objname, E_MALFORMED, me);
+      return NULL;
+   }
 
    _DBQQCalcStride(mm->stride, mm->dims, mm->ndims, mm->major_order);
 
@@ -3551,18 +3588,43 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
    mm->name = STRDUP(objname);
 
    for (i=0; i < mm->nmat; i++)
+   {
+       if (mm->nmatspec[i] < 0 || nstrs > INT_MAX - mm->nmatspec[i])
+       {
+          DBFreeMatspecies(mm);
+          FREE(tmpnames);
+          FREE(tmpcolors);
+          db_perror(objname, E_MALFORMED, me);
+          return NULL;
+       }
        nstrs += mm->nmatspec[i];
+   }
    if (tmpnames != NULL)
    {
-       if (nstrs > 0)
-          mm->specnames = DBStringListToStringArray(tmpnames, &nstrs, !skipFirstSemicolon);
+       int cnt = nstrs;
+       if (cnt > 0)
+          mm->specnames = DBStringListToStringArray(tmpnames, &cnt, !skipFirstSemicolon);
        FREE(tmpnames);
+       if (cnt != nstrs)
+       {
+          DBFreeMatspecies(mm);
+          FREE(tmpcolors);
+          db_perror(objname, E_MALFORMED, me);
+          return NULL;
+       }
    }
    if (tmpcolors != NULL)
    {
-       if (nstrs > 0)
-          mm->speccolors = DBStringListToStringArray(tmpcolors, &nstrs, !skipFirstSemicolon);
+       int cnt = nstrs;
+       if (cnt > 0)
+          mm->speccolors = DBStringListToStringArray(tmpcolors, &cnt, !skipFirstSemicolon);
        FREE(tmpcolors);
+       if (cnt != nstrs)
+       {
+          DBFreeMatspecies(mm);
+          db_perror(objname, E_MALFORMED, me);
+          return NULL;
+       }
    }
 
    return (mm);
@@ -3595,7 +3657,7 @@ db_pdb_GetMatspecies (DBfile *_dbfile,   /*DB file pointer */
 SILO_CALLBACK DBcompoundarray *
 db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
 {
-   int            i;
+   int            i, elemlengths_size = 0, values_size = 0, nsum = 0;
    DBfile_pdb    *dbfile = (DBfile_pdb *) _dbfile;
    DBcompoundarray *ca = NULL;
    char          *s, delim[2], *name_vector = NULL;
@@ -3613,7 +3675,7 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
    DEFINE_OBJ("nvalues", &tmpca.nvalues, DB_INT);
    DEFINE_OBJ("datatype", &tmpca.datatype, DB_INT);
    DEFALL_OBJ("elemnames", &name_vector, DB_CHAR);
-   DEFALL_OBJ("elemlengths", &tmpca.elemlengths, DB_INT);
+   DEFALL_OBN("elemlengths", &tmpca.elemlengths, DB_INT, &elemlengths_size);
    if (PJ_GetObject(dbfile->pdb, array_name, &tmp_obj, DB_ARRAY) < 0)
        return NULL;
    if (NULL == (ca = DBAllocCompoundarray()))
@@ -3621,9 +3683,29 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
    *ca = tmpca;
 
    if (ca->nelems <= 0 || ca->nvalues <= 0 || ca->datatype < 0 ||
-       !name_vector) {
+       !name_vector || !ca->elemlengths || elemlengths_size != ca->nelems) {
       DBFreeCompoundarray(ca);
-      db_perror(array_name, E_NOTFOUND, me);
+      FREE(name_vector);
+      db_perror(array_name, E_MALFORMED, me);
+      return NULL;
+   }
+
+   for (i = 0; i < ca->nelems; i++)
+   {
+      if (ca->elemlengths[i] < 0 || nsum > INT_MAX - ca->elemlengths[i])
+      {
+         DBFreeCompoundarray(ca);
+         FREE(name_vector);
+         db_perror(array_name, E_MALFORMED, me);
+         return NULL;
+      }
+      nsum += ca->elemlengths[i];
+   }
+   if (nsum != ca->nvalues)
+   {
+      DBFreeCompoundarray(ca);
+      FREE(name_vector);
+      db_perror(array_name, E_MALFORMED, me);
       return NULL;
    }
 
@@ -3640,6 +3722,13 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
       delim[1] = '\0';
       for (i = 0; i < ca->nelems; i++) {
          s = strtok(i ? NULL : (name_vector + 1), delim);
+         if (!s)
+         {
+            FREE(name_vector);
+            DBFreeCompoundarray(ca);
+            db_perror(array_name, E_MALFORMED, me);
+            return NULL;
+         }
          ca->elemnames[i] = STRDUP(s);
       }
       FREE(name_vector);
@@ -3653,8 +3742,14 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
       ca->datatype = DB_FLOAT;
    }
 
-   DEFALL_OBJ("values", &ca->values, ca->datatype);
-   PJ_GetObject(dbfile->pdb, array_name, &tmp_obj, 0);
+   DEFALL_OBN("values", &ca->values, ca->datatype, &values_size);
+   if (PJ_GetObject(dbfile->pdb, array_name, &tmp_obj, 0) < 0 ||
+       (ca->values && values_size != ca->nvalues))
+   {
+      DBFreeCompoundarray(ca);
+      db_perror(array_name, E_MALFORMED, me);
+      return NULL;
+   }
 
    ca->id = 0;
    ca->name = STRDUP(array_name);
@@ -3700,6 +3795,7 @@ db_pdb_GetCurve (DBfile *_dbfile, char const *name)
    PJcomplist   tmp_obj ;
    DBcurve tmpcu;
    PJcomplist  *_tcl;
+   int          xsize = 0, ysize = 0;
 
    memset(&tmpcu, 0, sizeof(DBcurve));
    INIT_OBJ (&tmp_obj) ;
@@ -3721,6 +3817,13 @@ db_pdb_GetCurve (DBfile *_dbfile, char const *name)
    if (NULL == (cu = DBAllocCurve ())) return NULL ;
    *cu = tmpcu;
 
+   if (cu->npts < 0)
+   {
+      DBFreeCurve(cu);
+      db_perror(name, E_MALFORMED, me);
+      return NULL;
+   }
+
    if (DB_DOUBLE == cu->datatype && PJ_InqForceSingle())
       cu->datatype = DB_FLOAT ;
 
@@ -3737,9 +3840,16 @@ db_pdb_GetCurve (DBfile *_dbfile, char const *name)
          cu->y = NULL;
       } else {
          INIT_OBJ (&tmp_obj) ;
-         DEFALL_OBJ ("xvals", &cu->x, cu->datatype) ;
-         DEFALL_OBJ ("yvals", &cu->y, cu->datatype) ;
-         PJ_GetObject (dbfile->pdb, name, &tmp_obj, 0) ;
+         DEFALL_OBN ("xvals", &cu->x, cu->datatype, &xsize) ;
+         DEFALL_OBN ("yvals", &cu->y, cu->datatype, &ysize) ;
+         if (PJ_GetObject (dbfile->pdb, name, &tmp_obj, 0) < 0 ||
+             (cu->x && xsize != cu->npts) ||
+             (cu->y && ysize != cu->npts))
+         {
+            DBFreeCurve(cu);
+            db_perror(name, E_MALFORMED, me);
+            return NULL;
+         }
       }
    }
 
@@ -4193,6 +4303,9 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
    char           tmpn[256];
    int           *offsetmap = 0, *offsetmapn=0, *offsetmapz=0, lneighbors = 0, tmpoff = 0;
    PJcomplist    *_tcl;
+   int            meshtypes_size = 0, nneighbors_size = 0;
+   int            neighbors_size = 0, back_size = 0;
+   int            lnodelists_size = 0, lzonelists_size = 0;
 
    db_pdb_getobjinfo(dbfile->pdb, (char*)objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -4209,12 +4322,12 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
       DEFINE_OBJ("totlnodelists", &tmpmmadj.totlnodelists, DB_INT);
       DEFINE_OBJ("totlzonelists", &tmpmmadj.totlzonelists, DB_INT);
       DEFINE_OBJ("blockorigin", &tmpmmadj.blockorigin, DB_INT);
-      DEFALL_OBJ("meshtypes", &tmpmmadj.meshtypes, DB_INT);
-      DEFALL_OBJ("nneighbors", &tmpmmadj.nneighbors, DB_INT);
-      DEFALL_OBJ("neighbors", &tmpmmadj.neighbors, DB_INT);
-      DEFALL_OBJ("back", &tmpmmadj.back, DB_INT);
-      DEFALL_OBJ("lnodelists", &tmpmmadj.lnodelists, DB_INT);
-      DEFALL_OBJ("lzonelists", &tmpmmadj.lzonelists, DB_INT);
+      DEFALL_OBN("meshtypes", &tmpmmadj.meshtypes, DB_INT, &meshtypes_size);
+      DEFALL_OBN("nneighbors", &tmpmmadj.nneighbors, DB_INT, &nneighbors_size);
+      DEFALL_OBN("neighbors", &tmpmmadj.neighbors, DB_INT, &neighbors_size);
+      DEFALL_OBN("back", &tmpmmadj.back, DB_INT, &back_size);
+      DEFALL_OBN("lnodelists", &tmpmmadj.lnodelists, DB_INT, &lnodelists_size);
+      DEFALL_OBN("lzonelists", &tmpmmadj.lzonelists, DB_INT, &lzonelists_size);
 
       if (PJ_GetObject(dbfile->pdb, (char*)objname, &tmp_obj, DB_MULTIMESHADJ) < 0)
          return NULL;
@@ -4222,9 +4335,13 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
          return NULL;
       *mmadj = tmpmmadj;
 
-      if (mmadj->nblocks < 0)
+      if (mmadj->nblocks < 0 || mmadj->lneighbors < 0 ||
+          mmadj->totlnodelists < 0 || mmadj->totlzonelists < 0)
          goto fail;
       if (mmadj->nblocks > 0 && (!mmadj->nneighbors || !mmadj->meshtypes))
+         goto fail;
+      if ((mmadj->meshtypes && meshtypes_size != mmadj->nblocks) ||
+          (mmadj->nneighbors && nneighbors_size != mmadj->nblocks))
          goto fail;
 
       if (mmadj->nblocks > 0)
@@ -4243,6 +4360,13 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
          offsetmap[i] = lneighbors;
          lneighbors += mmadj->nneighbors[i];
       }
+
+      if (lneighbors != mmadj->lneighbors ||
+          (mmadj->neighbors && neighbors_size != lneighbors) ||
+          (mmadj->back && back_size != lneighbors) ||
+          (mmadj->lnodelists && lnodelists_size != lneighbors) ||
+          (mmadj->lzonelists && lzonelists_size != lneighbors))
+         goto fail;
 
       if (mmadj->lnodelists && (DBGetDataReadMask2File(_dbfile) & DBMMADJNodelists))
       {
@@ -4400,7 +4524,7 @@ fail:
    FREE(offsetmapn);
    FREE(offsetmapz);
    DBFreeMultimeshadj(mmadj);
-   db_perror("malformed multimeshadj object", E_CALLFAIL, me);
+   db_perror("malformed multimeshadj object", E_MALFORMED, me);
    return NULL;
 }
 
@@ -4462,6 +4586,7 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
    static char   *me = "db_pdb_GetMultivar";
    char          *rpnames = NULL;
    PJcomplist    *_tcl;
+   int            vartypes_size = 0, extents_size = 0, empty_size = 0;
 
    db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -4476,7 +4601,7 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
       DEFINE_OBJ("nvars", &tmpmv.nvars, DB_INT);
       if (DBGetDataReadMask2File(_dbfile) & DBMBNamesAndTypes)
       {
-          DEFALL_OBJ("vartypes", &tmpmv.vartypes, DB_INT);
+          DEFALL_OBN("vartypes", &tmpmv.vartypes, DB_INT, &vartypes_size);
           DEFALL_OBJ("varnames", &tmpnames, DB_CHAR);
       }
       DEFINE_OBJ("ngroups", &tmpmv.ngroups, DB_INT);
@@ -4485,7 +4610,7 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
       if (DBGetDataReadMask2File(_dbfile) & DBMBOptions)
       {
           DEFINE_OBJ("extentssize", &tmpmv.extentssize, DB_INT);
-          DEFALL_OBJ("extents", &tmpmv.extents, DB_DOUBLE);
+          DEFALL_OBN("extents", &tmpmv.extents, DB_DOUBLE, &extents_size);
       }
       DEFINE_OBJ("guihide", &tmpmv.guihide, DB_INT);
       DEFALL_OBJ("region_pnames", &rpnames, DB_CHAR);
@@ -4496,7 +4621,7 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
       DEFALL_OBJ("file_ns", &tmpmv.file_ns, DB_CHAR);
       DEFALL_OBJ("block_ns", &tmpmv.block_ns, DB_CHAR);
       DEFINE_OBJ("block_type", &tmpmv.block_type, DB_INT);
-      DEFALL_OBJ("empty_list", &tmpmv.empty_list, DB_INT);
+      DEFALL_OBN("empty_list", &tmpmv.empty_list, DB_INT, &empty_size);
       DEFINE_OBJ("empty_cnt", &tmpmv.empty_cnt, DB_INT);
       DEFINE_OBJ("repr_block_idx", &tmpmv.repr_block_idx, DB_INT);
       DEFINE_OBJ("missing_value", &tmpmv.missing_value, DB_DOUBLE);
@@ -4506,6 +4631,20 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
       if ((mv = DBAllocMultivar(0)) == NULL)
          return NULL;
       *mv = tmpmv;
+
+      if (mv->nvars < 0 || mv->extentssize < 0 || mv->empty_cnt < 0 ||
+          (mv->vartypes && vartypes_size != mv->nvars) ||
+          (mv->extents &&
+           (mv->nvars != 0 && mv->extentssize > INT_MAX / mv->nvars ||
+            extents_size != mv->nvars * mv->extentssize)) ||
+          (mv->empty_list && empty_size != mv->empty_cnt))
+      {
+         DBFreeMultivar(mv);
+         FREE(tmpnames);
+         FREE(rpnames);
+         db_perror(objname, E_MALFORMED, me);
+         return NULL;
+      }
 
       /* -1 to support zero value indicating NOT SET */
       mv->repr_block_idx = mv->repr_block_idx - 1;
@@ -4518,8 +4657,15 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
        *----------------------------------------*/
 
       if (tmpnames != NULL) {
-         if (mv->nvars > 0)
-             db_StringListToStringArrayMBOpt(tmpnames, &(mv->varnames), &(mv->varnames_alloc), mv->nvars);
+         if (mv->nvars > 0 &&
+             db_StringListToStringArrayMBOpt(tmpnames, &(mv->varnames),
+                                             &(mv->varnames_alloc), mv->nvars) < 0)
+         {
+             DBFreeMultivar(mv);
+             FREE(rpnames);
+             db_perror(objname, E_MALFORMED, me);
+             return NULL;
+         }
        /*FREE(tmpnames); We don't free this here because the MBOpt routine creates pointers into it. */
       }
 
@@ -4608,6 +4754,8 @@ db_pdb_GetMultimat (DBfile *_dbfile, char const *objname)
    PJcomplist     tmp_obj;
    static char   *me = "db_pdb_GetMultimat";
    PJcomplist    *_tcl;
+   int            matnos_size = 0, mixlens_size = 0, matcounts_size = 0;
+   int            matlists_size = 0, empty_size = 0;
 
    db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -4628,10 +4776,10 @@ db_pdb_GetMultimat (DBfile *_dbfile, char const *objname)
       DEFINE_OBJ("nmatnos", &tmpmt.nmatnos, DB_INT);
       if (DBGetDataReadMask2File(_dbfile) & DBMBOptions)
       {
-          DEFALL_OBJ("matnos", &tmpmt.matnos, DB_INT);
-          DEFALL_OBJ("mixlens", &tmpmt.mixlens, DB_INT);
-          DEFALL_OBJ("matcounts", &tmpmt.matcounts, DB_INT);
-          DEFALL_OBJ("matlists", &tmpmt.matlists, DB_INT);
+          DEFALL_OBN("matnos", &tmpmt.matnos, DB_INT, &matnos_size);
+          DEFALL_OBN("mixlens", &tmpmt.mixlens, DB_INT, &mixlens_size);
+          DEFALL_OBN("matcounts", &tmpmt.matcounts, DB_INT, &matcounts_size);
+          DEFALL_OBN("matlists", &tmpmt.matlists, DB_INT, &matlists_size);
       }
       DEFINE_OBJ("guihide", &tmpmt.guihide, DB_INT);
       DEFINE_OBJ("allowmat0", &tmpmt.allowmat0, DB_INT);
@@ -4640,7 +4788,7 @@ db_pdb_GetMultimat (DBfile *_dbfile, char const *objname)
       DEFALL_OBJ("mmesh_name", &tmpmt.mmesh_name, DB_CHAR);
       DEFALL_OBJ("file_ns", &tmpmt.file_ns, DB_CHAR);
       DEFALL_OBJ("block_ns", &tmpmt.block_ns, DB_CHAR);
-      DEFALL_OBJ("empty_list", &tmpmt.empty_list, DB_INT);
+      DEFALL_OBN("empty_list", &tmpmt.empty_list, DB_INT, &empty_size);
       DEFINE_OBJ("empty_cnt", &tmpmt.empty_cnt, DB_INT);
       DEFINE_OBJ("repr_block_idx", &tmpmt.repr_block_idx, DB_INT);
 
@@ -4649,6 +4797,46 @@ db_pdb_GetMultimat (DBfile *_dbfile, char const *objname)
       if ((mt = DBAllocMultimat(0)) == NULL)
          return NULL;
       *mt = tmpmt;
+
+      if (mt->nmats < 0 || mt->nmatnos < 0 || mt->empty_cnt < 0 ||
+          (mt->matnos && matnos_size != mt->nmatnos) ||
+          (mt->mixlens && mixlens_size != mt->nmats) ||
+          (mt->matcounts && matcounts_size != mt->nmats) ||
+          (mt->empty_list && empty_size != mt->empty_cnt))
+      {
+         DBFreeMultimat(mt);
+         FREE(tmpnames);
+         FREE(tmpmaterial_names);
+         FREE(tmpmatcolors);
+         db_perror(objname, E_MALFORMED, me);
+         return NULL;
+      }
+      if (mt->matcounts)
+      {
+         int ii, ntot = 0;
+         for (ii = 0; ii < mt->nmats; ii++)
+         {
+            if (mt->matcounts[ii] < 0 || ntot > INT_MAX - mt->matcounts[ii])
+            {
+               DBFreeMultimat(mt);
+               FREE(tmpnames);
+               FREE(tmpmaterial_names);
+               FREE(tmpmatcolors);
+               db_perror(objname, E_MALFORMED, me);
+               return NULL;
+            }
+            ntot += mt->matcounts[ii];
+         }
+         if (mt->matlists && ntot != matlists_size)
+         {
+            DBFreeMultimat(mt);
+            FREE(tmpnames);
+            FREE(tmpmaterial_names);
+            FREE(tmpmatcolors);
+            db_perror(objname, E_MALFORMED, me);
+            return NULL;
+         }
+      }
 
       /* -1 to support zero value indicating NOT SET */
       mt->repr_block_idx = mt->repr_block_idx - 1;
@@ -4735,6 +4923,7 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
    PJcomplist         tmp_obj;
    static char       *me = "db_pdb_GetMultimatspecies";
    PJcomplist    *_tcl;
+   int                nmatspec_size = 0, empty_size = 0;
 
    db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
    type = DBGetObjtypeTag(tmp);
@@ -4754,14 +4943,14 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
       DEFINE_OBJ("grouporigin", &tmpmms.grouporigin, DB_INT);
       DEFINE_OBJ("guihide", &tmpmms.guihide, DB_INT);
       DEFINE_OBJ("nmat", &tmpmms.nmat, DB_INT);
-      DEFALL_OBJ("nmatspec", &tmpmms.nmatspec, DB_INT);
+      DEFALL_OBN("nmatspec", &tmpmms.nmatspec, DB_INT, &nmatspec_size);
       if (DBGetDataReadMask2File(_dbfile) & DBMatMatnames)
          DEFALL_OBJ("species_names", &tmpspecnames, DB_CHAR);
       if (DBGetDataReadMask2File(_dbfile) & DBMatMatcolors)
          DEFALL_OBJ("speccolors", &tmpcolors, DB_CHAR);
       DEFALL_OBJ("file_ns", &tmpmms.file_ns, DB_CHAR);
       DEFALL_OBJ("block_ns", &tmpmms.block_ns, DB_CHAR);
-      DEFALL_OBJ("empty_list", &tmpmms.empty_list, DB_INT);
+      DEFALL_OBN("empty_list", &tmpmms.empty_list, DB_INT, &empty_size);
       DEFINE_OBJ("empty_cnt", &tmpmms.empty_cnt, DB_INT);
       DEFINE_OBJ("repr_block_idx", &tmpmms.repr_block_idx, DB_INT);
       DEFALL_OBJ("matname", &tmpmms.matname, DB_CHAR);
@@ -4771,6 +4960,18 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
       if ((mms = DBAllocMultimatspecies(0)) == NULL)
          return NULL;
       *mms = tmpmms;
+
+      if (mms->nspec < 0 || mms->nmat < 0 || mms->empty_cnt < 0 ||
+          (mms->nmatspec && nmatspec_size != mms->nmat) ||
+          (mms->empty_list && empty_size != mms->empty_cnt))
+      {
+         DBFreeMultimatspecies(mms);
+         FREE(tmpnames);
+         FREE(tmpspecnames);
+         FREE(tmpcolors);
+         db_perror(objname, E_MALFORMED, me);
+         return NULL;
+      }
 
       /* -1 to support zero value indicating NOT SET */
       mms->repr_block_idx = mms->repr_block_idx - 1;
@@ -4792,7 +4993,17 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
       if (tmpspecnames != NULL)
       {
           for (i = 0; i < mms->nmat; i++)
+          {
+              if (mms->nmatspec[i] < 0 || nstrs > INT_MAX - mms->nmatspec[i])
+              {
+                  DBFreeMultimatspecies(mms);
+                  FREE(tmpspecnames);
+                  FREE(tmpcolors);
+                  db_perror(objname, E_MALFORMED, me);
+                  return NULL;
+              }
               nstrs += mms->nmatspec[i];
+          }
           if (nstrs > 0)
               mms->species_names = DBStringListToStringArray(tmpspecnames, &nstrs, !skipFirstSemicolon);
           FREE(tmpspecnames);
@@ -4802,7 +5013,16 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
           if (nstrs == 0)
           {
               for (i = 0; i < mms->nmat; i++)
+              {
+                  if (mms->nmatspec[i] < 0 || nstrs > INT_MAX - mms->nmatspec[i])
+                  {
+                      DBFreeMultimatspecies(mms);
+                      FREE(tmpcolors);
+                      db_perror(objname, E_MALFORMED, me);
+                      return NULL;
+                  }
                   nstrs += mms->nmatspec[i];
+              }
           }
           if (nstrs > 0)
               mms->speccolors = DBStringListToStringArray(tmpcolors, &nstrs, !skipFirstSemicolon);
@@ -4911,6 +5131,14 @@ db_pdb_GetPointmesh (DBfile *_dbfile, char const *objname)
    if ((pm = DBAllocPointmesh()) == NULL)
       return NULL;
    *pm = tmppm;
+
+   if (pm->ndims < 0 || pm->ndims > NELMTS(pm->coords) || pm->nels < 0)
+   {
+      DBFreePointmesh(pm);
+      FREE(tmpannums);
+      db_perror(objname, E_MALFORMED, me);
+      return NULL;
+   }
 
    if (tmpannums != NULL)
    {
@@ -5044,7 +5272,8 @@ db_pdb_GetPointvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *mv = tmpmv;
 
-    if (mv->nvals < 0 || (mv->nvals > 1 && (mv->nvals > NELMTS(_ptvalstr))))
+    if (mv->nvals < 0 || (mv->nvals > 1 && (mv->nvals > NELMTS(_ptvalstr))) ||
+        mv->nels < 0 || mv->ndims < 0 || mv->ndims > 3)
     {
         DBFreeMeshvar(mv);
         db_perror("nvals", E_MALFORMED, me);
@@ -5228,6 +5457,9 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     if (qm->ndims < 0 || qm->ndims > NELMTS(qm->dims))
     {
         DBFreeQuadmesh(qm);
+        FREE(tmpannum);
+        FREE(tmpaznum);
+        db_perror(objname, E_MALFORMED, me);
         return NULL;
     }
 
@@ -5389,7 +5621,8 @@ db_pdb_GetQuadvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *qv = tmpqv;
 
-   if (qv->nvals < 0 || qv->nvals > NELMTS(_valstr))
+   if (qv->nvals < 0 || qv->nvals > NELMTS(_valstr) ||
+       qv->nels < 0 || qv->mixlen < 0)
    {
        DBFreeQuadvar(qv);
        db_perror("nvals", E_MALFORMED, me);
@@ -5585,6 +5818,18 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
    if ((um = DBAllocUcdmesh()) == NULL)
       return NULL;
    *um = tmpum;
+
+   if (um->ndims < 0 || um->ndims > NELMTS(um->coords) || um->nnodes < 0)
+   {
+      DBFreeUcdmesh(um);
+      FREE(flname);
+      FREE(zlname);
+      FREE(elname);
+      FREE(phzlname);
+      FREE(tmpannum);
+      db_perror(meshname, E_MALFORMED, me);
+      return NULL;
+   }
 
    if (tmpannum)
    {
@@ -5883,7 +6128,8 @@ db_pdb_GetUcdvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *uv = tmpuv;
 
-   if (uv->nvals < 0 || uv->nvals > NELMTS(_valstr))
+   if (uv->nvals < 0 || uv->nvals > NELMTS(_valstr) ||
+       uv->nels < 0 || uv->mixlen < 0 || uv->ndims < 0 || uv->ndims > 3)
    {
        DBFreeUcdvar(uv);
        db_perror("nvals", E_MALFORMED, me);
@@ -6016,6 +6262,15 @@ db_pdb_GetCsgmesh (DBfile *_dbfile, char const *meshname)
    if (PJ_GetObject(dbfile->pdb, (char*) meshname, &tmp_obj, DB_CSGMESH) < 0)
       return NULL;
 
+   if (tmpcsgm.ndims < 0 || tmpcsgm.ndims > NELMTS(tmpcsgm.labels) ||
+       tmpcsgm.nbounds < 0 || tmpcsgm.lcoeffs < 0)
+   {
+      FREE(zlname);
+      FREE(tmpbndnames);
+      db_perror(meshname, E_MALFORMED, me);
+      return NULL;
+   }
+
     /* now that we know the object's data type, we can correctly
        read the coeffs */
     if ((DBGetDataReadMask2File(_dbfile) & DBCSGMBoundaryInfo) && (tmpcsgm.lcoeffs > 0))
@@ -6107,7 +6362,7 @@ db_pdb_GetCsgvar (DBfile *_dbfile, char const *objname)
       return NULL;
    *csgv = tmpcsgv;
 
-   if (csgv->nvals < 0 || csgv->nvals > NELMTS(_valstr))
+   if (csgv->nvals < 0 || csgv->nvals > NELMTS(_valstr) || csgv->nels < 0)
    {
        DBFreeCsgvar(csgv);
        db_perror("nvals", E_MALFORMED, me);
@@ -6223,6 +6478,14 @@ db_pdb_GetFacelist(DBfile *_dbfile, char const *objname)
        return NULL;
     *fl = tmpfl;
 
+    if (fl->ndims < 0 || fl->ndims > 3 || fl->nfaces < 0 ||
+        fl->lnodelist < 0 || fl->nshapes < 0 || fl->ntypes < 0)
+    {
+        DBFreeFacelist(fl);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
+
     return fl;
 }
 
@@ -6306,6 +6569,15 @@ db_pdb_GetZonelist(DBfile *_dbfile, char const *objname)
     if ((zl = DBAllocZonelist()) == NULL)
        return NULL;
     *zl = tmpzl;
+
+    if (zl->ndims < 0 || zl->ndims > 3 || zl->nzones < 0 ||
+        zl->lnodelist < 0 || zl->nshapes < 0)
+    {
+        DBFreeZonelist(zl);
+        FREE(tmpaznum);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
 
     if (tmpaznum)
     {
@@ -6407,6 +6679,15 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
        return NULL;
     *phzl = tmpphzl;
 
+    if (phzl->nfaces < 0 || phzl->lnodelist < 0 ||
+        phzl->nzones < 0 || phzl->lfacelist < 0)
+    {
+        DBFreePHZonelist(phzl);
+        FREE(tmpaznum);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
+
     if (tmpaznum)
     {
         phzl->alt_zonenum_vars = DBStringListToStringArray(tmpaznum, 0, !skipFirstSemicolon);
@@ -6485,6 +6766,15 @@ db_pdb_GetCSGZonelist(DBfile *_dbfile, char const *objname)
 
     if (PJ_GetObject(dbfile->pdb, (char*) objname, &tmp_obj, DB_CSGZONELIST) < 0)
        return NULL;
+
+    if (tmpzl.nregs < 0 || tmpzl.nzones < 0 || tmpzl.lxform < 0)
+    {
+       FREE(tmprnames);
+       FREE(tmpznames);
+       FREE(tmpaznums);
+       db_perror(objname, E_MALFORMED, me);
+       return NULL;
+    }
 
     /* now that we know the object's data type, we can correctly
        read the xforms */
@@ -7324,7 +7614,8 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    static char   *me = "db_pdb_GetMrgtree";
    DBmrgtree      tmptree;
    DBmrgtnode   **ltree;
-   int            root, num_nodes, i, j, n;
+   int            root = 0, num_nodes, i, j, n;
+   int            scalars_size = 0;
    int           *intArray = 0;
    char          *s, **strArray = 0;
    char          *mrgv_onames = 0, *mrgv_rnames = 0;
@@ -7342,7 +7633,7 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    DEFINE_OBJ("num_nodes", &tmptree.num_nodes, DB_INT);
    DEFINE_OBJ("root", &root, DB_FLOAT);
    DEFALL_OBJ("src_mesh_name", &tmptree.src_mesh_name, DB_CHAR);
-   DEFALL_OBJ("scalars", &intArray, DB_INT);
+   DEFALL_OBN("scalars", &intArray, DB_INT, &scalars_size);
    DEFALL_OBJ("mrgvar_onames", &mrgv_onames, DB_CHAR);
    DEFALL_OBJ("mrgvar_rnames", &mrgv_rnames, DB_CHAR);
 
@@ -7356,7 +7647,43 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    tree->cwr = 0;
    num_nodes = tree->num_nodes;
 
-   if (num_nodes <= 0) return (tree);
+   if (num_nodes < 0 || num_nodes > INT_MAX/6 ||
+       (num_nodes > 0 && (root < 0 || root >= num_nodes)) ||
+       (num_nodes > 0 && (!intArray || scalars_size != num_nodes*6)))
+   {
+      DBFreeMrgtree(tree);
+      FREE(intArray);
+      FREE(mrgv_onames);
+      FREE(mrgv_rnames);
+      db_perror(mrgtree_name, E_MALFORMED, me);
+      return NULL;
+   }
+   if (num_nodes == 0)
+   {
+      FREE(intArray);
+      FREE(mrgv_onames);
+      FREE(mrgv_rnames);
+      return tree;
+   }
+
+   for (i = 0; i < num_nodes; i++)
+   {
+      int narray = intArray[i*6+0];
+      int nsegs = intArray[i*6+3];
+      int nchildren = intArray[i*6+4];
+      int parent = intArray[i*6+5];
+      if (narray < 0 || nsegs < 0 || nchildren < 0 ||
+          parent < -1 || parent >= num_nodes ||
+          (narray && nsegs > INT_MAX/narray))
+      {
+         DBFreeMrgtree(tree);
+         FREE(intArray);
+         FREE(mrgv_onames);
+         FREE(mrgv_rnames);
+         db_perror(mrgtree_name, E_MALFORMED, me);
+         return NULL;
+      }
+   }
 
    /* allocate all the nodes of the tree and a linear list of pointers
    to them */
@@ -7567,11 +7894,11 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
 
     if (gm->num_segments < 0)
     {
-        db_perror("negative num_segments", E_MALFORMED, me);
         DBFreeGroupelmap(gm);
         FREE(segData);
         FREE(fracLengths);
         FREE(fracsArray);
+        db_perror("num_segments<0", E_MALFORMED, me);
         return NULL;
     }
 
@@ -7579,11 +7906,11 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         gm->num_segments != segids_size ||
         (fraclens_size > 0 && gm->num_segments != fraclens_size))
     {
-        db_perror("array not of size num_segements", E_MALFORMED, me);
         DBFreeGroupelmap(gm);
         FREE(segData);
         FREE(fracLengths);
         FREE(fracsArray);
+        db_perror("array size != num_segements", E_MALFORMED, me);
         return NULL;
     }
 
@@ -7721,7 +8048,8 @@ db_pdb_GetMrgvar(DBfile *_dbfile, char const *objname)
    mrgv = (DBmrgvar *) calloc(1, sizeof(DBmrgvar));
    *mrgv = tmpmrgv;
 
-   if (mrgv->ncomps < 0 || mrgv->ncomps > NELMTS(_valstr))
+   if (mrgv->ncomps < 0 || mrgv->ncomps > NELMTS(_valstr) ||
+       mrgv->nregns < 0)
    {
        DBFreeMrgvar(mrgv);
        db_perror("ncomps", E_MALFORMED, me);
