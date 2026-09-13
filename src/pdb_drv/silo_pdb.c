@@ -3977,10 +3977,10 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
 
        if (defv->ndefs < 0)
        {
-           db_perror("negative ndefs", E_MALFORMED, me);
            DBFreeDefvars(defv);
            FREE(tmpnames);
            FREE(tmpdefns);
+           db_perror("negative ndefs", E_MALFORMED, me);
            return NULL;
        }
 
@@ -3989,10 +3989,10 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
            defv->ndefs != defns_size ||
            (guihides_size > 0 && defv->ndefs != guihides_size))
        {
-           db_perror("array not of size ndefs", E_MALFORMED, me);
            DBFreeDefvars(defv);
            FREE(tmpnames);
            FREE(tmpdefns);
+           db_perror("array not of size ndefs", E_MALFORMED, me);
            return NULL;
        }
 
@@ -4228,10 +4228,10 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
           (mm->empty_cnt < 0) ||
           (mm->empty_list && (mm->empty_cnt != emptylist_size)))
       {
-          db_perror(objname, E_MALFORMED, me);
           DBFreeMultimesh(mm);
           FREE(tmpnames);
           FREE(tmpgnames);
+          db_perror(objname, E_MALFORMED, me);
           return NULL;
       }
 
@@ -4255,10 +4255,10 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
       if (tmpnames != NULL) {
           if (db_StringListToStringArrayMBOpt(tmpnames, &(mm->meshnames), &(mm->meshnames_alloc), mm->nblocks) < 0)
           {
-              db_perror(objname, E_MALFORMED, me);
               DBFreeMultimesh(mm);
               FREE(tmpnames);
               FREE(tmpgnames);
+              db_perror(objname, E_MALFORMED, me);
               return NULL;
           }
        /*FREE(tmpnames); We don't free this here because the MBOpt routine creates pointers into it. */
@@ -4268,10 +4268,10 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
          mm->groupnames = DBStringListToStringArray(tmpgnames, &cnt, !skipFirstSemicolon);
          if (!mm->groupnames || cnt != mm->lgroupings)
          {
-             db_perror(objname, E_MALFORMED, me);
              DBFreeMultimesh(mm);
              FREE(tmpnames);
              FREE(tmpgnames);
+             db_perror(objname, E_MALFORMED, me);
              return NULL;
          }
          FREE(tmpgnames);
@@ -6766,50 +6766,50 @@ db_pdb_GetCSGZonelist(DBfile *_dbfile, char const *objname)
 
     if (PJ_GetObject(dbfile->pdb, (char*) objname, &tmp_obj, DB_CSGZONELIST) < 0)
        return NULL;
+    if ((zl = DBAllocCSGZonelist()) == NULL)
+       return NULL;
+    *zl = tmpzl;
 
-    if (tmpzl.nregs < 0 || tmpzl.nzones < 0 || tmpzl.lxform < 0)
+    if (zl->nregs < 0 || zl->nzones < 0 || zl->lxform < 0)
     {
        FREE(tmprnames);
        FREE(tmpznames);
        FREE(tmpaznums);
+       DBFreeCSGZonelist(zl);
        db_perror(objname, E_MALFORMED, me);
        return NULL;
     }
 
     /* now that we know the object's data type, we can correctly
        read the xforms */
-    if ((DBGetDataReadMask2File(_dbfile) & DBZonelistInfo) && (tmpzl.lxform > 0))
+    if ((DBGetDataReadMask2File(_dbfile) & DBZonelistInfo) && (zl->lxform > 0))
     {
         INIT_OBJ(&tmp_obj);
-        if (DB_DOUBLE == tmpzl.datatype && PJ_InqForceSingle()) {
-           tmpzl.datatype = DB_FLOAT;
+        if (DB_DOUBLE == zl->datatype && PJ_InqForceSingle()) {
+           zl->datatype = DB_FLOAT;
         }
 
-        DEFALL_OBJ("xform", &tmpzl.xform, tmpzl.datatype);
+        DEFALL_OBJ("xform", &zl->xform, zl->datatype);
         PJ_GetObject(dbfile->pdb, (char*) objname, &tmp_obj, 0);
     }
 
-    if ((tmprnames != NULL) && (tmpzl.nregs > 0))
+    if ((tmprnames != NULL) && (zl->nregs > 0))
     {
-        tmpzl.regnames = DBStringListToStringArray(tmprnames, &tmpzl.nregs, !skipFirstSemicolon);
+        zl->regnames = DBStringListToStringArray(tmprnames, &zl->nregs, !skipFirstSemicolon);
         FREE(tmprnames);
     }
 
-    if ((tmpznames != NULL) && (tmpzl.nzones > 0))
+    if ((tmpznames != NULL) && (zl->nzones > 0))
     {
-        tmpzl.zonenames = DBStringListToStringArray(tmpznames, &tmpzl.nzones, !skipFirstSemicolon);
+        zl->zonenames = DBStringListToStringArray(tmpznames, &zl->nzones, !skipFirstSemicolon);
         FREE(tmpznames);
     }
 
     if (tmpaznums != NULL)
     {
-        tmpzl.alt_zonenum_vars = DBStringListToStringArray(tmpaznums, 0, !skipFirstSemicolon);
+        zl->alt_zonenum_vars = DBStringListToStringArray(tmpaznums, 0, !skipFirstSemicolon);
         FREE(tmpaznums);
     }
-
-    if ((zl = DBAllocCSGZonelist()) == NULL)
-       return NULL;
-    *zl = tmpzl;
 
     return zl;
 }
@@ -8051,6 +8051,8 @@ db_pdb_GetMrgvar(DBfile *_dbfile, char const *objname)
    if (mrgv->ncomps < 0 || mrgv->ncomps > NELMTS(_valstr) ||
        mrgv->nregns < 0)
    {
+       FREE(cnames);
+       FREE(rpnames);
        DBFreeMrgvar(mrgv);
        db_perror("ncomps", E_MALFORMED, me);
        return NULL;
@@ -8076,7 +8078,14 @@ db_pdb_GetMrgvar(DBfile *_dbfile, char const *objname)
       DEFALL_OBJ(_valstr[i], &mrgv->data[i], DB_FLOAT);
    }
 
-   PJ_GetObject(dbfile->pdb, (char*)objname, &tmp_obj, 0);
+   if (PJ_GetObject(dbfile->pdb, (char*)objname, &tmp_obj, 0) < 0)
+   {
+       FREE(cnames);
+       FREE(rpnames);
+       DBFreeMrgvar(mrgv);
+       db_perror("ncomps", E_MALFORMED, me);
+       return NULL;
+   }
 
    if (cnames != NULL)
    {

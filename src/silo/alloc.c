@@ -2118,6 +2118,8 @@ DBFreeMrgvar(DBmrgvar *mrgv)
     if (mrgv == 0)
         return;
 
+    FREE(mrgv->mrgt_name);
+
     if (mrgv->compnames)
     {
         for (i = 0; i < mrgv->ncomps; i++)
