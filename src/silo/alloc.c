@@ -2125,20 +2125,26 @@ DBFreeMrgvar(DBmrgvar *mrgv)
         FREE(mrgv->compnames);
     }
 
-    if (strchr(mrgv->reg_pnames[0], '%') == 0)
+    if (mrgv->reg_pnames)
     {
-        for (i = 0; i < mrgv->nregns; i++)
-            FREE(mrgv->reg_pnames[i]);
+        if (strchr(mrgv->reg_pnames[0], '%') == 0)
+        {
+            for (i = 0; i < mrgv->nregns; i++)
+                FREE(mrgv->reg_pnames[i]);
+        }
+        else
+        {
+            FREE(mrgv->reg_pnames[0]);
+        }
+        FREE(mrgv->reg_pnames);
     }
-    else
-    {
-        FREE(mrgv->reg_pnames[0]);
-    }
-    FREE(mrgv->reg_pnames);
 
-    for (i = 0; i < mrgv->ncomps; i++)
-        FREE(mrgv->data[i]);
-    FREE(mrgv->data);
+    if (mrgv->data)
+    {
+        for (i = 0; i < mrgv->ncomps; i++)
+            FREE(mrgv->data[i]);
+        FREE(mrgv->data);
+    }
 
     FREE(mrgv);
 }
