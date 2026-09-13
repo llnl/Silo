@@ -2416,6 +2416,7 @@ file_deref (obj_t _self, int argc, obj_t argv[]) {
     int         i, j, datatype, nelmts, ndims, dims[NDIMS];
     lex_t       *lex_in=NULL;
     DBobject    *obj=NULL;
+    int         saved_db_errno = DBErrno();
 
     if (1!=argc) {
         out_errorn("file_deref: wrong number of arguments");
@@ -2487,6 +2488,11 @@ file_deref (obj_t _self, int argc, obj_t argv[]) {
         DBSetEnableChecksums(1);
     else
         DBSetEnableChecksums(0);
+
+    /*
+     * Reset Silo's error number here so we can detect malformed reads
+     */
+    db_errno = E_NOERROR;
 
     /*
      * If the user wants low-level information then get that instead of
@@ -2810,29 +2816,31 @@ file_deref (obj_t _self, int argc, obj_t argv[]) {
      */
     if (!strchr(orig, '/')) {
         for (i=0; i<toc->narray; i++) {
-            DBcompoundarray *ca = DBGetCompoundarray(file,
-                                                     toc->array_names[i]);
-            assert(ca);
-            for (j=0; ca && j<ca->nelems; j++) {
-                if (!strcmp(ca->elemnames[j], orig)) {
-                    if (r_mem) {
-                        out_errorn("file_deref: `%s' is ambiguous", orig);
-                        browser_DBFreeSubarray(r_mem, type);
-                        r_mem = NULL;
-                        type = obj_dest(type);
-                        DBFreeCompoundarray(ca);
-                        goto error;
-                    } else {
-                        r_mem = browser_DBGetSubarray(ca, j, &type);
-                        assert(r_mem);
-                        savefunc = NULL;
-                        freefunc = browser_DBFreeSubarray;
+            DBcompoundarray *ca = DBGetCompoundarray(file, toc->array_names[i]);
+            if (ca) {
+                for (j=0; j<ca->nelems; j++) {
+                    if (!strcmp(ca->elemnames[j], orig)) {
+                        if (r_mem) {
+                            out_errorn("file_deref: `%s' is ambiguous", orig);
+                            browser_DBFreeSubarray(r_mem, type);
+                            r_mem = NULL;
+                            type = obj_dest(type);
+                            DBFreeCompoundarray(ca);
+                            goto error;
+                        } else {
+                            r_mem = browser_DBGetSubarray(ca, j, &type);
+                            if (r_mem) {
+                                savefunc = NULL;
+                                freefunc = browser_DBFreeSubarray;
+                                break;
+                            }
+                        }
                     }
                 }
+                if (r_mem) goto done;
+                toc = DBGetToc(file); /*insure pointer is valid*/
+                DBFreeCompoundarray(ca);
             }
-            if (r_mem) goto done;
-            toc = DBGetToc(file); /*insure pointer is valid*/
-            DBFreeCompoundarray(ca);
         }
     }
 
@@ -2875,16 +2883,18 @@ file_deref (obj_t _self, int argc, obj_t argv[]) {
      * If all else fails then read the object as a DBObject (a low-level
      * PDB-like data structure).
      */
-    DBShowErrors(DB_SUSPEND, NULL);
-    r_mem = browser_DBGetObject(file, base, &type);
-    type_name = NULL;
-    savefunc = browser_DBSaveObject;
-    freefunc = browser_DBFreeObject;
-    DBShowErrors(DB_RESUME, NULL);
-    if (r_mem) goto done;
+    if (DBErrno() == E_NOERROR) {
+        DBShowErrors(DB_SUSPEND, NULL);
+        r_mem = browser_DBGetObject(file, base, &type);
+        type_name = NULL;
+        savefunc = browser_DBSaveObject;
+        freefunc = browser_DBFreeObject;
+        DBShowErrors(DB_RESUME, NULL);
+        if (r_mem) goto done;
+    }
 
-    out_errorn("file_deref: `%s' is not a database object in `%s'",
-               name, self->name);
+    if (DBErrno() == E_NOERROR)
+        out_errorn("file_deref: `%s' is not a database object in `%s'", name, self->name);
 
  error:
     if (obj) {
@@ -2939,6 +2949,7 @@ file_deref (obj_t _self, int argc, obj_t argv[]) {
         out_error("file_deref: problems binding array dimensions", retval);
         retval = obj_dest(retval);
     }
+    db_errno = saved_db_errno;
     return retval;
 }
 
