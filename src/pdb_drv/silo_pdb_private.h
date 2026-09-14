@@ -158,7 +158,7 @@ SILO_CALLBACK int db_pdb_GetComponentNames (DBfile *, char const *, char ***, ch
 
 SILO_CALLBACK int db_pdb_FreeCompressionResources(DBfile *_dbfile, char const *meshname);
 
-PRIVATE int db_pdb_getobjinfo (PDBfile *, char const *, char *, int *);
+PRIVATE int db_pdb_getobjinfo (PDBfile *, char const *, char *, size_t, int *);
 PRIVATE int db_pdb_getvarinfo (PDBfile *, char const *, char *, int *, int *, int);
 
 #ifdef PDB_WRITE

@@ -1955,7 +1955,7 @@ db_hdf5_get_cmemb(hid_t compound_type, int membno, int *ndims/*out*/,
     if (H5T_ARRAY==H5Tget_class(type)) {
         int i;
         *ndims = H5Tget_array_ndims(type);
-        assert(*ndims<=3);
+        if (*ndims < 0 || *ndims > 3) return -1;
         H5Tget_array_dims(type, size);
         type = H5Tget_super(type);
     } else {
@@ -4750,7 +4750,7 @@ _db_hdf5_comprd(DBfile_hdf5 *dbfile, char *name, int ignore_force_single, int *s
     static char *me = "db_hdf5_comprd";
     void        *buf = NULL;
     hid_t       d=-1, fspace=-1, ftype=-1, mtype=-1;
-    int         i, nelmts;
+    hssize_t    i, nelmts;
     void       *retval = NULL;
     
     PROTECT {
@@ -8125,7 +8125,7 @@ db_hdf5_GetVarLength(DBfile *_dbfile, char const *name)
     DBfile_hdf5 *dbfile = (DBfile_hdf5*)_dbfile;
     static char *me = "db_hdf5_GetVarLength";
     hid_t       dset=-1, space=-1;
-    hsize_t     nelmts=-1;
+    hssize_t    nelmts=-1;
 
     PROTECT {
         if ((dset=H5Dopen(dbfile->cwg, name, H5P_DEFAULT))>=0) {
@@ -8152,6 +8152,7 @@ db_hdf5_GetVarLength(DBfile *_dbfile, char const *name)
         } H5E_END_TRY;
     } END_PROTECT;
 
+    if (nelmts > INT_MAX) return INT_MAX;
     return nelmts;
 }
 
@@ -8395,7 +8396,7 @@ db_hdf5_GetVar(DBfile *_dbfile, char const *name)
     DBfile_hdf5 *dbfile = (DBfile_hdf5*)_dbfile;
     static char *me = "db_hdf5_GetVar";
     hid_t       dset=-1, ftype=-1, mtype=-1, space=-1;
-    hsize_t     np;
+    hssize_t    np;
     void        *result=NULL;
 
     PROTECT {
@@ -8410,14 +8411,14 @@ db_hdf5_GetVar(DBfile *_dbfile, char const *name)
 
             /* Choose a memory type based on the file type */
             if ((mtype=hdf2hdf_type(ftype))<0) {
-                db_perror("data type", E_BADARGS, me);
+                db_perror(name, E_CALLFAIL, me);
                 UNWIND();
             }
         
             /* Allocate space for the result */
             np = H5Sget_simple_extent_npoints(space);
 
-            if (np) {
+            if (np>0) {
                 if (NULL==(result=malloc(np * H5Tget_size(mtype)))) {
                     db_perror(NULL, E_NOMEM, me);
                     UNWIND();

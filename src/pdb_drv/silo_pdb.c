@@ -987,7 +987,7 @@ PJ_ReadVariable(PDBfile *file,
    int            num, size, i, okay;
    int            act_datatype, forcing;
    int           *iptr;
-   char           tname[256], *lit;
+   char           tname[1024], *lit;
    float         *local_f = NULL;
    char          *local_c;
    float         *fptr;
@@ -1034,10 +1034,12 @@ PJ_ReadVariable(PDBfile *file,
        *  to type specified in string (default is int).
        *-------------------------------------------------*/
 
-      strcpy(tname, &name[1]);
-      tnmlen = strlen(tname);
-      tnmlen = tnmlen>0?tnmlen:1;
-      tname[tnmlen - 1] = '\0';
+      tnmlen = strlen(&name[1]);
+      strncpy(tname, &name[1], sizeof(tname));
+      if (tnmlen < sizeof(tname))
+          tname[tnmlen-1] = '\0'; /* -1 is to elim the trailing single quote char */
+      else
+          tname[sizeof(tname)-1] = '\0';
 
       if (name[1] == '<')
          lit = &tname[3];
@@ -1112,6 +1114,12 @@ PJ_ReadVariable(PDBfile *file,
       {
          FREE(name);
          return FALSE;
+      }
+
+      if (alloced && num >= 0 && num > nelmts)
+      {
+          FREE(name);
+          return FALSE;
       }
 
       /* If not already allocated, and is not a pointered var, allocate */
@@ -2468,11 +2476,13 @@ PRIVATE int
 db_pdb_getobjinfo (PDBfile       *pdb,
                    char const    *name, /* Name of object to inquire about */
                    char          *type, /* Returned object type of 'name'  */
+                   size_t    type_size, /* Size of returned type name string */
                    int           *num)  /* Returned number of elements */
 {
    char           newname[MAXNAME];
    char          *ctype;
    static char   *me = "db_pdb_getobjinfo";
+   int            len;
 
    if (!pdb)
       return db_perror(NULL, E_NOFILE, me);
@@ -2485,7 +2495,12 @@ db_pdb_getobjinfo (PDBfile       *pdb,
    if (PJ_read(pdb, newname, &ctype) == FALSE) {
       return db_perror("PJ_read", E_CALLFAIL, me);
    }
-   strcpy(type, ctype);
+   len = strlen(ctype);
+   strncpy(type, ctype, type_size);
+   if (len < type_size)
+       type[len] = '\0';
+   else
+       type[type_size-1] = '\0';
    SCFREE(ctype);
 
    sprintf(newname, "%s->ncomponents", name);
@@ -3952,7 +3967,7 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
    static char   *me = "db_pdb_GetDefvars";
    int            types_size, guihides_size, names_size, defns_size;
 
-   db_pdb_getobjinfo(dbfile->pdb, (char *) objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, (char *) objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    /* Read multi-block object */
@@ -4169,7 +4184,7 @@ db_pdb_GetMultimesh (DBfile *_dbfile, char const *objname)
                  dirids_size, extents_size, extzones_size, zncnts_size,
                  groupings_size, grpnames_size, emptylist_size;
 
-   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    if (type == DB_MULTIMESH) {
@@ -4309,7 +4324,7 @@ db_pdb_GetMultimeshadj (DBfile *_dbfile, char const *objname, int nmesh,
    int            neighbors_size = 0, back_size = 0;
    int            lnodelists_size = 0, lzonelists_size = 0;
 
-   db_pdb_getobjinfo(dbfile->pdb, (char*)objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, (char*)objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    if (type == DB_MULTIMESHADJ) {
@@ -4590,7 +4605,7 @@ db_pdb_GetMultivar (DBfile *_dbfile, char const *objname)
    PJcomplist    *_tcl;
    int            vartypes_size = 0, extents_size = 0, empty_size = 0;
 
-   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    if (type == DB_MULTIVAR) {
@@ -4759,7 +4774,7 @@ db_pdb_GetMultimat (DBfile *_dbfile, char const *objname)
    int            matnos_size = 0, mixlens_size = 0, matcounts_size = 0;
    int            matlists_size = 0, empty_size = 0;
 
-   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    if (type == DB_MULTIMAT) {
@@ -4927,7 +4942,7 @@ db_pdb_GetMultimatspecies (DBfile *_dbfile, char const *objname)
    PJcomplist    *_tcl;
    int                nmatspec_size = 0, empty_size = 0;
 
-   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, &ncomps);
+   db_pdb_getobjinfo(dbfile->pdb, objname, tmp, sizeof(tmp), &ncomps);
    type = DBGetObjtypeTag(tmp);
 
    if (type == DB_MULTIMATSPECIES) {
