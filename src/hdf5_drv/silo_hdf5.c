@@ -17062,7 +17062,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         FREE(strArray);
         FREE(intArray);
         FREE(ltree);
-        FREE(tree);
+        DBFreeMrgtree(tree);
         FREE(s);
     } END_PROTECT;
 
