@@ -3977,10 +3977,10 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
 
        if (defv->ndefs < 0)
        {
-           db_perror("negative ndefs", E_MALFORMED, me);
            DBFreeDefvars(defv);
            FREE(tmpnames);
            FREE(tmpdefns);
+           db_perror("ndefs<0", E_MALFORMED, me);
            return NULL;
        }
 
@@ -3989,22 +3989,24 @@ db_pdb_GetDefvars(DBfile *_dbfile, char const *objname)
            defv->ndefs != defns_size ||
            (guihides_size > 0 && defv->ndefs != guihides_size))
        {
-           db_perror("array not of size ndefs", E_MALFORMED, me);
            DBFreeDefvars(defv);
            FREE(tmpnames);
            FREE(tmpdefns);
+           db_perror("array size != ndefs", E_MALFORMED, me);
            return NULL;
        }
 
-       if ((tmpnames != NULL) && (defv->ndefs > 0))
+       if (tmpnames != NULL)
        {
-           defv->names = DBStringListToStringArray(tmpnames, &(defv->ndefs), !skipFirstSemicolon);
+           if (defv->ndefs > 0)
+               defv->names = DBStringListToStringArray(tmpnames, &(defv->ndefs), !skipFirstSemicolon);
            FREE(tmpnames);
        }
 
-       if ((tmpdefns != NULL) && (defv->ndefs > 0))
+       if (tmpdefns != NULL)
        {
-           defv->defns = DBStringListToStringArray(tmpdefns, &(defv->ndefs), !skipFirstSemicolon);
+           if (defv->ndefs > 0)
+               defv->defns = DBStringListToStringArray(tmpdefns, &(defv->ndefs), !skipFirstSemicolon);
            FREE(tmpdefns);
        }
    }
