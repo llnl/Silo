@@ -634,7 +634,8 @@ main(int argc, char *argv[])
                 7,13,12,6,16};
 
             int shapecnt[] = {2, 2, 2, 2, 3};
-            int shapesize[] = {8, 6, 4, 69, 5};
+            int shapesize[] = {8, 6, 4, 0, 5};
+            int shapesize2[] = {8, 6, 4, 69, 5};
             int shapetype[] = {
                 DB_ZONETYPE_HEX,
                 DB_ZONETYPE_PRISM,
@@ -647,9 +648,9 @@ main(int argc, char *argv[])
                 shapecnt, 5);
             DBSetDeprecateWarnings(3);
             DBPutZonelist2(dbfile, "zl2", nzones, 3, nl, LEN(nl), 0, 0, 0, shapetype,
-                shapesize, shapecnt, 5, 0);
+                shapesize2, shapecnt, 5, 0);
             DBPutZonelist2(dbfile, "zl2g", nzones, 3, nl, LEN(nl), 0, 1, 1, shapetype,
-                shapesize, shapecnt, 5, 0);
+                shapesize2, shapecnt, 5, 0);
         }
 
         ol = DBMakeOptlist(3);
