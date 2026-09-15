@@ -7637,6 +7637,7 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    char          *s, **strArray = 0;
    char          *mrgv_onames = 0, *mrgv_rnames = 0;
    PJcomplist    *_tcl;
+   int            seg_ids_size, seg_lens_size, seg_types_size, children_size;
 
    /*------------------------------------------------------------*/
    /*          Comp. Name        Comp. Address     Data Type     */
@@ -7726,10 +7727,20 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
    if (s)
    {
-       strArray = DBStringListToStringArray(s, &num_nodes, !skipFirstSemicolon);
+       int cnt = num_nodes;
+       strArray = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+       FREE(s);
+       if (cnt != num_nodes)
+       {
+           DBFreeMrgtree(tree);
+           FREE(mrgv_onames);
+           FREE(mrgv_rnames);
+           DBFreeStringArray(strArray, cnt);
+           db_perror(mrgtree_name, E_MALFORMED, me);
+           return NULL;
+       }
        for (i = 0; i < num_nodes; i++)
            ltree[i]->name = strArray[i];
-       FREE(s);
        FREE(strArray); /* free only top-level array of pointers */
    }
 
@@ -7739,9 +7750,10 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
    if (s)
    {
-       strArray = DBStringListToStringArray(s, 0, !skipFirstSemicolon);
-       n = 0;
-       for (i = 0; i < num_nodes; i++)
+       int cnt = num_nodes;
+       strArray = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+       FREE(s);
+       for (i = 0, n = 0; i < num_nodes && n < cnt; i++)
        {
            if (ltree[i]->narray == 0)
                continue;
@@ -7759,7 +7771,15 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
                n++;
            }
        }
-       FREE(s);
+       if (n != cnt)
+       {
+           DBFreeMrgtree(tree);
+           FREE(mrgv_onames);
+           FREE(mrgv_rnames);
+           DBFreeStringArray(strArray, cnt);
+           db_perror(mrgtree_name, E_MALFORMED, me);
+           return NULL;
+       }
        FREE(strArray); /* free only top-level array of pointers */
    }
 
@@ -7769,19 +7789,28 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
    if (s)
    {
-       strArray = DBStringListToStringArray(s, &num_nodes, !skipFirstSemicolon);
+       int cnt = num_nodes;
+       strArray = DBStringListToStringArray(s, &cnt, !skipFirstSemicolon);
+       FREE(s);
+       if (cnt != num_nodes)
+       {
+           DBFreeMrgtree(tree);
+           FREE(mrgv_onames);
+           FREE(mrgv_rnames);
+           DBFreeStringArray(strArray, cnt);
+           db_perror(mrgtree_name, E_MALFORMED, me);
+           return NULL;
+       }
        for (i = 0; i < num_nodes; i++)
            ltree[i]->maps_name = strArray[i];
-       FREE(s);
        FREE(strArray); /* free only top-level array of pointers */
    }
 
    /* read the map segment id data */
    INIT_OBJ(&tmp_obj);
-   DEFALL_OBJ("seg_ids", &intArray, DB_INT);
+   DEFALL_OBN("seg_ids", &intArray, DB_INT, &seg_ids_size);
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
-   n = 0;
-   for (i = 0; i < num_nodes; i++)
+   for (i = 0, n = 0; i < num_nodes && n < seg_ids_size; i++)
    {
        int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
        if (ns > 0)
@@ -7792,13 +7821,17 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
        }
    }
    FREE(intArray);
+   if (n != seg_ids_size)
+   {
+       db_perror(mrgtree_name, E_MALFORMED, me);
+       return NULL;
+   }
 
    /* read the map segment len data */
    INIT_OBJ(&tmp_obj);
-   DEFALL_OBJ("seg_lens", &intArray, DB_INT);
+   DEFALL_OBN("seg_lens", &intArray, DB_INT, &seg_lens_size);
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
-   n = 0;
-   for (i = 0; i < num_nodes; i++)
+   for (i = 0, n = 0; i < num_nodes && n < seg_lens_size; i++)
    {
        int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
        if (ns > 0)
@@ -7809,13 +7842,17 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
        }
    }
    FREE(intArray);
+   if (n != seg_lens_size)
+   {
+       db_perror(mrgtree_name, E_MALFORMED, me);
+       return NULL;
+   }
 
    /* read the map segment type data */
    INIT_OBJ(&tmp_obj);
-   DEFALL_OBJ("seg_types", &intArray, DB_INT);
+   DEFALL_OBN("seg_types", &intArray, DB_INT, &seg_types_size);
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
-   n = 0;
-   for (i = 0; i < num_nodes; i++)
+   for (i = 0, n = 0; i < num_nodes && n < seg_types_size; i++)
    {
        int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
        if (ns > 0)
@@ -7826,13 +7863,17 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
        }
    }
    FREE(intArray);
+   if (n != seg_types_size)
+   {
+       db_perror(mrgtree_name, E_MALFORMED, me);
+       return NULL;
+   }
 
    /* read the child ids */
    INIT_OBJ(&tmp_obj);
-   DEFALL_OBJ("children", &intArray, DB_INT);
+   DEFALL_OBN("children", &intArray, DB_INT, &children_size);
    PJ_GetObject(dbfile->pdb, (char*)mrgtree_name, &tmp_obj, 0);
-   n = 0;
-   for (i = 0; i < num_nodes; i++)
+   for (i = 0, n = 0; i < num_nodes && n < children_size; i++)
    {
        int nc = ltree[i]->num_children;
        if (nc > 0)
@@ -7843,6 +7884,11 @@ db_pdb_GetMrgtree(DBfile *_dbfile, char const *mrgtree_name)
        }
    }
    FREE(intArray);
+   if (n != children_size)
+   {
+       db_perror(mrgtree_name, E_MALFORMED, me);
+       return NULL;
+   }
 
    if (mrgv_onames)
    {

@@ -16853,6 +16853,8 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
     DBmrgtnode         **ltree = 0;
     char                *s = 0;
     DBmrgtree           *tree = 0;
+    int                  seg_ids_size, seg_lens_size, seg_types_size, child_ids_size;
+    int                  nStrArray;
     
     PROTECT {
         /* Open object and make sure it's a material */
@@ -16902,6 +16904,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         if (num_nodes > INT_MAX/6 ||
             (num_nodes > 0 && (!intArray || scalars_size != num_nodes*6)))
         {
+            FREE(intArray);
             db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
@@ -16915,6 +16918,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                 parent < -1 || parent >= num_nodes ||
                 (narray && nsegs > INT_MAX/narray))
             {
+                FREE(intArray);
                 db_perror(name, E_MALFORMED, me);
                 UNWIND();
             }
@@ -16938,9 +16942,15 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         FREE(intArray);
 
         /* read the node 'name' member */
+        nStrArray = num_nodes;
         s = (char *)db_hdf5_comprd(dbfile, m.n_name, 1);
-        strArray = DBStringListToStringArray(s, &num_nodes, !skipFirstSemicolon);
-        for (i = 0; (i < num_nodes) && strArray; i++)
+        strArray = DBStringListToStringArray(s, &nStrArray, !skipFirstSemicolon);
+        if (strArray && nStrArray != num_nodes)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+        for (i = 0; i < num_nodes; i++)
             ltree[i]->name = strArray[i];
         FREE(s);
         FREE(strArray); /* free only top-level array of pointers */
@@ -16949,9 +16959,9 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         s = (char *)db_hdf5_comprd(dbfile, m.n_names, 1);
         if (s)
         {
-            strArray = DBStringListToStringArray(s, 0, !skipFirstSemicolon);
-            n = 0;
-            for (i = 0; i < num_nodes; i++)
+            nStrArray = -1;
+            strArray = DBStringListToStringArray(s, &nStrArray, !skipFirstSemicolon);
+            for (i = 0, n = 0; i < num_nodes && n < nStrArray; i++)
             {
                 if (ltree[i]->narray == 0)
                     continue;
@@ -16969,77 +16979,117 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     n++;
                 }
             }
+            if (n != nStrArray)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
         FREE(s);
         FREE(strArray); /* free only top-level array of pointers */
 
         /* read the maps_name data */
+        nStrArray = num_nodes;
         s = (char *)db_hdf5_comprd(dbfile, m.n_maps_name, 1);
-        strArray = DBStringListToStringArray(s, &num_nodes, !skipFirstSemicolon);
+        strArray = DBStringListToStringArray(s, &nStrArray, !skipFirstSemicolon);
+        if (strArray && nStrArray != num_nodes)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
+
         for (i = 0; i < num_nodes; i++)
             ltree[i]->maps_name = strArray[i];
         FREE(s);
         FREE(strArray); /* free only top-level array of pointers */
 
         /* read the map segment id data */
-        intArray = (int *)db_hdf5_comprd(dbfile, m.n_seg_ids, 1);
-        n = 0;
-        for (i = 0; (i < num_nodes) && intArray; i++)
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.n_seg_ids, 1, &seg_ids_size);
+        if (intArray)
         {
-            int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
-            if (ns > 0)
+            for (i = 0, n = 0; i < num_nodes && n < seg_ids_size; i++)
             {
-                ltree[i]->seg_ids = (int*) malloc(ns * sizeof(int));
-                for (j = 0; j < ns; j++)
-                    ltree[i]->seg_ids[j] = intArray[n++];
+                int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
+                if (ns > 0)
+                {
+                    ltree[i]->seg_ids = (int*) malloc(ns * sizeof(int));
+                    for (j = 0; j < ns; j++)
+                        ltree[i]->seg_ids[j] = intArray[n++];
+                }
+            }
+            FREE(intArray);
+            if (n != seg_ids_size)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
             }
         }
-        FREE(intArray);
 
         /* read the map segment len data */
-        intArray = (int *)db_hdf5_comprd(dbfile, m.n_seg_lens, 1);
-        n = 0;
-        for (i = 0; (i < num_nodes) && intArray; i++)
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.n_seg_lens, 1, &seg_lens_size);
+        if (intArray)
         {
-            int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
-            if (ns > 0)
+            for (i = 0, n = 0; i < num_nodes && n < seg_lens_size; i++)
             {
-                ltree[i]->seg_lens = (int*) malloc(ns * sizeof(int));
-                for (j = 0; j < ns; j++)
-                    ltree[i]->seg_lens[j] = intArray[n++];
+                int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
+                if (ns > 0)
+                {
+                    ltree[i]->seg_lens = (int*) malloc(ns * sizeof(int));
+                    for (j = 0; j < ns; j++)
+                        ltree[i]->seg_lens[j] = intArray[n++];
+                }
+            }
+            FREE(intArray);
+            if (n != seg_ids_size)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
             }
         }
-        FREE(intArray);
 
         /* read the map segment type data */
-        intArray = (int *)db_hdf5_comprd(dbfile, m.n_seg_types, 1);
-        n = 0;
-        for (i = 0; (i < num_nodes) && intArray; i++)
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.n_seg_types, 1, &seg_types_size);
+        if (intArray)
         {
-            int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
-            if (ns > 0)
+            for (i = 0, n = 0; i < num_nodes && n < seg_types_size; i++)
             {
-                ltree[i]->seg_types = (int*) malloc(ns * sizeof(int));
-                for (j = 0; j < ns; j++)
-                    ltree[i]->seg_types[j] = intArray[n++];
+                int ns = ltree[i]->nsegs*(ltree[i]->narray?ltree[i]->narray:1);
+                if (ns > 0)
+                {
+                    ltree[i]->seg_types = (int*) malloc(ns * sizeof(int));
+                    for (j = 0; j < ns; j++)
+                        ltree[i]->seg_types[j] = intArray[n++];
+                }
+            }
+            FREE(intArray);
+            if (n != seg_types_size)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
             }
         }
-        FREE(intArray);
 
         /* read the child ids */
-        intArray = (int *)db_hdf5_comprd(dbfile, m.n_children, 1);
-        n = 0;
-        for (i = 0; (i < num_nodes) && intArray; i++)
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.n_children, 1, &child_ids_size);
+        if (intArray)
         {
-            int nc = ltree[i]->num_children;
-            if (nc > 0)
+            for (i = 0, n = 0; i < num_nodes && n < child_ids_size; i++)
             {
-                ltree[i]->children = (DBmrgtnode**) malloc(nc * sizeof(DBmrgtnode*));
-                for (j = 0; j < nc; j++)
-                    ltree[i]->children[j] = ltree[intArray[n++]];
+                int nc = ltree[i]->num_children;
+                if (nc > 0)
+                {
+                    ltree[i]->children = (DBmrgtnode**) malloc(nc * sizeof(DBmrgtnode*));
+                    for (j = 0; j < nc; j++)
+                        ltree[i]->children[j] = ltree[intArray[n++]];
+                }
+            }
+            FREE(intArray);
+            if (n != child_ids_size)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
             }
         }
-        FREE(intArray);
 
         s = (char *)db_hdf5_comprd(dbfile, m.mrgvar_onames, 1);
         if (s) tree->mrgvar_onames = DBStringListToStringArray(s, 0, !skipFirstSemicolon);
@@ -17060,11 +17110,16 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
-        FREE(strArray);
+        FREE(s);
+        DBFreeStringArray(strArray, nStrArray);
         FREE(intArray);
+        for (i = 0; i < num_nodes; i++) {
+            FREE(ltree[i]->name);
+            FREE(ltree[i]->maps_name);
+            FREE(ltree[i]);
+        }
         FREE(ltree);
         DBFreeMrgtree(tree);
-        FREE(s);
     } END_PROTECT;
 
     return tree;

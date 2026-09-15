@@ -653,6 +653,8 @@ _DBQQCalcStride(int stride[], int dims[], int ndims, int major_order)
       * on whether arrays are stored row-major or column-major.
       *-----------------------------------------------------*/
 
+    if (ndims <= 0) return;
+
     if (major_order == DB_ROWMAJOR) {
         stride[0] = 1;
 
@@ -13801,6 +13803,7 @@ PUBLIC void
 DBFreeStringArray(char **strArray, int n)
 {
     int i;
+    if (!strArray) return;
     if (n < 0)
     {
         for (i = 0; strArray[i]; i++)
