@@ -367,7 +367,7 @@ typedef struct context_t {
 #define MAXDIMS_VARWRITE 7
 #define OVER_WRITE      0x0001            /*overwrite DBobject */
 #define FREE_MEM        0x0002            /*free DBobject memory */
-#define NELMTS(X)       (sizeof(X)/sizeof(X[0]))  /*Number of elements */
+#define NELMTS(X)       ((int)(sizeof(X)/sizeof((X)[0])))  /*Number of elements */
 
 #define STR_EQUAL(S1,S2) (!strcmp((S1),(S2)))
 #define STR_BEGINSWITH(S,P) ((strstr((S),(P))==(S))?1:0)

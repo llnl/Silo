@@ -595,7 +595,7 @@ typedef enum {
 #define     E_CHECKSUM  24      /*Checksum failed */
 #define     E_COMPRESSION  25   /*Compression failed */
 #define     E_GRABBED   26      /*Low level driver enabled */
-#define     E_NOTREG    27      /*The dbfile pointer is not resitered. */
+#define     E_NOTREG    27      /*The dbfile pointer is not registered. */
 #define     E_CONCURRENT 28     /*File is opened multiply and not all read-only. */
 #define     E_DRVRCANTOPEN 29   /*Driver cannot open the file. */
 #define     E_BADOPTCLASS 30    /*Optlist contains options for wrong class */
@@ -606,6 +606,7 @@ typedef enum {
 #define     E_OBJBUFFULL  35    /*No more temp. buffer space for object */
 #define     E_NOSILOHDF5 36     /*Not HDF5 file produced by silo */
 #define     E_FILELOCKING 37    /*File locking prevented operation */
+#define     E_MALFORMED 38      /*Object in file is malformed */
 #define     E_NERRORS   50
 
 /* Definitions for MAJOR_ORDER */
