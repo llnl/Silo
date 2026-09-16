@@ -904,7 +904,7 @@ INTERNAL int UM_CalcExtents (DBVCP2_t, int, int, int, void *,
                                  void *);
 INTERNAL int db_ProcessOptlist (int, DBoptlist const * const);
 INTERNAL int db_VariableNameValid(char const *);
-INTERNAL int db_SplitShapelist (DBucdmesh *um);
+INTERNAL int db_SplitShapelist (DBzonelist *zl);
 INTERNAL int db_ResetGlobalData_Csgmesh ();
 INTERNAL int db_ResetGlobalData_Mrgtree();
 INTERNAL int db_ResetGlobalData_PointMesh (int ndims);

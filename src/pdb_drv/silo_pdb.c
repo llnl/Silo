@@ -5886,91 +5886,13 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
    if (um->nnodes>0 && (flname != NULL && strlen(flname) > 0)
        && (DBGetDataReadMask2File(_dbfile) & DBUMFacelist))
    {
-      DBfacelist tmpfaces;
-      memset(&tmpfaces, 0, sizeof(DBfacelist));
-
-
-      /*------------------------------------------------------------*/
-      /*          Comp. Name        Comp. Address     Data Type     */
-      /*------------------------------------------------------------*/
-      INIT_OBJ(&tmp_obj);
-
-      DEFINE_OBJ("ndims", &tmpfaces.ndims, DB_INT);
-      DEFINE_OBJ("nfaces", &tmpfaces.nfaces, DB_INT);
-      DEFINE_OBJ("lnodelist", &tmpfaces.lnodelist, DB_INT);
-      DEFINE_OBJ("nshapes", &tmpfaces.nshapes, DB_INT);
-      DEFINE_OBJ("ntypes", &tmpfaces.ntypes, DB_INT);
-      DEFINE_OBJ("origin", &tmpfaces.origin, DB_INT);
-
-      DEFALL_OBJ("nodelist", &tmpfaces.nodelist, DB_INT);
-      DEFALL_OBJ("shapesize", &tmpfaces.shapesize, DB_INT);
-      DEFALL_OBJ("shapecnt", &tmpfaces.shapecnt, DB_INT);
-      DEFALL_OBJ("typelist", &tmpfaces.typelist, DB_INT);
-      DEFALL_OBJ("types", &tmpfaces.types, DB_INT);
-      DEFALL_OBJ("zoneno", &tmpfaces.zoneno, DB_INT);
-
-      if (PJ_GetObject(dbfile->pdb, flname, &tmp_obj, 0) < 0)
-      {
-         DBFreeUcdmesh(um);
-         return NULL;
-      }
-      if ((um->faces = DBAllocFacelist()) == NULL)
-      {
-         DBFreeUcdmesh(um);
-         return NULL;
-      }
-      *(um->faces) = tmpfaces;
-
+      um->faces = db_pdb_GetFacelist(_dbfile, flname);
    }
 
    if (um->nnodes>0 && (zlname != NULL && strlen(zlname) > 0)
        && (DBGetDataReadMask2File(_dbfile) & DBUMZonelist))
    {
-      DBzonelist tmpzones;
-      memset(&tmpzones, 0, sizeof(DBzonelist));
-
-      /*------------------------------------------------------------*/
-      /*          Comp. Name        Comp. Address     Data Type     */
-      /*------------------------------------------------------------*/
-      INIT_OBJ(&tmp_obj);
-
-      DEFINE_OBJ("ndims", &tmpzones.ndims, DB_INT);
-      DEFINE_OBJ("nzones", &tmpzones.nzones, DB_INT);
-      DEFINE_OBJ("nshapes", &tmpzones.nshapes, DB_INT);
-      DEFINE_OBJ("lnodelist", &tmpzones.lnodelist, DB_INT);
-      DEFINE_OBJ("origin", &tmpzones.origin, DB_INT);
-
-      DEFALL_OBJ("nodelist", &tmpzones.nodelist, DB_INT);
-      DEFALL_OBJ("shapetype", &tmpzones.shapetype, DB_INT);
-      DEFALL_OBJ("shapesize", &tmpzones.shapesize, DB_INT);
-      DEFALL_OBJ("shapecnt", &tmpzones.shapecnt, DB_INT);
-      DEFINE_OBJ("gnznodtype", &tmpzones.gnznodtype, DB_INT);
-
-      /*----------------------------------------------------------*/
-      /* These are optional so set them to their default values   */
-      /*----------------------------------------------------------*/
-      lo_offset = 0;
-      hi_offset = 0;
-      DEFINE_OBJ("lo_offset", &lo_offset, DB_INT);
-      DEFINE_OBJ("hi_offset", &hi_offset, DB_INT);
- 
-      if (DBGetDataReadMask2File(_dbfile) & DBZonelistGhostZoneLabels)
-         DEFALL_OBJ("ghost_zone_labels", &tmpzones.ghost_zone_labels, DB_CHAR);
-
-      if (PJ_GetObject(dbfile->pdb, zlname, &tmp_obj, DB_ZONELIST) < 0)
-      {
-         DBFreeUcdmesh(um);
-         return NULL;
-      }
-      if ((um->zones = DBAllocZonelist()) == NULL)
-      {
-         DBFreeUcdmesh(um);
-         return NULL;
-      }
-      *(um->zones) = tmpzones;
-
-      um->zones->min_index = lo_offset;
-      um->zones->max_index = um->zones->nzones - hi_offset - 1;
+      um->zones = db_pdb_GetZonelist(_dbfile, zlname);
 
       /*----------------------------------------------------------*/
       /* If we have ghost zones, split any group of shapecnt so   */
@@ -5978,28 +5900,17 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
       /* zones.  This will make dealing with ghost zones easier   */
       /* for applications.                                        */
       /*----------------------------------------------------------*/
-      if ((lo_offset != 0 || hi_offset != 0) &&
+      if (um->zones && (um->zones->min_index != 0 || um->zones->max_index != um->zones->nzones-1) &&
           DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
       {
-          db_SplitShapelist (um);
+          db_SplitShapelist (um->zones);
       }
-
-      /* Read optional global zone numbers */
-      um->zones->gnznodtype = um->zones->gnznodtype?um->zones->gnznodtype:DB_INT;
-      if (DBGetDataReadMask2File(_dbfile) & DBZonelistGlobZoneNo) {
-          INIT_OBJ(&tmp_obj);
-          DEFALL_OBJ("gzoneno", &tmpzones.gzoneno, um->zones->gnznodtype);
-          um->zones->gzoneno = 0;
-          if (PJ_GetObject(dbfile->pdb, zlname, &tmp_obj, 0)>=0)
-              um->zones->gzoneno = tmpzones.gzoneno;
-      }
-
    }
 
    if (um->nnodes>0 && elname && *elname) {
+      int beg_size, end_size;
       DBedgelist tmpedges;
       memset(&tmpedges, 0, sizeof(DBedgelist));
-
 
       /*------------------------------------------------------------*/
       /*          Comp. Name        Comp. Address     Data Type     */
@@ -6010,13 +5921,18 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
       DEFINE_OBJ("nedges", &tmpedges.nedges, DB_INT);
       DEFINE_OBJ("origin", &tmpedges.origin, DB_INT);
 
-      DEFALL_OBJ("edge_beg", &tmpedges.edge_beg, DB_INT);
-      DEFALL_OBJ("edge_end", &tmpedges.edge_end, DB_INT);
+      DEFALL_OBN("edge_beg", &tmpedges.edge_beg, DB_INT, &beg_size);
+      DEFALL_OBN("edge_end", &tmpedges.edge_end, DB_INT, &end_size);
 
       if (PJ_GetObject(dbfile->pdb, elname, &tmp_obj, 0) < 0)
       {
          DBFreeUcdmesh(um);
          return NULL;
+      }
+      if (tmpedges.nedges != beg_size || tmpedges.nedges != end_size)
+      {
+          db_perror(elname, E_MALFORMED, me);
+          return NULL;
       }
       if ((um->edges = DBAllocEdgelist()) == NULL)
       {
@@ -6552,6 +6468,7 @@ db_pdb_GetZonelist(DBfile *_dbfile, char const *objname)
     DBzonelist           tmpzl;
     PJcomplist          *_tcl;
     char                *tmpaznum = 0;
+    int                 lo_offset = 0, hi_offset = 0;
 
     /*------------------------------------------------------------*/
     /*          Comp. Name        Comp. Address     Data Type     */
@@ -6567,6 +6484,8 @@ db_pdb_GetZonelist(DBfile *_dbfile, char const *objname)
     DEFINE_OBJ("min_index", &tmpzl.min_index, DB_INT);
     DEFINE_OBJ("max_index", &tmpzl.max_index, DB_INT);
     DEFINE_OBJ("gnznodtype", &tmpzl.gnznodtype, DB_INT);
+    DEFINE_OBJ("lo_offset", &lo_offset, DB_INT);
+    DEFINE_OBJ("hi_offset", &hi_offset, DB_INT);
 
     if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
     {
@@ -6611,6 +6530,27 @@ db_pdb_GetZonelist(DBfile *_dbfile, char const *objname)
        if (PJ_GetObject(dbfile->pdb, objname, &tmp_obj, 0)>=0)
            zl->gzoneno = tmpzl.gzoneno; 
     }
+
+    zl->min_index = lo_offset;
+    zl->max_index = zl->nzones - hi_offset - 1;
+
+    /* We should really do this splitting operation here. But,
+     historically Silo only did this split operation when the
+     zonelist was being obtained as part of a DBGetUcdmesh call.
+     So, we still handle it there instead of here. */
+#if 0
+    /*----------------------------------------------------------*/
+    /* If we have ghost zones, split any group of shapecnt so   */
+    /* all the shapecnt refer to all real zones or all ghost    */
+    /* zones.  This will make dealing with ghost zones easier   */
+    /* for applications.                                        */
+    /*----------------------------------------------------------*/
+    if ((lo_offset != 0 || hi_offset != 0) &&
+        DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
+    {
+        db_SplitShapelist (zl);
+    }
+#endif
 
     return zl;
 }

@@ -13167,7 +13167,7 @@ DBGetComponentNames(DBfile *dbfile, const char *objname,
  *    Moved from silo_pdb.c to public place where any driver can call
  *--------------------------------------------------------------------*/
 INTERNAL int
-db_SplitShapelist (DBucdmesh *um)
+db_SplitShapelist (DBzonelist *zl)
 {
     int       *shapecnt=NULL, *shapesize=NULL, *shapetype=NULL, nshapes;
     int       *zonelist=NULL, nzones;
@@ -13176,14 +13176,14 @@ db_SplitShapelist (DBucdmesh *um)
     int        i, iz, izl, deltaiz;
     int        isplit, splits[3];
 
-    shapecnt  = um->zones->shapecnt;
-    shapesize = um->zones->shapesize;
-    shapetype = um->zones->shapetype;
-    nshapes   = um->zones->nshapes;
-    zonelist  = um->zones->nodelist;
-    min_index = um->zones->min_index;
-    max_index = um->zones->max_index;
-    nzones    = um->zones->nzones;
+    shapecnt  = zl->shapecnt;
+    shapesize = zl->shapesize;
+    shapetype = zl->shapetype;
+    nshapes   = zl->nshapes;
+    zonelist  = zl->nodelist;
+    min_index = zl->min_index;
+    max_index = zl->max_index;
+    nzones    = zl->nzones;
 
     nshapes2   = 0;
     shapecnt2  = ALLOC_N (int, nshapes+2);
@@ -13273,10 +13273,10 @@ db_SplitShapelist (DBucdmesh *um)
     FREE (shapecnt);
     FREE (shapesize);
     FREE (shapetype);
-    um->zones->shapecnt  = shapecnt2;
-    um->zones->shapesize = shapesize2;
-    um->zones->shapetype = shapetype2;
-    um->zones->nshapes   = nshapes2;
+    zl->shapecnt  = shapecnt2;
+    zl->shapesize = shapesize2;
+    zl->shapetype = shapetype2;
+    zl->nshapes   = nshapes2;
 
     return 0;
 }

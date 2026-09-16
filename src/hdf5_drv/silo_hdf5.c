@@ -11771,7 +11771,7 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
                      (um->zones->max_index != um->zones->nzones - 1)) &&
                      (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo))
                 {
-                    db_SplitShapelist (um);
+                    db_SplitShapelist (um->zones);
                 }
             }
         }
@@ -12888,16 +12888,38 @@ db_hdf5_GetZonelist(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
         {
-            zl->shapecnt = (int *)db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapecnt), 1);
-            zl->shapesize = (int *)db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapesize), 1);
-            zl->shapetype = (int *)db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapetype), 1);
-            zl->nodelist = (int *)db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.nodelist), 1);
+            int size1, size2, size3, size4;
+            zl->shapecnt = (int *)_db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapecnt), 1, &size1);
+            zl->shapesize = (int *)_db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapesize), 1, &size2);
+            zl->shapetype = (int *)_db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.shapetype), 1, &size3);
+            zl->nodelist = (int *)_db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.nodelist), 1, &size4);
+            if (size1 != zl->nshapes || size2 != zl->nshapes || (zl->shapetype && (size3 != zl->nshapes)) || size4 != zl->lnodelist)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistGlobZoneNo)
-            zl->gzoneno = db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.gzoneno), 1);
+        {
+            int size1;
+            zl->gzoneno = _db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.gzoneno), 1, &size1);
+            if (zl->gzoneno && (size1 != zl->nzones))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
         zl->gnznodtype = m.gnznodtype?m.gnznodtype:DB_INT;
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistGhostZoneLabels)
-            zl->ghost_zone_labels = (char *)db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.ghost_zone_labels), 1);
+        {
+            int size1;
+            zl->ghost_zone_labels = (char *)_db_hdf5_comprd(dbfile, db_hdf5_resolvename(_dbfile, name, m.ghost_zone_labels), 1, &size1);
+            if (zl->ghost_zone_labels && (size1 != zl->nzones))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
 
         /* alternate zone number variables */
         {
