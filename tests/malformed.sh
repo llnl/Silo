@@ -132,6 +132,7 @@ check_malformed material_objects material_mix 'mix_next="ed"' || exit 1
 check_malformed material_objects matspecies 'ndims=5' || exit 1
 check_malformed material_objects matspecies 'nmat=-1' || exit 1
 check_malformed simple_objects curve 'npts=-1' || exit 1
+check_malformed simple_objects curve 'npts=6' || exit 1
 check_malformed simple_objects compound 'nelems=-1' || exit 1
 check_malformed simple_objects compound 'nvalues=-1' || exit 1
 check_malformed simple_objects defvars 'ndefs=-1' || exit 1

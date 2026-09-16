@@ -9422,8 +9422,15 @@ db_hdf5_GetCurve(DBfile *_dbfile, char const *name)
                 cu->x = NULL;
                 cu->y = NULL;
             } else {
-                cu->x = db_hdf5_comprd(dbfile, m.xvarname, 0);
-                cu->y = db_hdf5_comprd(dbfile, m.yvarname, 0);
+                int xsize, ysize;
+                cu->x = _db_hdf5_comprd(dbfile, m.xvarname, 0, &xsize);
+                cu->y = _db_hdf5_comprd(dbfile, m.yvarname, 0, &ysize);
+                if ((cu->x && (cu->npts != xsize)) ||
+                    (cu->y && (cu->npts != ysize)))
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
             }
         }
         H5Tclose(o);
@@ -9663,20 +9670,42 @@ db_hdf5_GetCsgmesh(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         if ((DBGetDataReadMask2File(_dbfile) & DBCSGMBoundaryInfo) && (m.nbounds > 0))
         {
-            csgm->typeflags = (int *)db_hdf5_comprd(dbfile, m.typeflags, 1);
-            csgm->bndids = (int *)db_hdf5_comprd(dbfile, m.bndids, 1);
+            int size1, size2;
+            csgm->typeflags = (int *)_db_hdf5_comprd(dbfile, m.typeflags, 1, &size1);
+            csgm->bndids = (int *)_db_hdf5_comprd(dbfile, m.bndids, 1, &size2);
+            if (size1 != csgm->nbounds || (csgm->bndids && (size2 != csgm->nbounds)))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
 
         if ((DBGetDataReadMask2File(_dbfile) & DBCSGMBoundaryNames) && (m.nbounds > 0))
         {
             char *tmpbndnames = (char *)db_hdf5_comprd(dbfile, m.bndnames, 1);
             if (tmpbndnames)
-                csgm->bndnames = DBStringListToStringArray(tmpbndnames, &m.nbounds, !skipFirstSemicolon);
-            FREE(tmpbndnames);
+            {
+                int cnt = csgm->nbounds;
+                csgm->bndnames = DBStringListToStringArray(tmpbndnames, &cnt, !skipFirstSemicolon);
+                FREE(tmpbndnames);
+                if (cnt != csgm->nbounds)
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
+            }
         }
 
         if ((DBGetDataReadMask2File(_dbfile) & DBCSGMBoundaryInfo) && (m.lcoeffs > 0))
-            csgm->coeffs = db_hdf5_comprd(dbfile, m.coeffs, 0);
+        {
+            int size1;
+            csgm->coeffs = _db_hdf5_comprd(dbfile, m.coeffs, 0, &size1);
+            if (csgm->coeffs && (size1 != csgm->lcoeffs))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
 
         if ((m.nbounds>0 && m.zonel_name[0] && (DBGetDataReadMask2File(_dbfile) & DBCSGMZonelist)))
             csgm->zones = db_hdf5_GetCSGZonelist(_dbfile, 
@@ -9896,17 +9925,17 @@ db_hdf5_GetCsgvar(DBfile *_dbfile, char const *name)
         csgv->extensive = m.extensive;
         db_SetMissingValueForGet(csgv->missing_value, m.missing_value);
 
-        /* Read the raw data */
-        if (m.nvals>MAX_VARS) {
-            db_perror((char*)name, E_CALLFAIL, me);
-            UNWIND();
-        }
-
         if ((DBGetDataReadMask2File(_dbfile) & DBCSGVData) && m.nvals)
         {
             csgv->vals = (void **)calloc(m.nvals, sizeof(void*));
             for (i=0; i<m.nvals; i++) {
-                csgv->vals[i] = db_hdf5_comprd(dbfile, m.vals[i], 0);
+                int size;
+                csgv->vals[i] = _db_hdf5_comprd(dbfile, m.vals[i], 0, &size);
+                if (size != csgv->nvals)
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
             }
         }
 
@@ -10110,27 +10139,49 @@ db_hdf5_GetCSGZonelist(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
         {
-            zl->typeflags = (int *)db_hdf5_comprd(dbfile, m.typeflags, 1);
-            zl->leftids = (int *)db_hdf5_comprd(dbfile, m.leftids, 1);
-            zl->rightids = (int *)db_hdf5_comprd(dbfile, m.rightids, 1);
-            zl->xform = db_hdf5_comprd(dbfile, m.xform, 0);
-            zl->zonelist = (int *)db_hdf5_comprd(dbfile, m.zonelist, 1);
+            int size1, size2, size3, size4, size5;
+            zl->typeflags = (int *)_db_hdf5_comprd(dbfile, m.typeflags, 1, &size1);
+            zl->leftids = (int *)_db_hdf5_comprd(dbfile, m.leftids, 1, &size2);
+            zl->rightids = (int *)_db_hdf5_comprd(dbfile, m.rightids, 1, &size3);
+            zl->xform = _db_hdf5_comprd(dbfile, m.xform, 0, &size4);
+            zl->zonelist = (int *)_db_hdf5_comprd(dbfile, m.zonelist, 1, &size5);
+            if (size1 != zl->nregs || size2 != zl->nregs || size3 != zl->nregs ||
+               (zl->xform && (size4 != zl->lxform)) ||
+               (size5 != zl->nzones))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
 
         if (DBGetDataReadMask2File(_dbfile) & DBCSGZonelistRegNames)
         {
             char *tmpnames = (char *)db_hdf5_comprd(dbfile, m.regnames, 1);
-            if (tmpnames)
-                zl->regnames = DBStringListToStringArray(tmpnames, &m.nregs, !skipFirstSemicolon);
-            FREE(tmpnames);
+            if (tmpnames) {
+                int cnt = zl->nregs;
+                zl->regnames = DBStringListToStringArray(tmpnames, &cnt, !skipFirstSemicolon);
+                FREE(tmpnames);
+                if (cnt != zl->nregs)
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
+            }
         }
 
         if (DBGetDataReadMask2File(_dbfile) & DBCSGZonelistZoneNames)
         {
             char *tmpnames = (char *)db_hdf5_comprd(dbfile, m.zonenames, 1);
-            if (tmpnames)
-                zl->zonenames = DBStringListToStringArray(tmpnames, &m.nzones, !skipFirstSemicolon);
-            FREE(tmpnames);
+            if (tmpnames) {
+                int cnt = zl->nzones;
+                zl->zonenames = DBStringListToStringArray(tmpnames, &cnt, !skipFirstSemicolon);
+                FREE(tmpnames);
+                if (cnt != zl->nzones)
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
+            }
         }
 
         /* alternate zone number variables */
