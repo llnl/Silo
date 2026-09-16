@@ -76,12 +76,6 @@ ext="pdb"
 [ "$1" = "DB_HDF5" ] && ext="h5"
 
 #
-# Ensure the multi_test executable is available
-#
-multi_test=$(find_file -x tests/bin/multi_test tests/multi_test ./multi_test ../../multi_test)
-[ $? -eq 0 ] || exit 1
-
-#
 # Ensure we have Silo's 'browser' tool available
 #
 browser=$(find_file -x bin/browser tools/browser/browser tools/browser/.libs/browser ../tools/browser/browser ../../../tools/browser/browser)
@@ -95,7 +89,7 @@ e_malformed_code=$(grep E_MALFORMED $silo_header | tr -s ' ' | cut -d' ' -f3)
 [ $? -eq 0 ] || exit 1
 
 #
-# Find text executable to generate data
+# Find text executable to generate data and then resulting data file
 #
 all_objs=$(find_file -x all_silo_objects tests/bin/all_silo_objects)
 [ $? -eq 0 ] || exit 1
@@ -156,6 +150,7 @@ check_malformed point_objects pointvar 'nvals=99' || exit 1
 check_malformed quad_objects quadmesh 'ndims=5' || exit 1
 check_malformed quad_objects quadvar 'nvals=99' || exit 1
 check_malformed ucd_objects ucdmesh 'ndims=5' || exit 1
+check_malformed ucd_objects ucdmesh 'nnodes=8' || exit 1
 check_malformed ucd_objects ucdvar 'nvals=99' || exit 1
 check_malformed ucd_objects zl2 'nzones=-1' || exit 1
 check_malformed flphzl_objects facelist 'nfaces=-1' || exit 1

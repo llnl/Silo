@@ -5777,6 +5777,7 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
    DBucdmesh tmpum;
    PJcomplist    *_tcl;
    char          *tmpannum = 0;
+   int           c0size, c1size, c2size;
 
    /*------------------------------------------------------------*/
    /*          Comp. Name        Comp. Address     Data Type     */
@@ -5801,9 +5802,9 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
 
    if (DBGetDataReadMask2File(_dbfile) & DBUMCoords)
    {
-       DEFALL_OBJ("coord0", &tmpum.coords[0], DB_FLOAT);
-       DEFALL_OBJ("coord1", &tmpum.coords[1], DB_FLOAT);
-       DEFALL_OBJ("coord2", &tmpum.coords[2], DB_FLOAT);
+       DEFALL_OBN("coord0", &tmpum.coords[0], DB_FLOAT, &c0size);
+       DEFALL_OBN("coord1", &tmpum.coords[1], DB_FLOAT, &c1size);
+       DEFALL_OBN("coord2", &tmpum.coords[2], DB_FLOAT, &c2size);
    }
    DEFALL_OBJ("label0", &tmpum.labels[0], DB_CHAR);
    DEFALL_OBJ("label1", &tmpum.labels[1], DB_CHAR);
@@ -5836,7 +5837,10 @@ db_pdb_GetUcdmesh (DBfile *_dbfile, char const *meshname)
       return NULL;
    *um = tmpum;
 
-   if (um->ndims < 0 || um->ndims > NELMTS(um->coords) || um->nnodes < 0)
+   if ((um->ndims < 0 || um->ndims > NELMTS(um->coords) || um->nnodes < 0) ||
+       (um->coords[0] && (c0size != um->nnodes)) ||
+       (um->coords[1] && (c1size != um->nnodes)) ||
+       (um->coords[2] && (c2size != um->nnodes)))
    {
       DBFreeUcdmesh(um);
       FREE(flname);

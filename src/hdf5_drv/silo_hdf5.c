@@ -11783,7 +11783,13 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
         if (DBGetDataReadMask2File(_dbfile) & DBUMCoords)
         {
             for (i=0; i<m.ndims; i++) {
-                um->coords[i] = db_hdf5_comprd(dbfile, m.coord[i], 0);
+                int csize;
+                um->coords[i] = _db_hdf5_comprd(dbfile, m.coord[i], 0, &csize);
+                if (um->coords[i] && (csize != um->nnodes))
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
             }
         }
         if (DBGetDataReadMask2File(_dbfile) & DBUMGlobNodeNo)
