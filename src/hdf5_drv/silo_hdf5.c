@@ -964,7 +964,7 @@ static hid_t    P_ckrdprops = -1;
     for (_j=0; _j<N; _j++) {                                                  \
         _tmp_m = T_##TYPE; /*possible function call*/                         \
         if (_tmp_m>=0) {                                                      \
-            sprintf(_fullname, "%s%d", #NAME, _j);                            \
+            snprintf(_fullname, sizeof(_fullname), "%s%d", #NAME, _j);        \
             db_hdf5_put_cmemb(_mt, _fullname, OFFSET(_m, NAME[_j]), 0, NULL,  \
                               _tmp_m);                                        \
             if (_f && (_tmp_f=_f->T_##TYPE)>=0) {                             \
@@ -1767,7 +1767,7 @@ friendly_name(DBfile *_dbfile, char const *base_name, char const *fmtstr, void c
     if (fmtstr == 0)
         return base_name;
 
-    sprintf(totfmtstr, "%s%s", base_name, fmtstr);
+    snprintf(totfmtstr, sizeof(totfmtstr), "%s%s", base_name, fmtstr);
     if (val == 0)
         return totfmtstr;
 
@@ -1780,9 +1780,9 @@ friendly_name(DBfile *_dbfile, char const *base_name, char const *fmtstr, void c
     typechar = i+1 < flen ? fmtstr[i+1] : '\0';
     switch (typechar)
     {
-        case 'd': sprintf(retval, totfmtstr, *((int const*) val)); break; 
-        case 's': sprintf(retval, totfmtstr, *((char const*) val)); break;
-        case 'f': sprintf(retval, totfmtstr, *((const float*) val)); break;
+        case 'd': snprintf(retval, sizeof(retval), totfmtstr, *((int const*) val)); break; 
+        case 's': snprintf(retval, sizeof(retval), totfmtstr, *((char const*) val)); break;
+        case 'f': snprintf(retval, sizeof(retval), totfmtstr, *((const float*) val)); break;
         default: return totfmtstr;
     }
     return retval;
@@ -4434,8 +4434,9 @@ db_hdf5_handle_ctdt(DBfile_hdf5 *dbfile, int ts, float t, int dts, double dt, in
  *
  *-------------------------------------------------------------------------
  */
+#define _EIGHT 8
 PRIVATE int
-db_hdf5_compname(DBfile_hdf5 *dbfile, char name[8]/*out*/)
+db_hdf5_compname(DBfile_hdf5 *dbfile, char name[_EIGHT]/*out*/)
 {
     static char *me = "db_hdf5_compname";
     hid_t       attr=-1;
@@ -4471,7 +4472,7 @@ db_hdf5_compname(DBfile_hdf5 *dbfile, char name[8]/*out*/)
         H5Aclose(attr);
 
         /* Create a name */
-        sprintf(name, "#%06d", nlinks);
+        snprintf(name, _EIGHT, "#%06d", nlinks);
         
     } CLEANUP {
         H5E_BEGIN_TRY {
@@ -4481,6 +4482,7 @@ db_hdf5_compname(DBfile_hdf5 *dbfile, char name[8]/*out*/)
 
     return 0;
 }
+#undef _EIGHT
 
 /*-------------------------------------------------------------------------
  * Function:    db_hdf5_compwrz
@@ -5929,7 +5931,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
     if (majno != H5_VERS_MAJOR || minno != H5_VERS_MINOR || relno != H5_VERS_RELEASE)
     {
         /* Since headers and libs don't match, write information about headers first */
-        sprintf(hdf5VString, "hdf5-%d.%d.%d%s%s", H5_VERS_MAJOR, H5_VERS_MINOR, H5_VERS_RELEASE,
+        snprintf(hdf5VString, sizeof(hdf5VString), "hdf5-%d.%d.%d%s%s", H5_VERS_MAJOR, H5_VERS_MINOR, H5_VERS_RELEASE,
             strlen(H5_VERS_SUBRELEASE) ? "-" : "", H5_VERS_SUBRELEASE);
         size = strlen(hdf5VString)+1;
         if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5incinfo", hdf5VString, &size, 1, DB_CHAR, nofilters)<0) {
@@ -5938,7 +5940,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
         }
     }
 
-    sprintf(hdf5VString, "hdf5-%d.%d.%d", majno, minno, relno);
+    snprintf(hdf5VString, sizeof(hdf5VString), "hdf5-%d.%d.%d", majno, minno, relno);
     size = strlen(hdf5VString)+1;
     if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5libinfo", hdf5VString, &size, 1, DB_CHAR, nofilters)<0) {
         db_perror("_hdf5libinfo", E_CALLFAIL, me);
@@ -6004,7 +6006,7 @@ db_hdf5_initiate_close(DBfile *_dbfile)
             int n;
             char msg[4096];
             hid_t *ooids = (hid_t *) malloc(noo * sizeof(hid_t));
-            sprintf(msg, "Internal Silo error: %d objects left open in file: ", noo);
+            snprintf(msg, sizeof(msg), "Internal Silo error: %d objects left open in file: ", noo);
 #if HDF5_VERSION_GE(1,6,5)
             H5Fget_obj_ids(dbfile->fid, obj_flags, noo, ooids);
 #else
@@ -6015,7 +6017,7 @@ db_hdf5_initiate_close(DBfile *_dbfile)
             {
                 char name[256], tmp[256];
                 H5Iget_name(ooids[i], name, sizeof(name));
-                sprintf(tmp, "\"%.235s\" (id=%llu), ", name, (unsigned long long) ooids[i]);
+                snprintf(tmp, sizeof(tmp), "\"%.235s\" (id=%llu), ", name, (unsigned long long) ooids[i]);
                 if ((strlen(msg) + strlen(tmp) + 1) >= sizeof(msg))
                     break;
                 strcat(msg, tmp);
@@ -6822,7 +6824,7 @@ copy_obj(hid_t hobj, char const *name, void *op_data)
                     H5Ocopy(hobj, mem_value, dstfile->link, cname, H5P_DEFAULT, H5P_DEFAULT);
 
                     /* update this attribute's entry with name for this dataset */
-                    sprintf(file_value+offset, "%s%s", LINKGRP, cname);
+                    snprintf(file_value+offset, 16, "%s%s", LINKGRP, cname);
                 }
                 else
                 {
@@ -8125,7 +8127,7 @@ db_hdf5_GetVarLength(DBfile *_dbfile, char const *name)
     DBfile_hdf5 *dbfile = (DBfile_hdf5*)_dbfile;
     static char *me = "db_hdf5_GetVarLength";
     hid_t       dset=-1, space=-1;
-    hssize_t    nelmts=-1;
+    hsize_t     nelmts=-1;
 
     PROTECT {
         if ((dset=H5Dopen(dbfile->cwg, name, H5P_DEFAULT))>=0) {
@@ -9178,7 +9180,7 @@ db_hdf5_GetObject(DBfile *_dbfile, char const *name)
                     DBAddStrComponent(obj, memname, mem_value);
                 } else {
                     for (j=0; (size_t)j<nelmts; j++) {
-                        sprintf(bigname, "%s%d", memname, j+1);
+                        snprintf(bigname, sizeof(bigname), "%s%d", memname, j+1);
                         DBAddStrComponent(obj, bigname,
                                           mem_value+j*H5Tget_size(member_type));
                     }
@@ -17526,9 +17528,9 @@ db_hdf5_PutMrgvar(DBfile *_dbfile, char const *name,
             char tmpname[256];
             char const *p = tmpname;
             if (compnames)
-                sprintf(tmpname, "%s_%s", name, compnames[i]);
+                snprintf(tmpname, sizeof(tmpname), "%s_%s", name, compnames[i]);
             else
-                sprintf(tmpname, "%s_comp%d", name, i);
+                snprintf(tmpname, sizeof(tmpname), "%s_comp%d", name, i);
             db_hdf5_compwr(dbfile, datatype, 1, &nregns, data[i],
                 m.data[i]/*out*/, friendly_name(_dbfile,p, "_data", 0));
         }
