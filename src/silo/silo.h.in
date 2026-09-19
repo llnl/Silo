@@ -401,6 +401,15 @@ typedef enum {
     DB_FLOAT_OR_DOUBLE=27  /* for "datatype" component queries on HDF5 driver */
 } DBdatatype;
 
+/* negative values used here so an int can store an index into an array */
+typedef enum {
+    DB_VALIDATE_BAD=-1, /* align "bad" with -1 failure for rest of API */
+    DB_VALIDATE_NONE=-2,
+    DB_VALIDATE_ONLY=-3,
+    DB_VALIDATE_AND=-4,
+    DB_VALIDATE_GOOD=-5
+} DBvalidate;
+
 /* Flags for DBCreate (used only in DBCreate) */
 #define         DB_CLOBBER   0
 #define         DB_NOCLOBBER 1
@@ -2166,6 +2175,7 @@ SILO_API extern DBcsgzonelist *        DBGetCSGZonelist(DBfile *, char const *);
 SILO_API extern DBfacelist *           DBGetFacelist(DBfile *, char const *);
 SILO_API extern DBzonelist *           DBGetZonelist(DBfile *, char const *);
 SILO_API extern DBphzonelist *         DBGetPHZonelist(DBfile *, char const *);
+SILO_API extern int                    DBValidateZonelist(DBzonelist const *zl, int max_node_id);
 SILO_API extern int                    DBInqMeshname(DBfile *, char const *, char *);
 SILO_API extern int                    DBInqMeshtype(DBfile *, char const *);
 SILO_API extern int                    DBPutCompoundarray(DBfile *dbfile, char const *name, char const * const *elemnames,
@@ -2286,6 +2296,7 @@ SILO_API extern void                   DBFreeStringArray(char **strArray, int n)
 SILO_API extern int                    DBIsDifferentDouble(double a, double b, double abstol, double reltol, double reltol_eps);
 SILO_API extern int                    DBIsDifferentLongLong(long long a, long long b, double abstol, double reltol, double reltol_eps);
 SILO_API extern int                    DBCalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *narrs, void ***vfracs);
+SILO_API extern int                    DBValidateMaterial(DBmaterial const *mat);
 SILO_API extern DBmaterial            *DBCalcMaterialFromDenseArrays(int narrs, int ndims, int const *dims, int const *matnos, int dtype, DBVCP2_t const vfracs);
 SILO_API extern char                  *DBGenerateMBBlockName(int idx, DBnamescheme const *fileNS, DBnamescheme const *blockNS,
                                            int emptyCnt, int const *emptyLst);

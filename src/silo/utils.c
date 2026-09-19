@@ -52,7 +52,6 @@ Government or Lawrence Livermore National Security, LLC, and shall not
 be used for advertising or product endorsement purposes.
 */
 
-#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 
@@ -60,7 +59,6 @@ be used for advertising or product endorsement purposes.
 
 static double get_frac(int m, int i, int dtype, DBVCP2_t const vfracs)
 {
-    assert(dtype==DB_FLOAT || dtype==DB_DOUBLE);
     if (dtype == DB_FLOAT)
     {
         float const **ffracs = (float const **) vfracs;
@@ -78,9 +76,8 @@ static double get_frac(int m, int i, int dtype, DBVCP2_t const vfracs)
 
 static void put_frac(void *mix_vf, int mixlen, int dtype, double vf)
 {
-    assert(mix_vf);
-    assert(dtype==DB_FLOAT || dtype==DB_DOUBLE);
-    assert(0 <= vf && vf <= 1);
+    if (!mix_vf) return;
+    if (!(0 <= vf && vf <= 1)) return;
     if (dtype == DB_FLOAT)
     {
         float *fmix_vf = (float *) mix_vf;
@@ -154,7 +151,7 @@ DBmaterial *db_CalcMaterialFromDenseArrays(int narrs, int ndims, int const *dims
 
             if (vf >= 1.0)
             {
-                assert(matlist[z] == notSet);
+                if (!(matlist[z] == notSet)) goto cleanup;
                 matlist[z] = matnos[m];
             }
             else if (vf > 0.0)
@@ -199,7 +196,7 @@ DBmaterial *db_CalcMaterialFromDenseArrays(int narrs, int ndims, int const *dims
                 mixlen++;
             }
         }
-        assert(nmixing==0 || nmixing>=2);
+        if (!(nmixing==0 || nmixing>=2)) goto cleanup;
     }
 
     /* create material object to return */
@@ -264,7 +261,9 @@ int compar_ints(void const *ia, void const *ib)
 }
 
 /* Binary search for a given material number in the sorted
-   list of material numbers. */
+   list of material numbers. If queried multiple times in a row
+   for the same material number, employe a simple accelerator
+   cache to quickly return the same result. */
 PRIVATE
 int mat_index(int nmat_nums, int const *mat_nums, int mat_num)
 {
@@ -300,16 +299,30 @@ int mat_index(int nmat_nums, int const *mat_nums, int mat_num)
        avoid having to test whether to execut it *every*
        lookup. A call of mat_index(0,0,-1) is sufficient
        to cause this reset code to execute. */
-    assert(nmat_nums==0 && mat_nums==0 && mat_num==-1);
-    last_mat_num = -1;
-    last_mat_idx = 0;
+    if (nmat_nums==0 && mat_nums==0 && mat_num==-1)
+    {
+        last_mat_num = -1;
+        last_mat_idx = 0;
+    }
+
     return -1;
 }
 
 
+/*
+ * Purpose: Given a DBmaterial object, compute dense array representation.
+ *          Can also be used to simply validate a DBmaterial object.
+ *
+ * Return value: For a valid DBmaterial object, DB_VALIDATE_GOOD.
+ *               For a malformed DBmaterial object, DB_VALIDATE_BAD or
+ *               a value greater than zero inidicating the index of
+ *               the first zone for which validation failed.
+ */
+
 PRIVATE
-int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *narrs, void ***vfracs)
+int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *narrs, void ***vfracs, DBvalidate validate)
 {
+    int retval = DB_VALIDATE_BAD;
     static char const *me = "db_CalcDenseArraysFromMaterial";
     int i;
     int nzones = 1;
@@ -320,34 +333,35 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     void **matarrs=0, **matarrs_fixed=0;
     float *pflt;
     double *pdbl;
-#ifndef NDEBUG
     float *check_fracs = 0;
-#endif
 
     if (datatype == DB_DOUBLE)
         typesz = (int) sizeof(double);
 
-    if (mat->nmat <= 0)
+    if (mat->nmat <= 0 || mat->mixlen < 0 || mat->ndims < 0 || mat->ndims > 3)
     {
-        etag = E_BADARGS;
+        etag = E_MALFORMED;
         goto cleanup;
     }
 
-    matarrs = (void **) calloc(mat->nmat,sizeof(void *));
-    if (!matarrs) goto cleanup;
-    matarrs_fixed = (void **) calloc(mat->nmat,sizeof(void *));
-    if (!matarrs_fixed) goto cleanup;
+    if (validate != DB_VALIDATE_ONLY)
+    {
+        matarrs = (void **) calloc(mat->nmat,sizeof(void *));
+        if (!matarrs) goto cleanup;
+        matarrs_fixed = (void **) calloc(mat->nmat,sizeof(void *));
+        if (!matarrs_fixed) goto cleanup;
+    }
 
     for (i = 0; i < mat->ndims; i++)
     {
         if (mat->dims[i] < 0)
         {
-            etag = E_BADARGS;
+            etag = E_MALFORMED;
             goto cleanup;
         }
         if ((size_t) mat->dims[i] != 0 && nzones_sz > ((size_t) INT_MAX) / (size_t) mat->dims[i])
         {
-            etag = E_BADARGS;
+            etag = E_MALFORMED;
             goto cleanup;
         }
         nzones_sz *= (size_t) mat->dims[i];
@@ -355,20 +369,22 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
     nzones = (int) nzones_sz;
 
     /* use calloc so vfrac arrays are initialized with zeros */
-    for (i = 0; i < mat->nmat; i++)
+    for (i = 0; i < mat->nmat && validate != DB_VALIDATE_ONLY; i++)
     {
         matarrs[i] = (void *) calloc(nzones, typesz);
         if (!matarrs[i]) goto cleanup;
     }
-#ifndef NDEBUG
-    check_fracs = (float *) calloc(nzones, sizeof(float));
-    if (!check_fracs) goto cleanup;
-#endif
+
+    if (validate != DB_VALIDATE_NONE)
+    {
+        check_fracs = (float *) calloc(nzones, sizeof(float));
+        if (!check_fracs) goto cleanup;
+    }
 
     /* make a copy of matnos and sort it for binary search */
     if ((size_t) mat->nmat > SIZE_MAX / sizeof(int))
     {
-        etag = E_BADARGS;
+        etag = E_MALFORMED;
         goto cleanup;
     }
     matnos_sorted = (int *) malloc((size_t) mat->nmat * sizeof(int));
@@ -384,35 +400,56 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
         if (mat->matlist[i] >= 0) /* clean case */
         {
             int idx = mat_index(mat->nmat, matnos_sorted, mat->matlist[i]);
-            switch (datatype)
+            if (idx < 0)
             {
-                case DB_FLOAT: ((float*)(matarrs[idx]))[i] = 1.0; break;
-                case DB_DOUBLE: ((double*)(matarrs[idx]))[i] = 1.0; break;
+                etag = E_MALFORMED;
+                retval = i;
+                goto cleanup;
             }
-#ifndef NDEBUG
-            check_fracs[i] += 1.0;
-#endif
+            if (validate != DB_VALIDATE_ONLY)
+            {
+                switch (datatype)
+                {
+                    case DB_FLOAT: ((float*)(matarrs[idx]))[i] = 1.0; break;
+                    case DB_DOUBLE: ((double*)(matarrs[idx]))[i] = 1.0; break;
+                }
+            }
+            if (validate != DB_VALIDATE_NONE)
+                check_fracs[i] += 1.0;
         }
         else /* mixing case */
         {
             int mix_idx = -mat->matlist[i] - 1;
             while(mix_idx >= 0)
             {
-                int matno = mat->mix_mat[mix_idx];
-                int idx = mat_index(mat->nmat, matnos_sorted, matno);
+                int matno, idx;
+                if (mix_idx >= mat->mixlen)
+                {
+                    etag = E_MALFORMED;
+                    retval = i;
+                    goto cleanup;
+                }
+                matno = mat->mix_mat[mix_idx];
+                idx = mat_index(mat->nmat, matnos_sorted, matno);
+                if (idx < 0)
+                {
+                    etag = E_MALFORMED;
+                    retval = i;
+                    goto cleanup;
+                }
                 switch (datatype)
                 {
                     case DB_FLOAT:
-                        ((float*)matarrs[idx])[i] = ((float*)mat->mix_vf)[mix_idx];
-#ifndef NDEBUG
-                        check_fracs[i] += ((float*)matarrs[idx])[i];
-#endif
+                        if (validate != DB_VALIDATE_ONLY)
+                            ((float*)matarrs[idx])[i] = ((float*)mat->mix_vf)[mix_idx];
+                        if (validate != DB_VALIDATE_NONE)
+                            check_fracs[i] += ((float*)mat->mix_vf)[mix_idx];
                         break;
                     case DB_DOUBLE:
-                        ((double*)matarrs[idx])[i] = ((double*)mat->mix_vf)[mix_idx];
-#ifndef NDEBUG
-                        check_fracs[i] += ((double*)matarrs[idx])[i];
-#endif
+                        if (validate != DB_VALIDATE_ONLY)
+                            ((double*)matarrs[idx])[i] = ((double*)mat->mix_vf)[mix_idx];
+                        if (validate != DB_VALIDATE_NONE)
+                            check_fracs[i] += ((double*)mat->mix_vf)[mix_idx];
                         break;
                 }
                 mix_idx = mat->mix_next[mix_idx] - 1;
@@ -420,26 +457,35 @@ int db_CalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *nar
         }
     }
 
-#ifndef NDEBUG
-    /* sanity check */
-    for (i = 0; i < nzones; i++)
-        assert(0.999 <= check_fracs[i] && check_fracs[i] < 1.001);
-    FREE(check_fracs);
-#endif
+    if (validate != DB_VALIDATE_NONE)
+    {
+        /* sanity check */
+        for (i = 0; i < nzones; i++)
+        {
+            if (!(0.999 <= check_fracs[i] && check_fracs[i] < 1.001))
+            {
+                etag = E_MALFORMED;
+                retval = i;
+                goto cleanup;
+            }
+        }
+    }
 
     /* The matarr arrays are in the wrong order because
        we pre-sorted matnos. We need to undue that now. */
     mat_index(0,0,-1);
-    for (i = 0; i < mat->nmat; i++)
-        matarrs_fixed[i] = matarrs[mat_index(mat->nmat, matnos_sorted, mat->matnos[i])];
+    if (validate != DB_VALIDATE_ONLY)
+    {
+        for (i = 0; i < mat->nmat; i++)
+            matarrs_fixed[i] = matarrs[mat_index(mat->nmat, matnos_sorted, mat->matnos[i])];
 
-    free(matarrs);
-    free(matnos_sorted);
+        *narrs = mat->nmat;
+        *vfracs = matarrs_fixed; 
+    }
 
-    *narrs = mat->nmat;
-    *vfracs = matarrs_fixed; 
-
-    return 0;
+    FREE(matarrs);
+    matarrs = 0;
+    retval = DB_VALIDATE_GOOD;
 
 cleanup:
 
@@ -449,14 +495,13 @@ cleanup:
             FREE(matarrs[i]);
         FREE(matarrs);
     }
-    FREE(matarrs_fixed);
     FREE(matnos_sorted);
-#ifndef NDEBUG
     FREE(check_fracs);
-#endif
-    db_perror(NULL, etag, me);
 
-    return -1;
+    if (retval != DB_VALIDATE_GOOD)
+        db_perror(NULL, etag, me);
+
+    return retval;
 }
 
 PUBLIC
@@ -475,8 +520,103 @@ int DBCalcDenseArraysFromMaterial(DBmaterial const *mat, int datatype, int *narr
             API_ERROR("narrs pointer", E_BADARGS);
         if (!vfracs)
             API_ERROR("vfracs pointer", E_BADARGS);
-        retval = db_CalcDenseArraysFromMaterial(mat, datatype, narrs, vfracs);
+        retval = db_CalcDenseArraysFromMaterial(mat, datatype, narrs, vfracs, DB_VALIDATE_AND);
         API_RETURN(retval);
     }
     API_END_NOPOP;
+}
+
+PUBLIC
+int DBValidateMaterial(DBmaterial const *mat)
+{
+    int retval;
+
+    API_BEGIN("DBValidateMaterial", int, -1) {
+        if (!mat)
+            API_ERROR("NULL DBmaterial pointer", E_BADARGS);
+        retval = db_CalcDenseArraysFromMaterial(mat, mat->datatype, 0, 0, DB_VALIDATE_ONLY);
+        API_RETURN(retval);
+    }
+    API_END_NOPOP;
+}
+
+PUBLIC
+int DBValidateZonelist(DBzonelist const *zl, int max_node_id)
+{
+    int nlidx, nzones;
+
+    if (DBIsEmptyZonelist(zl)) return DB_VALIDATE_GOOD;
+
+    if (zl->ndims < 1 || zl->ndims > 3 ||
+        zl->nzones < 0 || zl->nshapes < 0 || zl->lnodelist < 0 ||
+        zl->origin < 0 || zl->origin > 1 ||
+        zl->min_index < 0 || zl->min_index >= zl->nzones ||
+        zl->max_index < 0 || zl->max_index >= zl->nzones ||
+        zl->min_index >= zl->max_index)
+        return DB_VALIDATE_BAD;
+
+    if (max_node_id < 0) max_node_id = INT_MAX;
+
+    nlidx = 0;
+    nzones = 0;
+    for (int i = 0; i < zl->nshapes; i++)
+    {
+        if (zl->ndims == 2 && ((zl->shapetype && zl->shapetype[i] == DB_ZONETYPE_POLYGON && zl->shapesize[i] > 0) ||
+                                zl->shapesize[i] == 0))
+        {
+            if (zl->shapetype && zl->shapetype[i] == DB_ZONETYPE_POLYGON && zl->shapesize[i] > 0)
+            {
+                /* Each of the zl->shapecnt[i] polygons in this segment has the same number
+                   of nodes (zl->shapesize[i]) in the nodelist. */
+                for (int j = 0; j < zl->shapecnt[i] && nlidx < zl->lnodelist; j++, nzones++)
+                {
+                    int nnodes = zl->shapesize[i];
+                    for (int k = 0; k < nnodes && nlidx < zl->lnodelist; k++, nlidx++)
+                        if (zl->nodelist[nlidx] > max_node_id) return nzones;
+                }
+            }
+            else if (zl->shapesize[i] == 0)
+            {
+                /* Each of the zl->shapecnt[i] polygons in this segment has possibly different
+                   node count, encoded as first int of each polygon's node ids in the nodelist. */
+                for (int j = 0; j < zl->shapecnt[i] && nlidx < zl->lnodelist; j++, nzones++)
+                {
+                    int nnodes = zl->nodelist[nlidx++];
+                    for (int k = 0; k < nnodes && nlidx < zl->lnodelist; k++, nlidx++)
+                        if (zl->nodelist[nlidx] > max_node_id) return nzones;
+                }
+            }
+        }
+        else if (zl->ndims == 3 && ((zl->shapetype && zl->shapetype[i] == DB_ZONETYPE_POLYHEDRON) ||
+                                     zl->shapesize[i] > 8 || zl->shapesize[i] == 0))
+        {
+            /* zl->shapecnt[i] polyehdrons are enconded in nodelist starting with count of 
+               faces followed by encoding each face as a polygon, count of nodes followed by
+               the polygon's node ids */
+            for (int j = 0; j < zl->shapecnt[i] && nlidx < zl->lnodelist; j++, nzones++)
+            {
+                int nfaces = zl->nodelist[nlidx++];
+                for (int k = 0; k < nfaces; k++)
+                {
+                    int nnodes = zl->nodelist[nlidx++];
+                    for (int l = 0; l < nnodes && nlidx < zl->lnodelist; l++, nlidx++)
+                        if (zl->nodelist[nlidx] > max_node_id) return nzones;
+                }
+            }
+        }
+        else
+        {
+            for (int j = 0; j < zl->shapecnt[i] && nlidx < zl->lnodelist; j++, nzones++)
+            {
+                int nnodes = zl->shapesize[i];
+                for (int k = 0; k < nnodes; k++, nlidx++)
+                    if (zl->nodelist[nlidx] > max_node_id) return nzones;
+            }
+        }
+    }
+
+    if (nzones != zl->nzones) return DB_VALIDATE_BAD;
+    if (nlidx < zl->lnodelist) return DB_VALIDATE_BAD;
+
+    return DB_VALIDATE_GOOD;
 }
