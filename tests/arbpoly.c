@@ -67,6 +67,7 @@ main(int argc, char *argv[])
     int		    driver=DB_PDB;
     char            *filename = "arbpoly-zoohybrid.silo";
     DBoptlist       *ol;
+    int             retval = 0;
 
     for (i=1; i<argc; i++) {
 	if (!strncmp(argv[i], "DB_PDB",6)) {
@@ -634,7 +635,8 @@ main(int argc, char *argv[])
                 7,13,12,6,16};
 
             int shapecnt[] = {2, 2, 2, 2, 3};
-            int shapesize[] = {8, 6, 4, 69, 5};
+            int shapesize[] = {8, 6, 4, 0, 5};
+            int shapesize2[] = {8, 6, 4, 69, 5};
             int shapetype[] = {
                 DB_ZONETYPE_HEX,
                 DB_ZONETYPE_PRISM,
@@ -647,9 +649,9 @@ main(int argc, char *argv[])
                 shapecnt, 5);
             DBSetDeprecateWarnings(3);
             DBPutZonelist2(dbfile, "zl2", nzones, 3, nl, LEN(nl), 0, 0, 0, shapetype,
-                shapesize, shapecnt, 5, 0);
+                shapesize2, shapecnt, 5, 0);
             DBPutZonelist2(dbfile, "zl2g", nzones, 3, nl, LEN(nl), 0, 1, 1, shapetype,
-                shapesize, shapecnt, 5, 0);
+                shapesize2, shapecnt, 5, 0);
         }
 
         ol = DBMakeOptlist(3);
@@ -685,7 +687,25 @@ main(int argc, char *argv[])
 
     DBClose(dbfile);
 
+    /* Read zonelists back and validate them now */
+    {
+        char *zlnames[] = {"2D/zl1", "2D/zl2", "2D/zlg2", "2Dz/zl1", "2Dz/zl2", "2Dz/zlg2", "3D/zl1", "3D/zl2", "3D/zl2g"};
+        dbfile = DBOpen(filename, driver, DB_READ);
+        for (int i = 0; i < sizeof(zlnames)/sizeof(zlnames[0]); i++)
+        {
+            DBzonelist *zl = DBGetZonelist(dbfile, zlnames[i]);
+            int zlvalid = DBValidateZonelist(zl, -1);
+            if (zlvalid != DB_VALIDATE_GOOD)
+            {
+	        fprintf(stderr, "DBValidateZonelist(\"%s\", -1) fails (returns %d).\n", zlnames[i], zlvalid);
+                retval = 1;
+            }
+            DBFreeZonelist(zl);
+        } 
+        DBClose(dbfile);
+    }
+
     CleanupDriverStuff();
 
-    return (0);
+    return retval;
 }

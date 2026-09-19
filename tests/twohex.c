@@ -227,7 +227,7 @@ main(int argc, char *argv[])
 
 
     DBSetDeprecateWarnings(0);
-    DBPutZonelist(dbfile, "zonelist", 2, 3, nodelist, 12, 0, shapesize,
+    DBPutZonelist(dbfile, "zonelist", 2, 3, nodelist, 16, 0, shapesize,
                   shapecnt, 1);
     DBSetDeprecateWarnings(3);
 

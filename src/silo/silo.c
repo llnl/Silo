@@ -212,7 +212,8 @@ PUBLIC char   *_db_err_list[] =
     "Although this appears to be an HDF5 file,\n"
     "it does not appear to be one produced by Silo\n"
     "and so cannot be open and read by Silo.", /* 36 */
-    "File locking has prevented an operation." /* 37 */
+    "File locking has prevented an operation.", /* 37 */
+    "Malformed file object" /* 38 */
 };
 
 /* Table of contents object count */
@@ -651,6 +652,8 @@ _DBQQCalcStride(int stride[], int dims[], int ndims, int major_order)
       * Define strides for accessing adjacent elements based
       * on whether arrays are stored row-major or column-major.
       *-----------------------------------------------------*/
+
+    if (ndims <= 0) return;
 
     if (major_order == DB_ROWMAJOR) {
         stride[0] = 1;
@@ -9515,6 +9518,8 @@ DBPutMaterial(
 {
     int i, retval, is_empty = 1;
     int const zdims[10] = {0,0,0,0,0,0,0,0,0,0};
+    DBmaterial dummy_mat;
+    char emsg[64];
 
     API_BEGIN2("DBPutMaterial", int, -1, name) {
         if (!dbfile)
@@ -9529,8 +9534,12 @@ DBPutMaterial(
             API_ERROR("overwrite not allowed", E_NOOVERWRITE);
         if (nmat < 0)
             API_ERROR("nmat<0", E_BADARGS);
-        if (ndims < 0)
-            API_ERROR("ndims<0", E_BADARGS);
+        if (ndims < 0 || ndims > NELMTS(dummy_mat.dims))
+        {
+            snprintf(emsg, sizeof(emsg), "ndims (%d) out of range [0...%d]",
+                ndims, NELMTS(dummy_mat.dims));
+            API_ERROR(emsg, E_BADARGS);
+        }
         if (!dims)
             API_ERROR("dims=0", E_BADARGS);
         for (i = 0; i < ndims; i++)
@@ -13158,7 +13167,7 @@ DBGetComponentNames(DBfile *dbfile, const char *objname,
  *    Moved from silo_pdb.c to public place where any driver can call
  *--------------------------------------------------------------------*/
 INTERNAL int
-db_SplitShapelist (DBucdmesh *um)
+db_SplitShapelist (DBzonelist *zl)
 {
     int       *shapecnt=NULL, *shapesize=NULL, *shapetype=NULL, nshapes;
     int       *zonelist=NULL, nzones;
@@ -13167,14 +13176,14 @@ db_SplitShapelist (DBucdmesh *um)
     int        i, iz, izl, deltaiz;
     int        isplit, splits[3];
 
-    shapecnt  = um->zones->shapecnt;
-    shapesize = um->zones->shapesize;
-    shapetype = um->zones->shapetype;
-    nshapes   = um->zones->nshapes;
-    zonelist  = um->zones->nodelist;
-    min_index = um->zones->min_index;
-    max_index = um->zones->max_index;
-    nzones    = um->zones->nzones;
+    shapecnt  = zl->shapecnt;
+    shapesize = zl->shapesize;
+    shapetype = zl->shapetype;
+    nshapes   = zl->nshapes;
+    zonelist  = zl->nodelist;
+    min_index = zl->min_index;
+    max_index = zl->max_index;
+    nzones    = zl->nzones;
 
     nshapes2   = 0;
     shapecnt2  = ALLOC_N (int, nshapes+2);
@@ -13264,10 +13273,10 @@ db_SplitShapelist (DBucdmesh *um)
     FREE (shapecnt);
     FREE (shapesize);
     FREE (shapetype);
-    um->zones->shapecnt  = shapecnt2;
-    um->zones->shapesize = shapesize2;
-    um->zones->shapetype = shapetype2;
-    um->zones->nshapes   = nshapes2;
+    zl->shapecnt  = shapecnt2;
+    zl->shapesize = shapesize2;
+    zl->shapetype = shapetype2;
+    zl->nshapes   = nshapes2;
 
     return 0;
 }
@@ -13794,6 +13803,7 @@ PUBLIC void
 DBFreeStringArray(char **strArray, int n)
 {
     int i;
+    if (!strArray) return;
     if (n < 0)
     {
         for (i = 0; strArray[i]; i++)
@@ -13884,7 +13894,8 @@ db_StringListToStringArrayMBOpt(char *strList, char ***retArray, char **alloc_fl
     if (n != nblocks)
     {
         free(strArray);
-        return db_perror("incorrect number of block names", E_INTERNAL, me);
+        /*return db_perror("incorrect number of block names", E_INTERNAL, me);*/
+        return -1;
     }
 
     /* ensure we store the originally allocated pointer for later free's */
