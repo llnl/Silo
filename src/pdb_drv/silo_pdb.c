@@ -5409,6 +5409,8 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     DBquadmesh tmpqm;
     PJcomplist    *_tcl;
     char           *tmpannum = 0, *tmpaznum = 0;
+    int            coords_size[3];
+    int            nnodes, nzones, valid;
 
     memset(&tmpqm, 0, sizeof(DBquadmesh));
     tmpqm.base_index[0] = -99999;
@@ -5436,9 +5438,9 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
 
     if (DBGetDataReadMask2File(_dbfile) & DBQMCoords)
     {
-        DEFALL_OBJ("coord0", &tmpqm.coords[0], DB_FLOAT);
-        DEFALL_OBJ("coord1", &tmpqm.coords[1], DB_FLOAT);
-        DEFALL_OBJ("coord2", &tmpqm.coords[2], DB_FLOAT);
+        DEFALL_OBN("coord0", &tmpqm.coords[0], DB_FLOAT, &coords_size[0]);
+        DEFALL_OBN("coord1", &tmpqm.coords[1], DB_FLOAT, &coords_size[1]);
+        DEFALL_OBN("coord2", &tmpqm.coords[2], DB_FLOAT, &coords_size[2]);
     }
     DEFALL_OBJ("label0", &tmpqm.labels[0], DB_CHAR);
     DEFALL_OBJ("label1", &tmpqm.labels[1], DB_CHAR);
@@ -5472,6 +5474,39 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     *qm = tmpqm;
 
     if (qm->ndims < 0 || qm->ndims > NELMTS(qm->dims))
+    {
+        DBFreeQuadmesh(qm);
+        FREE(tmpannum);
+        FREE(tmpaznum);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
+
+    nnodes = nzones = 1;
+    for (int i = 0; i < qm->ndims; i++)
+    {
+        nnodes *= qm->dims[i];
+        nzones *= (qm->dims[i]>0?qm->dims[i]-1:0);
+    }
+
+    valid = E_NOERROR;
+    if (qm->coordtype == DB_COLLINEAR)
+    {
+        for (int i = 0; i < qm->ndims; i++)
+        {
+            if (coords_size[i] != qm->dims[i])
+                valid = E_MALFORMED;
+        }
+    }
+    else
+    {
+        for (int i = 0; i < qm->ndims; i++)
+        {
+            if (coords_size[i] != nnodes)
+                valid = E_MALFORMED;
+        }
+    }
+    if (valid != E_NOERROR)
     {
         DBFreeQuadmesh(qm);
         FREE(tmpannum);

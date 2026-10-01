@@ -10827,9 +10827,8 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
             qm->stride[i] = stride;
             stride *= qm->dims[i];
             nnodes *= qm->dims[i];
-            nzones *= (qm->dims[i]-1);
+            nzones *= (qm->dims[i]>0?qm->dims[i]-1:0);
         }
-printf("nnodes=%d, nzones=%d\n", nnodes, nzones);
 
         PrepareForQuadmeshDecompression(dbfile, name, qm);
 
@@ -11288,9 +11287,18 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
             qv->vals = (void **)calloc(m.nvals, sizeof(void*));
             if (m.mixlen) qv->mixvals = (void **)calloc(m.nvals, sizeof(void*));
             for (i=0; i<m.nvals; i++) {
-                qv->vals[i] = db_hdf5_comprd(dbfile, m.value[i], 0);
+                int size1;
+                qv->vals[i] = _db_hdf5_comprd(dbfile, m.value[i], 0, &size1);
+                if (size1 != qv->nels) {
+                    db_perror(name, E_CALLFAIL, me);
+                    UNWIND();
+                }
                 if (m.mixlen && m.mixed_value[i][0]) {
-                    qv->mixvals[i] = db_hdf5_comprd(dbfile, m.mixed_value[i], 0);
+                    qv->mixvals[i] = _db_hdf5_comprd(dbfile, m.mixed_value[i], 0, &size1);
+                    if (size1 != qv->mixlen) {
+                        db_perror(name, E_CALLFAIL, me);
+                        UNWIND();
+                    }
                 }
             }
         }

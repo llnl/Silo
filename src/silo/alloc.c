@@ -910,9 +910,6 @@ DBFreeQuadmesh(DBquadmesh *msh)
 PUBLIC int
 DBIsEmptyQuadmesh(DBquadmesh const *msh)
 {
-#ifndef _WIN32
-#warning CHECK THIS LOGIC. IF ANY DIM>0, IT IS NOT EMPTY
-#endif
     int i, is_empty = 1;
 
     for (i = 0; msh && i < msh->ndims; i++)
