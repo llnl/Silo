@@ -11906,6 +11906,8 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
         H5Tclose(o);
     } CLEANUP {
         H5E_BEGIN_TRY {
+            DBFreeUcdmesh(um);
+            um = NULL;
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
