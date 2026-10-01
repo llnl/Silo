@@ -10747,7 +10747,7 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
     DBquadmesh          *qm = NULL;
     DBquadmesh_mt       m;
     hid_t               o=-1, attr=-1;
-    int                 _objtype, stride, i;
+    int                 _objtype, stride, i, nnodes, nzones;
     
     PROTECT {
         /* Open object and make sure it's a quadmesh */
@@ -10805,6 +10805,8 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
         qm->guihide = m.guihide;
         qm->mrgtree_name = OPTDUP(m.mrgtree_name);
 
+        nnodes = 1;
+        nzones = 1;
         for (stride=1, i=0; i<qm->ndims; i++) {
             if (qm->datatype == DB_DOUBLE)
             {
@@ -10824,20 +10826,42 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
             qm->base_index[i] = m.baseindex[i];
             qm->stride[i] = stride;
             stride *= qm->dims[i];
+            nnodes *= qm->dims[i];
+            nzones *= (qm->dims[i]-1);
         }
+printf("nnodes=%d, nzones=%d\n", nnodes, nzones);
 
         PrepareForQuadmeshDecompression(dbfile, name, qm);
 
         /* Read coordinate arrays */
         for (i=0; i<qm->ndims; i++) {
-            if (DBGetDataReadMask2File(_dbfile) & DBQMCoords)
-                qm->coords[i] = db_hdf5_comprd(dbfile, m.coord[i], 0);
+            if (DBGetDataReadMask2File(_dbfile) & DBQMCoords) {
+                int size;
+                qm->coords[i] = _db_hdf5_comprd(dbfile, m.coord[i], 0, &size);
+                if ((qm->coordtype == DB_COLLINEAR && size != qm->dims[i]) ||
+                    (qm->coordtype == DB_NONCOLLINEAR && size != nnodes)) {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
+            }
         }
 
-        if (DBGetDataReadMask2File(_dbfile) & DBQMGhostNodeLabels)
-            qm->ghost_node_labels = (char *)db_hdf5_comprd(dbfile, m.ghost_node_labels, 0);
-        if (DBGetDataReadMask2File(_dbfile) & DBQMGhostZoneLabels)
-            qm->ghost_zone_labels = (char *)db_hdf5_comprd(dbfile, m.ghost_zone_labels, 0);
+        if (DBGetDataReadMask2File(_dbfile) & DBQMGhostNodeLabels) {
+            int size;
+            qm->ghost_node_labels = (char *)_db_hdf5_comprd(dbfile, m.ghost_node_labels, 0, &size);
+            if (qm->ghost_node_labels && size != nnodes) {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
+        if (DBGetDataReadMask2File(_dbfile) & DBQMGhostZoneLabels) {
+            int size;
+            qm->ghost_zone_labels = (char *)_db_hdf5_comprd(dbfile, m.ghost_zone_labels, 0, &size);
+            if (qm->ghost_zone_labels && size != nzones) {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
 
         /* alternate node number variables */
         {
