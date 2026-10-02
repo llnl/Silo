@@ -6774,9 +6774,6 @@ copy_obj(hid_t hobj, char const *name, void *op_data)
             UNWIND();
         }
         asize = H5Tget_size(atype);
-#ifndef _MSC_VER
-#warning WHY THIS SIZE
-#endif
         msize = MAX(asize, 3*1024);
         if (NULL==(file_value=(char *)malloc(asize)) ||
             NULL==(mem_value=(char *)malloc(msize)) ||
@@ -6816,6 +6813,9 @@ copy_obj(hid_t hobj, char const *name, void *op_data)
                    the attribute to refer to the copy in the new file */
                 if (strncmp(mem_value, "/.silo/#", 8) == 0)
                 {
+                    int n;
+                    size_t avail = asize - offset;
+
                     /* get unique name for this dataset in dst file */
                     char cname[8];
                     db_hdf5_compname(dstfile, cname);
@@ -6824,7 +6824,12 @@ copy_obj(hid_t hobj, char const *name, void *op_data)
                     H5Ocopy(hobj, mem_value, dstfile->link, cname, H5P_DEFAULT, H5P_DEFAULT);
 
                     /* update this attribute's entry with name for this dataset */
-                    snprintf(file_value+offset, 16, "%s%s", LINKGRP, cname);
+                    n = snprintf(file_value+offset, avail, "%s%s", LINKGRP, cname);
+                    if (n < 0 || (size_t)n >= avail)
+                    {
+                        db_perror(name, E_INTERNAL, me);
+                        UNWIND();
+                    }
                 }
                 else
                 {
