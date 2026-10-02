@@ -66,7 +66,7 @@ This package contains the development files of %{name}.
 %check
 # FIX: Bug in HDF5-1.14.6 causes checksum testing to fail
 # The issue was reported to The HDF Group 10/25/25
-%global testargs --exclude-regex '\(checksums\)'
+%global testargs --parallel 1 --exclude-regex '\(checksums\)'
 %ctest %{?testargs} || %ctest %{?testargs} --rerun-failed --output-on-failure
 
 %files devel
