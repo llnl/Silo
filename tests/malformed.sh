@@ -115,10 +115,15 @@ check_malformed()
         sep="_"
     fi
 
+    # Create temp file to corrupt and then corrupt the specific object
     cp $all_objs_file malformed.$ext || return 1
-    $browser -q -W -l 1 -e "cd $dirname" -e "${objname}${sep}${cname_assign}" malformed.$ext
-    [ $? -eq 0 ] || return 1
+    $browser --proper-exit-code -q -W -l 1 -e "cd $dirname" -e "${objname}${sep}${cname_assign}" malformed.$ext
+    [ $? -eq 0 ] || {
+        echo "Attempted corruption of $dirname/$objname with $cname_assign failed" >&2
+        return 1
+    }
 
+    # Now, try to display that corrupted object in a new browser instance
     $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" malformed.$ext
     [ $? -eq $e_malformed_code ] || {
         echo "expected E_MALFORMED for $dirname/$objname after $cname_assign" >&2
@@ -160,6 +165,8 @@ check_malformed quad_objects quadvar nvals=99 || exit 1
 check_malformed ucd_objects ucdmesh ndims=5 || exit 1
 check_malformed ucd_objects ucdmesh nnodes=8 || exit 1
 check_malformed ucd_objects ucdvar nvals=99 || exit 1
+check_malformed ucd_objects ucdvar nels=9999 || exit 1
+check_malformed ucd_objects ucdvar_mix mixlen=5 || exit 1
 check_malformed ucd_objects zl2 nzones=-1 || exit 1
 check_malformed flphzl_objects facelist nfaces=-1 || exit 1
 check_malformed flphzl_objects phzl nfaces=-1 || exit 1
