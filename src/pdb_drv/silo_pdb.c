@@ -7958,15 +7958,30 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
 
     tot_len = 0;
     for (i = 0; i < gm->num_segments; i++)
-        tot_len += (gm->segment_lengths[i]>0?gm->segment_lengths[i]:0);
+    {
+        int sl = gm->segment_lengths[i];
+
+        if (sl < 0 || sl > segdata_size - tot_len)
+        {
+            DBFreeGroupelmap(gm);
+            FREE(segData);
+            FREE(fracLengths);
+            FREE(fracsArray);
+            db_perror("segment_lengths out of range", E_MALFORMED, me);
+            return NULL;
+        }
+
+        tot_len += sl;
+    }
+
 
     if (segdata_size > 0 && tot_len != segdata_size)
     {
-        db_perror("seg_data size not sum of segment_lengths", E_MALFORMED, me);
         DBFreeGroupelmap(gm);
         FREE(segData);
         FREE(fracLengths);
         FREE(fracsArray);
+        db_perror("seg_data size not sum of segment_lengths", E_MALFORMED, me);
         return NULL;
     }
 
@@ -7988,22 +8003,35 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     /* unflatten frac data if we have it */
     if (fracLengths != NULL)
     {
-
         tot_len = 0;
         for (i = 0; i < gm->num_segments; i++)
-            tot_len += (fracLengths[i]>0?fracLengths[i]:0);
+        {
+            int sl = fracLengths[i];
+
+            if (sl < 0 || sl > fraclens_size - tot_len)
+            {
+                DBFreeGroupelmap(gm);
+                FREE(segData);
+                FREE(fracLengths);
+                FREE(fracsArray);
+                db_perror("frac_lengths out of range", E_MALFORMED, me);
+                return NULL;
+            }
+
+            tot_len += sl;
+        }
 
         if (segfracs_size > 0 && tot_len != segfracs_size)
         {
-            db_perror("seg_fracs size not sum of frac_lengths", E_MALFORMED, me);
             DBFreeGroupelmap(gm);
             FREE(segData);
             FREE(fracLengths);
             FREE(fracsArray);
+            db_perror("seg_fracs size not sum of frac_lengths", E_MALFORMED, me);
             return NULL;
         }
 
-        gm->segment_fracs = (void **)calloc(gm->num_segments, sizeof(void*));
+        gm->segment_fracs = calloc(gm->num_segments, sizeof(void*));
         n = 0;
         for (i = 0; i < gm->num_segments; i++)
         {
