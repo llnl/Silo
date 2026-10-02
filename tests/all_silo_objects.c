@@ -114,6 +114,9 @@ put_ucd_objects(DBfile *db)
     void *uvals[2] = {u0,u1};
     char *unames[2] = {"ucomp0","ucomp1"};
     float uone[4] = {31.f,32.f,33.f,34.f};
+    float mixu0[4] = {41.4,42.f,43.f};
+    float mixu1[4] = {41.4,42.f,43.f};
+    float *mixuvals[2]={mixu0,mixu1};
 
     PUT(DBPutZonelist(db, "zl_old",
                       4, 2, nodelist, 16, 0,
@@ -132,6 +135,10 @@ put_ucd_objects(DBfile *db)
     PUT(DBPutUcdvar(db, "ucdvar", "ucdmesh", 2,
                     (DBCAS_t)unames, uvals, 4,
                     NULL, 0, DB_FLOAT, DB_ZONECENT, NULL));
+
+    PUT(DBPutUcdvar(db, "ucdvar_mix", "ucdmesh", 2,
+                    (DBCAS_t)unames, uvals, 4,
+                    mixuvals, 3, DB_FLOAT, DB_ZONECENT, NULL));
 
     PUT(DBPutUcdvar1(db, "ucdvar_one", "ucdmesh",
                      uone, 4, NULL, 0, DB_FLOAT, DB_ZONECENT, NULL));

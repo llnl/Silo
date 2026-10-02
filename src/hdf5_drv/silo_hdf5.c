@@ -11906,11 +11906,11 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
         H5Tclose(o);
     } CLEANUP {
         H5E_BEGIN_TRY {
-            DBFreeUcdmesh(um);
             um = NULL;
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
+        DBFreeUcdmesh(um);
     } END_PROTECT;
 
 #ifdef HAVE_HZIP
@@ -12289,9 +12289,18 @@ db_hdf5_GetUcdvar(DBfile *_dbfile, char const *name)
             uv->vals = (void **)calloc(m.nvals, sizeof(void*));
             if (m.mixlen) uv->mixvals = (void **)calloc(m.nvals, sizeof(void*));
             for (i=0; i<m.nvals; i++) {
-                uv->vals[i] = db_hdf5_comprd(dbfile, m.value[i], 0);
+                int size;
+                uv->vals[i] = _db_hdf5_comprd(dbfile, m.value[i], 0, &size);
+                if (uv->vals[i] && size != uv->nels) {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
+                }
                 if (m.mixlen && m.mixed_value[i][0]) {
-                    uv->mixvals[i] = db_hdf5_comprd(dbfile, m.mixed_value[i], 0);
+                    uv->mixvals[i] = _db_hdf5_comprd(dbfile, m.mixed_value[i], 0, &size);
+                    if (uv->mixvals[i] && size != uv->mixlen) {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
             }
         }
