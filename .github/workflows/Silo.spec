@@ -5,7 +5,7 @@ Summary:        Mesh and Field I/O Library and Scientific Database
 
 License:        BSD-3-Clause 
 URL:            https://silo.llnl.gov/
-Source0:        https://github.com/LLNL/Silo/archive/%{version}/%{name}-%{version}.tar.gz
+Source0:        Silo-%{version}.tar.gz
 
 BuildRequires:  gcc-c++
 BuildRequires:  cmake >= 3.12
