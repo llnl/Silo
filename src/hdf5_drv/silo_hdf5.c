@@ -12496,12 +12496,23 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         if (DBGetDataReadMask2File(_dbfile) & DBFacelistInfo)
         {
-            fl->nodelist = (int *)db_hdf5_comprd(dbfile, m.nodelist, 1);
-            fl->shapecnt = (int *)db_hdf5_comprd(dbfile, m.shapecnt, 1);
-            fl->shapesize = (int *)db_hdf5_comprd(dbfile, m.shapesize, 1);
-            fl->typelist = (int *)db_hdf5_comprd(dbfile, m.typelist, 1);
-            fl->types = (int *)db_hdf5_comprd(dbfile, m.types, 1);
-            fl->zoneno = (int *)db_hdf5_comprd(dbfile, m.zoneno, 1);
+            int nlsize, scntsize, shszsize, tlsize, tsize, znsize;
+            fl->nodelist = (int *)_db_hdf5_comprd(dbfile, m.nodelist, 1, &nlsize);
+            fl->shapecnt = (int *)_db_hdf5_comprd(dbfile, m.shapecnt, 1, &scntsize);
+            fl->shapesize = (int *)_db_hdf5_comprd(dbfile, m.shapesize, 1, &shszsize);
+            fl->typelist = (int *)_db_hdf5_comprd(dbfile, m.typelist, 1, &tlsize);
+            fl->types = (int *)_db_hdf5_comprd(dbfile, m.types, 1, &tsize);
+            fl->zoneno = (int *)_db_hdf5_comprd(dbfile, m.zoneno, 1, &znsize);
+            if ((fl->nodelist && nlsize != fl->lnodelist) ||
+                (fl->shapecnt && scntsize != fl->nshapes) ||
+                (fl->shapesize && shszsize != fl->nshapes) ||
+                (fl->typelist && tlsize != fl->nshapes) ||
+                (fl->types && tsize != fl->ntypes) ||
+                (fl->zoneno && znsize != fl->nfaces))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
 
         H5Tclose(o);

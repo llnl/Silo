@@ -169,6 +169,9 @@ check_malformed ucd_objects ucdvar nels=9999 || exit 1
 check_malformed ucd_objects ucdvar_mix mixlen=5 || exit 1
 check_malformed ucd_objects zl2 nzones=-1 || exit 1
 check_malformed flphzl_objects facelist nfaces=-1 || exit 1
+check_malformed flphzl_objects facelist nfaces=99 || exit 1
+check_malformed flphzl_objects facelist nshapes=99 || exit 1
+check_malformed flphzl_objects facelist lnodelist=99 || exit 1
 check_malformed flphzl_objects phzl nfaces=-1 || exit 1
 
 # CSG and MRG objects.
