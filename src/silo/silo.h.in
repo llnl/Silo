@@ -2176,6 +2176,7 @@ SILO_API extern DBfacelist *           DBGetFacelist(DBfile *, char const *);
 SILO_API extern DBzonelist *           DBGetZonelist(DBfile *, char const *);
 SILO_API extern DBphzonelist *         DBGetPHZonelist(DBfile *, char const *);
 SILO_API extern int                    DBValidateZonelist(DBzonelist const *zl, int max_node_id);
+SILO_API extern int                    DBValidateFacelist(DBfacelist const *fl, int max_node_id);
 SILO_API extern int                    DBInqMeshname(DBfile *, char const *, char *);
 SILO_API extern int                    DBInqMeshtype(DBfile *, char const *);
 SILO_API extern int                    DBPutCompoundarray(DBfile *dbfile, char const *name, char const * const *elemnames,

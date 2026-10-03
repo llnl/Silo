@@ -561,6 +561,31 @@ int DBValidateZonelist(DBzonelist const *zl, int max_node_id)
     nzones = 0;
     for (int i = 0; i < zl->nshapes; i++)
     {
+        if (zl->shapetype)
+        {
+            switch (zl->shapetype[i])
+            {
+                case DB_ZONETYPE_BEAM:
+                case DB_ZONETYPE_POLYGON:
+                case DB_ZONETYPE_TRIANGLE:
+                case DB_ZONETYPE_QUAD:
+                case DB_ZONETYPE_POLYHEDRON:
+                case DB_ZONETYPE_TET:
+                case DB_ZONETYPE_PYRAMID:
+                case DB_ZONETYPE_PRISM:
+                case DB_ZONETYPE_HEX:
+                case DB_ZONETYPE_CONVEX_HULL:
+                case DB_ZONETYPE_QUAD_BEAM:
+                case DB_ZONETYPE_QUAD_TRIANGLE:
+                case DB_ZONETYPE_QUAD_QUAD:
+                case DB_ZONETYPE_QUAD_TET:
+                case DB_ZONETYPE_QUAD_PYRAMID:
+                case DB_ZONETYPE_QUAD_PRISM:
+                case DB_ZONETYPE_QUAD_HEX:
+                default: return DB_VALIDATE_BAD;
+            }
+        }
+
         if (zl->ndims == 2 && ((zl->shapetype && zl->shapetype[i] == DB_ZONETYPE_POLYGON && zl->shapesize[i] > 0) ||
                                 zl->shapesize[i] == 0))
         {
@@ -619,4 +644,23 @@ int DBValidateZonelist(DBzonelist const *zl, int max_node_id)
     if (nlidx < zl->lnodelist) return DB_VALIDATE_BAD;
 
     return DB_VALIDATE_GOOD;
+}
+
+PUBLIC
+int DBValidateFacelist(DBfacelist const *fl, int max_node_id)
+{
+    DBzonelist zl = {
+        .ndims = fl->ndims,
+        .nzones = fl->nfaces,
+        .nshapes = fl->nshapes,
+        .shapecnt = fl->shapecnt,
+        .shapesize = fl->shapesize,
+        .shapetype = fl->typelist,
+        .nodelist = fl->nodelist,
+        .lnodelist = fl->lnodelist,
+        .origin = fl->origin,
+        .min_index = 0,
+        .max_index = fl->nfaces - 1,
+    };
+    return DBValidateZonelist(&zl, max_node_id);
 }
