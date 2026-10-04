@@ -12507,7 +12507,7 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
                 (fl->shapecnt && scntsize != fl->nshapes) ||
                 (fl->shapesize && shszsize != fl->nshapes) ||
                 (fl->typelist && tlsize != fl->nshapes) ||
-                (fl->types && tsize != fl->ntypes) ||
+                (fl->types && tsize != fl->nfaces) ||
                 (fl->zoneno && znsize != fl->nfaces))
             {
                 db_perror(name, E_MALFORMED, me);

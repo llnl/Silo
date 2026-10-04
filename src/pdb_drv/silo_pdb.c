@@ -6065,6 +6065,7 @@ db_pdb_GetUcdvar (DBfile *_dbfile, char const *objname)
    char          *rpnames = NULL;
    DBucdvar tmpuv;
    PJcomplist    *_tcl;
+   int            size1[NELMTS(_valstr)], size2[NELMTS(_valstr)];
 
    /*------------------------------------------------------------*/
    /*          Comp. Name        Comp. Address     Data Type     */
@@ -6134,14 +6135,25 @@ db_pdb_GetUcdvar (DBfile *_dbfile, char const *objname)
           uv->datatype = DB_FLOAT;
 
       for (i = 0; i < uv->nvals; i++) {
-         DEFALL_OBJ(_valstr[i], &uv->vals[i], DB_FLOAT);
+
+         DEFALL_OBN(_valstr[i], &uv->vals[i], DB_FLOAT, &size1[i]);
 
          if (uv->mixlen > 0) {
-            DEFALL_OBJ(_mixvalstr[i], &uv->mixvals[i], DB_FLOAT);
+            DEFALL_OBN(_mixvalstr[i], &uv->mixvals[i], DB_FLOAT, &size2[i]);
          }
       }
 
       PJ_GetObject(dbfile->pdb, objname, &tmp_obj, 0);
+
+      for (i = 0; i < uv->nvals; i++) {
+          if ((uv->vals[i] && size1[i] != uv->nels) ||
+              (uv->mixvals[i] && size2[i] != uv->mixlen))
+          {
+             DBFreeUcdvar(uv);
+             db_perror("nvals", E_MALFORMED, me);
+             return NULL;
+          }
+      }
    }
 
    if (rpnames != NULL)
@@ -6419,6 +6431,8 @@ db_pdb_GetFacelist(DBfile *_dbfile, char const *objname)
     static char *me = "db_pdb_GetFacelist";
     DBfacelist           tmpfl;
     PJcomplist         *_tcl;
+    int                 nlsize, shcntsize, shszsize, tlsize, tsize,
+                        nnosize, znosize;
 
     /*------------------------------------------------------------*/
     /*          Comp. Name        Comp. Address     Data Type     */
@@ -6435,13 +6449,13 @@ db_pdb_GetFacelist(DBfile *_dbfile, char const *objname)
 
     if (DBGetDataReadMask2File(_dbfile) & DBFacelistInfo)
     {
-        DEFALL_OBJ("nodelist", &tmpfl.nodelist, DB_INT);
-        DEFALL_OBJ("shapecnt", &tmpfl.shapecnt, DB_INT);
-        DEFALL_OBJ("shapesize", &tmpfl.shapesize, DB_INT);
-        DEFALL_OBJ("typelist", &tmpfl.typelist, DB_INT);
-        DEFALL_OBJ("types", &tmpfl.types, DB_INT);
-        DEFALL_OBJ("nodeno", &tmpfl.nodeno, DB_INT);
-        DEFALL_OBJ("zoneno", &tmpfl.zoneno, DB_INT);
+        DEFALL_OBN("nodelist", &tmpfl.nodelist, DB_INT, &nlsize);
+        DEFALL_OBN("shapecnt", &tmpfl.shapecnt, DB_INT, &shcntsize);
+        DEFALL_OBN("shapesize", &tmpfl.shapesize, DB_INT, &shszsize);
+        DEFALL_OBN("typelist", &tmpfl.typelist, DB_INT, &tlsize);
+        DEFALL_OBN("types", &tmpfl.types, DB_INT, &tsize);
+        DEFALL_OBN("nodeno", &tmpfl.nodeno, DB_INT, &nnosize);
+        DEFALL_OBN("zoneno", &tmpfl.zoneno, DB_INT, &znosize);
     }
 
     if (PJ_GetObject(dbfile->pdb, objname, &tmp_obj, DB_FACELIST) < 0)
@@ -6452,6 +6466,19 @@ db_pdb_GetFacelist(DBfile *_dbfile, char const *objname)
 
     if (fl->ndims < 0 || fl->ndims > 3 || fl->nfaces < 0 ||
         fl->lnodelist < 0 || fl->nshapes < 0 || fl->ntypes < 0)
+    {
+        DBFreeFacelist(fl);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
+
+    if ((fl->nodelist && nlsize != fl->lnodelist) ||
+        (fl->shapecnt && shcntsize != fl->nshapes) ||
+        (fl->shapesize && shszsize != fl->nshapes) ||
+        (fl->typelist && tlsize != fl->nshapes) ||
+        (fl->types && tsize != fl->nfaces) ||
+        (fl->nodeno && nnosize != fl->lnodelist) ||
+        (fl->zoneno && znosize != fl->nfaces))
     {
         DBFreeFacelist(fl);
         db_perror(objname, E_MALFORMED, me);
