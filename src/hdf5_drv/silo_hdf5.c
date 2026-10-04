@@ -11883,10 +11883,26 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
             }
         }
         if (DBGetDataReadMask2File(_dbfile) & DBUMGlobNodeNo)
-            um->gnodeno = db_hdf5_comprd(dbfile, m.gnodeno, 1);
+        {
+            int size;
+            um->gnodeno = _db_hdf5_comprd(dbfile, m.gnodeno, 1, &size);
+            if (um->gnodeno && size != um->nnodes)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
         um->gnznodtype = m.gnznodtype?m.gnznodtype:DB_INT;
         if (DBGetDataReadMask2File(_dbfile) & DBUMGhostNodeLabels)
-            um->ghost_node_labels = (char *)db_hdf5_comprd(dbfile, m.ghost_node_labels, 1);
+        {
+            int size;
+            um->ghost_node_labels = (char *)_db_hdf5_comprd(dbfile, m.ghost_node_labels, 1, &size);
+            if (um->ghost_node_labels && size != um->nnodes)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
 
         /* alt nodenum vars */
         {
@@ -11911,11 +11927,11 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
         H5Tclose(o);
     } CLEANUP {
         H5E_BEGIN_TRY {
-            um = NULL;
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
         DBFreeUcdmesh(um);
+        um = NULL;
     } END_PROTECT;
 
 #ifdef HAVE_HZIP
