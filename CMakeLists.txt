@@ -743,8 +743,14 @@ install(FILES ${silo_public_headers} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 
 # Symlink old style silo_f77.inc
 if(SILO_ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
-    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink silo.inc silo_f77.inc
-        WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})")
+    install(CODE "
+        set(FINAL_DIR \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}\")
+        if(NOT \"\$ENV{DESTDIR}\" STREQUAL \"\")
+            set(FINAL_DIR \"\$ENV{DESTDIR}\${FINAL_DIR}\")
+        endif()
+        execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink silo.inc silo_f77.inc
+            WORKING_DIRECTORY \"\${FINAL_DIR}\")
+    ")
 endif()
 
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
