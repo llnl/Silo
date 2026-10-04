@@ -160,7 +160,11 @@ check_malformed multi_objects multimatspecies nspec=-1 || exit 1
 check_malformed point_objects pointmesh ndims=5 || exit 1
 check_malformed point_objects pointvar nvals=99 || exit 1
 check_malformed quad_objects quadmesh ndims=5 || exit 1
-check_malformed quad_objects quadmesh dims={2,3,0} subarr || exit 1
+if [ "$ext" = "pdb" ]; then
+    check_malformed quad_objects quadmesh dims={2,3} subarr || exit 1
+else
+    check_malformed quad_objects quadmesh dims={2,3,0} || exit 1
+fi
 check_malformed quad_objects quadvar nvals=99 || exit 1
 check_malformed ucd_objects ucdmesh ndims=5 || exit 1
 check_malformed ucd_objects ucdmesh nnodes=8 || exit 1
