@@ -13136,16 +13136,43 @@ db_hdf5_GetPHZonelist(DBfile *_dbfile, char const *name)
 
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
         {
-            phzl->nodecnt = (int *)db_hdf5_comprd(dbfile, m.nodecnt, 1);
-            phzl->nodelist = (int *)db_hdf5_comprd(dbfile, m.nodelist, 1);
-            phzl->extface = (char *)db_hdf5_comprd(dbfile, m.extface, 1);
-            phzl->facecnt = (int *)db_hdf5_comprd(dbfile, m.facecnt, 1);
-            phzl->facelist = (int  *)db_hdf5_comprd(dbfile, m.facelist, 1);
+            int ncntsize, nlsize, efsize, fcntsize, flsize;
+
+            phzl->nodecnt = (int *)_db_hdf5_comprd(dbfile, m.nodecnt, 1, &ncntsize);
+            phzl->nodelist = (int *)_db_hdf5_comprd(dbfile, m.nodelist, 1, &nlsize);
+            phzl->extface = (char *)_db_hdf5_comprd(dbfile, m.extface, 1, &efsize);
+            phzl->facecnt = (int *)_db_hdf5_comprd(dbfile, m.facecnt, 1, &fcntsize);
+            phzl->facelist = (int  *)_db_hdf5_comprd(dbfile, m.facelist, 1, &flsize);
+            if ((phzl->nodecnt && ncntsize != phzl->nfaces) ||
+                (phzl->nodelist && nlsize != phzl->lnodelist) ||
+                (phzl->extface && efsize != phzl->nfaces) ||
+                (phzl->facecnt && fcntsize != phzl->nzones) ||
+                (phzl->facelist && flsize != phzl->lfacelist))
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistGlobZoneNo)
-            phzl->gzoneno = db_hdf5_comprd(dbfile, m.gzoneno, 1);
+        {
+            int size;
+            phzl->gzoneno = _db_hdf5_comprd(dbfile, m.gzoneno, 1, &size);
+            if (phzl->gzoneno && size != phzl->nzones)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistGhostZoneLabels)
-            phzl->ghost_zone_labels = (char *)db_hdf5_comprd(dbfile, m.ghost_zone_labels, 1);
+        {
+            int size;
+            phzl->ghost_zone_labels = (char *)_db_hdf5_comprd(dbfile, m.ghost_zone_labels, 1, &size);
+            if (phzl->ghost_zone_labels && size != phzl->nzones)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
 
         /* alternate zone number variables */
         {

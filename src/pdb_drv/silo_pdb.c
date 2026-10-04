@@ -6146,8 +6146,8 @@ db_pdb_GetUcdvar (DBfile *_dbfile, char const *objname)
       PJ_GetObject(dbfile->pdb, objname, &tmp_obj, 0);
 
       for (i = 0; i < uv->nvals; i++) {
-          if ((uv->vals[i] && size1[i] != uv->nels) ||
-              (uv->mixvals[i] && size2[i] != uv->mixlen))
+          if ((uv->vals && uv->vals[i] && size1[i] != uv->nels) ||
+              (uv->mixvals && uv->mixvals[i] && size2[i] != uv->mixlen))
           {
              DBFreeUcdvar(uv);
              db_perror("nvals", E_MALFORMED, me);
@@ -6666,6 +6666,7 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
     DBphzonelist         tmpphzl;
     PJcomplist          *_tcl;
     char                *tmpaznum = 0;
+    int                  ncntsize, nlsize, efsize, fcntsize, flsize, znosize, gzlsize;
 
     /*------------------------------------------------------------*/
     /*          Comp. Name        Comp. Address     Data Type     */
@@ -6684,16 +6685,16 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
 
     if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
     {
-        DEFALL_OBJ("nodecnt", &tmpphzl.nodecnt, DB_INT);
-        DEFALL_OBJ("nodelist", &tmpphzl.nodelist, DB_INT);
-        DEFALL_OBJ("extface", &tmpphzl.extface, DB_CHAR);
-        DEFALL_OBJ("facecnt", &tmpphzl.facecnt, DB_INT);
-        DEFALL_OBJ("facelist", &tmpphzl.facelist, DB_INT);
-        DEFALL_OBJ("zoneno", &tmpphzl.zoneno, DB_INT);
+        DEFALL_OBN("nodecnt", &tmpphzl.nodecnt, DB_INT, &ncntsize);
+        DEFALL_OBN("nodelist", &tmpphzl.nodelist, DB_INT, &nlsize);
+        DEFALL_OBN("extface", &tmpphzl.extface, DB_CHAR, &efsize);
+        DEFALL_OBN("facecnt", &tmpphzl.facecnt, DB_INT, &fcntsize);
+        DEFALL_OBN("facelist", &tmpphzl.facelist, DB_INT, &flsize);
+        DEFALL_OBN("zoneno", &tmpphzl.zoneno, DB_INT, &znosize);
     }
 
     if (DBGetDataReadMask2File(_dbfile) & DBZonelistGhostZoneLabels)
-       DEFALL_OBJ("ghost_zone_labels", &tmpphzl.ghost_zone_labels, DB_CHAR);
+       DEFALL_OBN("ghost_zone_labels", &tmpphzl.ghost_zone_labels, DB_CHAR, &gzlsize);
     DEFALL_OBJ("alt_zonenum_vars", &tmpaznum, DB_CHAR);
 
     if (PJ_GetObject(dbfile->pdb, objname, &tmp_obj, DB_PHZONELIST) < 0)
@@ -6704,6 +6705,20 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
 
     if (phzl->nfaces < 0 || phzl->lnodelist < 0 ||
         phzl->nzones < 0 || phzl->lfacelist < 0)
+    {
+        DBFreePHZonelist(phzl);
+        FREE(tmpaznum);
+        db_perror(objname, E_MALFORMED, me);
+        return NULL;
+    }
+
+    if ((phzl->nodecnt && ncntsize != phzl->nfaces) ||
+        (phzl->nodelist && nlsize != phzl->lnodelist) ||
+        (phzl->extface && efsize != phzl->nfaces) ||
+        (phzl->facecnt && fcntsize != phzl->nzones) ||
+        (phzl->facelist && flsize != phzl->lfacelist) ||
+        (phzl->zoneno && znosize != phzl->nzones) ||
+        (phzl->ghost_zone_labels && gzlsize != phzl->nzones))
     {
         DBFreePHZonelist(phzl);
         FREE(tmpaznum);

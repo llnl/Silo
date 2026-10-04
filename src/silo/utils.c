@@ -582,7 +582,9 @@ int DBValidateZonelist(DBzonelist const *zl, int max_node_id)
                 case DB_ZONETYPE_QUAD_PYRAMID:
                 case DB_ZONETYPE_QUAD_PRISM:
                 case DB_ZONETYPE_QUAD_HEX:
-                default: return DB_VALIDATE_BAD;
+                    break;
+                default:
+                    return DB_VALIDATE_BAD;
             }
         }
 

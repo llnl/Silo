@@ -173,6 +173,9 @@ check_malformed flphzl_objects facelist nfaces=99 || exit 1
 check_malformed flphzl_objects facelist nshapes=99 || exit 1
 check_malformed flphzl_objects facelist lnodelist=99 || exit 1
 check_malformed flphzl_objects phzl nfaces=-1 || exit 1
+check_malformed flphzl_objects phzl lnodelist=999 || exit 1
+check_malformed flphzl_objects phzl lfacelist=999 || exit 1
+check_malformed flphzl_objects phzl nzones=999 || exit 1
 
 # CSG and MRG objects.
 check_malformed csg_objects csgmesh ndims=5 || exit 1
