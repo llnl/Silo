@@ -145,16 +145,34 @@ put_ucd_objects(DBfile *db)
     float mixu1[4] = {41.4,42.f,43.f};
     float *mixuvals[2]={mixu0,mixu1};
 
+    char gzl[4] = {0x0,0x1,0x2,0x3};
+    char gnl[9] = {0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8};
+
+    int nnum[9] = {100,101,102,103,104,105,106,107,108};
+    int znum[4] = {100,101,102,103};
+
+    DBoptlist *ol = DBMakeOptlist(20);
+    DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
+    DBAddOption(ol, DBOPT_ZONENUM, znum);
+
+    int badi[3] = {999,998,997};
+    char badc[3] = {0xF9,0xF8,0xF7};
+    int three = 3;
+
     PUT(DBPutZonelist(db, "zl_old",
                       4, 2, nodelist, 16, 0,
                       shapesize, shapecnt, 1));
 
     PUT(DBPutZonelist2(db, "zl2",
                        4, 2, nodelist, 16, 0,
-                       0, 0, shapetype, shapesize, shapecnt, 1, NULL));
+                       0, 0, shapetype, shapesize, shapecnt, 1, ol));
+
+    DBClearOptlist(ol);
+    DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, gnl);
+    DBAddOption(ol, DBOPT_NODENUM, nnum);
 
     PUT(DBPutUcdmesh(db, "ucdmesh", 2, (DBCAS_t)coordnames, coords,
-                     9, 4, "zl2", NULL, DB_FLOAT, NULL));
+                     9, 4, "zl2", NULL, DB_FLOAT, ol));
 
     PUT(DBPutUcdsubmesh(db, "ucdsubmesh", "ucdmesh",
                         4, "zl2", NULL, NULL));
@@ -169,6 +187,11 @@ put_ucd_objects(DBfile *db)
 
     PUT(DBPutUcdvar1(db, "ucdvar_one", "ucdmesh",
                      uone, 4, NULL, 0, DB_FLOAT, DB_ZONECENT, NULL));
+
+    DBWrite(db, "x", badi, &three, 1, DB_INT);
+    DBWrite(db, "y", badc, &three, 1, DB_CHAR);
+
+    DBFreeOptlist(ol);
 }
 
 /* ---------------------------------------------------------------------- */
