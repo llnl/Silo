@@ -65,18 +65,36 @@ put_quad_objects(DBfile *db)
     float x[3] = {0.f, 1.f, 2.f};
     float y[3] = {0.f, 1.f, 2.f};
     void *coords[2] = {x, y};
+    float x2[9] = {0.f, 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f};
+    float y2[9] = {0.f, 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f};
+    void *coords2[2] = {x2, y2};
     char *coordnames[2] = {"qx", "qy"};
+    char *coordnames2[2] = {"qx", "qy"};
 
     float qv0[4] = {1.f, 2.f, 3.f, 4.f};
     float qv1[4] = {5.f, 6.f, 7.f, 8.f};
+    float qv2[9] = {50.f, 51.f, 52.f, 53.f, 54.f, 55.f, 56.f, 57.f, 58.f};
     void *qvals[2] = {qv0, qv1};
     char *qnames[2] = {"qcomp0", "qcomp1"};
-
     float qone[4] = {11.f, 12.f, 13.f, 14.f};
+
+    char nnum[9] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    char znum[4] = {0x00, 0x01, 0x02, 0x03};
+    int five = 5;
+    int baseindex[3] = {5, 10, 0};
+
+    DBoptlist *ol = DBMakeOptlist(20);
+    DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, nnum);
+    DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, znum);
+    DBAddOption(ol, DBOPT_BASEINDEX, baseindex);
 
     PUT(DBPutQuadmesh(db, "quadmesh",
                       (DBCAS_t)coordnames, coords, dims_nodes, 2,
-                      DB_FLOAT, DB_COLLINEAR, NULL));
+                      DB_FLOAT, DB_COLLINEAR, ol));
+
+    PUT(DBPutQuadmesh(db, "quadmesh2",
+                      (DBCAS_t)coordnames2, coords2, dims_nodes, 2,
+                      DB_FLOAT, DB_NONCOLLINEAR, ol));
 
     PUT(DBPutQuadvar(db, "quadvar", "quadmesh", 2,
                      (DBCAS_t)qnames, qvals, dims_zones, 2,
@@ -85,6 +103,15 @@ put_quad_objects(DBfile *db)
     PUT(DBPutQuadvar1(db, "quadvar_one", "quadmesh",
                       qone, dims_zones, 2, NULL, 0,
                       DB_FLOAT, DB_ZONECENT, NULL));
+
+    PUT(DBPutQuadvar1(db, "quadvar_two", "quadmesh2",
+                      qv2, dims_nodes, 2, NULL, 0,
+                      DB_FLOAT, DB_NODECENT, NULL));
+
+    /* some extra data to use to spoil above objects from browser */
+    DBWrite(db, "qs", nnum, &five, 1, DB_CHAR);
+
+    DBFreeOptlist(ol);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -159,14 +186,26 @@ put_point_objects(DBfile *db)
     void *pvals[2] = {p0,p1};
     char *pnames[2] = {"pcomp0","pcomp1"};
     float pone[5] = {51,52,53,54,55};
+    int nnum[5] = {101,102,103,104,105};
+    char gnl[5] = {0x0,0x1,0x2,0x3,0x4};
+    int  bad[3] = {91,92,93};
+    int three = 3;
+    
+    DBoptlist *ol = DBMakeOptlist(20);
+    DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, gnl);
+    DBAddOption(ol, DBOPT_NODENUM, nnum);
 
-    PUT(DBPutPointmesh(db, "pointmesh", 2, coords, 5, DB_FLOAT, NULL));
+    PUT(DBPutPointmesh(db, "pointmesh", 2, coords, 5, DB_FLOAT, ol));
 
     PUT(DBPutPointvar(db, "pointvar", "pointmesh", 2,
                       pvals, 5, DB_FLOAT, NULL));
 
     PUT(DBPutPointvar1(db, "pointvar_one", "pointmesh",
                        pone, 5, DB_FLOAT, NULL));
+
+    DBWrite(db, "x", bad, &three, 1, DB_INT);
+
+    DBFreeOptlist(ol);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -233,7 +272,7 @@ put_material_objects(DBfile *db)
 /* Curve, compound array and defvars.                                    */
 /* ---------------------------------------------------------------------- */
 static void
-put_simple_objects(DBfile *db)
+put_misc_objects(DBfile *db)
 {
     {
         float x[5] = {0,1,2,3,4};
@@ -503,24 +542,24 @@ main(int argc, char **argv)
         return 1;
     }
 
-    SET_DIR(quad_objects);
+    SET_DIR(quad_objs);
     put_quad_objects(db);
-    SET_DIR(ucd_objects);
+    SET_DIR(ucd_objs);
     put_ucd_objects(db);
-    SET_DIR(point_objects);
+    SET_DIR(point_objs);
     put_point_objects(db);
-    SET_DIR(material_objects);
+    SET_DIR(mat_objs);
     put_material_objects(db);
-    SET_DIR(simple_objects);
-    put_simple_objects(db);
-    SET_DIR(flphzl_objects);
+    SET_DIR(misc_objs);
+    put_misc_objects(db);
+    SET_DIR(list_objs);
     put_facelist(db);
     put_phzonelist(db);
-    SET_DIR(csg_objects);
+    SET_DIR(csg_objs);
     put_csg_objects(db);
-    SET_DIR(mrg_objects);
+    SET_DIR(mrg_objs);
     put_mrg_objects(db);
-    SET_DIR(multi_objects);
+    SET_DIR(mult_objs);
     put_multi_objects(db);
 
     if (DBClose(db) < 0)

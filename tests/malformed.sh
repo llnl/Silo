@@ -132,62 +132,69 @@ check_malformed()
 }
 
 # Existing material coverage.
-check_malformed material_objects material ndims=5 || exit 1
-check_malformed material_objects material nmat=7 || exit 1
-check_malformed material_objects material_mix mixlen=4495 || exit 1
-check_malformed material_objects material matnos='ed' || exit 1
-check_malformed material_objects material matlist='ed' || exit 1
-check_malformed material_objects material_mix mix_next='ed' || exit 1
+check_malformed mat_objs material ndims=5 || exit 1
+check_malformed mat_objs material nmat=7 || exit 1
+check_malformed mat_objs material_mix mixlen=4495 || exit 1
+check_malformed mat_objs material matnos='ed' || exit 1
+check_malformed mat_objs material matlist='ed' || exit 1
+check_malformed mat_objs material_mix mix_next='ed' || exit 1
 
 # Material species and simple objects.
-check_malformed material_objects matspecies ndims=5 || exit 1
-check_malformed material_objects matspecies nmat=-1 || exit 1
-check_malformed simple_objects curve npts=-1 || exit 1
-check_malformed simple_objects curve npts=6 || exit 1
-check_malformed simple_objects compound nelems=-1 || exit 1
-check_malformed simple_objects compound nvalues=-1 || exit 1
-check_malformed simple_objects defvars ndefs=-1 || exit 1
+check_malformed mat_objs matspecies ndims=5 || exit 1
+check_malformed mat_objs matspecies nmat=-1 || exit 1
+check_malformed misc_objs curve npts=-1 || exit 1
+check_malformed misc_objs curve npts=6 || exit 1
+check_malformed misc_objs compound nelems=-1 || exit 1
+check_malformed misc_objs compound nvalues=-1 || exit 1
+check_malformed misc_objs defvars ndefs=-1 || exit 1
 
 # Multi-block objects.
-check_malformed multi_objects multimesh nblocks=-1 || exit 1
-check_malformed multi_objects multimeshadj nblocks=-1 || exit 1
-check_malformed multi_objects multimeshadj lneighbors=-1 || exit 1
-check_malformed multi_objects multivar nvars=-1 || exit 1
-check_malformed multi_objects multimat nmats=-1 || exit 1
-check_malformed multi_objects multimatspecies nspec=-1 || exit 1
+check_malformed mult_objs multimesh nblocks=-1 || exit 1
+check_malformed mult_objs multimeshadj nblocks=-1 || exit 1
+check_malformed mult_objs multimeshadj lneighbors=-1 || exit 1
+check_malformed mult_objs multivar nvars=-1 || exit 1
+check_malformed mult_objs multimat nmats=-1 || exit 1
+check_malformed mult_objs multimatspecies nspec=-1 || exit 1
 
 # Point, quad, UCD and list objects.
-check_malformed point_objects pointmesh ndims=5 || exit 1
-check_malformed point_objects pointvar nvals=99 || exit 1
-check_malformed quad_objects quadmesh ndims=5 || exit 1
+check_malformed point_objs pointmesh ndims=5 || exit 1
+check_malformed point_objs pointmesh nels=2 || exit 1
+check_malformed point_objs pointmesh gnodeno=/point_objs/x || exit 1
+check_malformed point_objs pointmesh ghost_node_labels=/point_objs/x || exit 1
+check_malformed point_objs pointvar nvals=99 || exit 1
+check_malformed quad_objs quadmesh ndims=5 || exit 1
+check_malformed quad_objs quadmesh min_index={-1,-1,-1} || exit 1
+check_malformed quad_objs quadmesh max_index={99,99,99} || exit 1
+check_malformed quad_objs quadmesh ghost_node_labels=/quad_objs/qs || exit 1
+check_malformed quad_objs quadmesh ghost_zone_labels=/quad_objs/qs || exit 1
 if [ "$ext" = "pdb" ]; then
-    check_malformed quad_objects quadmesh dims={2,3} subarr || exit 1
+    check_malformed quad_objs quadmesh dims={2,3} subarr || exit 1
 else
-    check_malformed quad_objects quadmesh dims={2,3,0} || exit 1
+    check_malformed quad_objs quadmesh dims={2,3,0} || exit 1
 fi
-check_malformed quad_objects quadvar nvals=99 || exit 1
-check_malformed ucd_objects ucdmesh ndims=5 || exit 1
-check_malformed ucd_objects ucdmesh nnodes=8 || exit 1
-check_malformed ucd_objects ucdvar nvals=99 || exit 1
-check_malformed ucd_objects ucdvar nels=9999 || exit 1
-check_malformed ucd_objects ucdvar_mix mixlen=5 || exit 1
-check_malformed ucd_objects zl2 nzones=-1 || exit 1
-check_malformed flphzl_objects facelist nfaces=-1 || exit 1
-check_malformed flphzl_objects facelist nfaces=99 || exit 1
-check_malformed flphzl_objects facelist nshapes=99 || exit 1
-check_malformed flphzl_objects facelist lnodelist=99 || exit 1
-check_malformed flphzl_objects phzl nfaces=-1 || exit 1
-check_malformed flphzl_objects phzl lnodelist=999 || exit 1
-check_malformed flphzl_objects phzl lfacelist=999 || exit 1
-check_malformed flphzl_objects phzl nzones=999 || exit 1
+check_malformed quad_objs quadvar nvals=99 || exit 1
+check_malformed ucd_objs ucdmesh ndims=5 || exit 1
+check_malformed ucd_objs ucdmesh nnodes=8 || exit 1
+check_malformed ucd_objs ucdvar nvals=99 || exit 1
+check_malformed ucd_objs ucdvar nels=9999 || exit 1
+check_malformed ucd_objs ucdvar_mix mixlen=5 || exit 1
+check_malformed ucd_objs zl2 nzones=-1 || exit 1
+check_malformed list_objs facelist nfaces=-1 || exit 1
+check_malformed list_objs facelist nfaces=99 || exit 1
+check_malformed list_objs facelist nshapes=99 || exit 1
+check_malformed list_objs facelist lnodelist=99 || exit 1
+check_malformed list_objs phzl nfaces=-1 || exit 1
+check_malformed list_objs phzl lnodelist=999 || exit 1
+check_malformed list_objs phzl lfacelist=999 || exit 1
+check_malformed list_objs phzl nzones=999 || exit 1
 
 # CSG and MRG objects.
-check_malformed csg_objects csgmesh ndims=5 || exit 1
-check_malformed csg_objects csgzl nregs=-1 || exit 1
-check_malformed csg_objects csgvar nvals=99 || exit 1
-check_malformed mrg_objects groupelmap num_segments=-1 || exit 1
-check_malformed mrg_objects mrgtree num_nodes=-1 || exit 1
-check_malformed mrg_objects mrgvar ncomps=99 || exit 1
+check_malformed csg_objs csgmesh ndims=5 || exit 1
+check_malformed csg_objs csgzl nregs=-1 || exit 1
+check_malformed csg_objs csgvar nvals=99 || exit 1
+check_malformed mrg_objs groupelmap num_segments=-1 || exit 1
+check_malformed mrg_objs mrgtree num_nodes=-1 || exit 1
+check_malformed mrg_objs mrgvar ncomps=99 || exit 1
 
 #
 # Cleanup
