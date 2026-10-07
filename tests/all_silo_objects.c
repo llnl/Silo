@@ -347,22 +347,43 @@ static void
 put_phzonelist(DBfile *db)
 {
     /* Six quad faces. */
-    int nodecnt[6] = {4,4,4,4,4,4};
-    int nodelist[24] = {
+    int nodecnt[12] = {4,4,4,4,4,4,4,4,4,4,4,4};
+    int nodelist[48] = {
         0,1,2,3,  /* bottom */
         4,7,6,5,  /* top */
         0,4,5,1,
         1,5,6,2,
         2,6,7,3,
-        3,7,4,0
+        3,7,4,0,
+        0+8,1+8,2+8,3+8,  /* bottom */
+        4+8,7+8,6+8,5+8,  /* top */
+        0+8,4+8,5+8,1+8,
+        1+8,5+8,6+8,2+8,
+        2+8,6+8,7+8,3+8,
+        3+8,7+8,4+8,0+8
     };
-    int facecnt[1] = {6};
-    int facelist[6] = {0,1,2,3,4,5};
+    int facecnt[2] = {6,6};
+    int facelist[12] = {0,1,2,3,4,5,6,7,8,9,10,11};
+    char gzl[2] = {0x0, 0x1};
+    char badc[1] = {0xF9};
+    int znum[2] = {500,501};
+    int badi[1] = {999};
+    int one = 1;
+
+    DBoptlist *ol = DBMakeOptlist(20);
+    DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
+    DBAddOption(ol, DBOPT_ZONENUM, znum);
 
     PUT(DBPutPHZonelist(db, "phzl",
-                        6, nodecnt, 24, nodelist, NULL,
-                        1, facecnt, 6, facelist,
-                        0, 0, 0, NULL));
+                        12, nodecnt, 48, nodelist, NULL,
+                        2, facecnt, 12, facelist,
+                        0, 0, 1, ol));
+
+    /* some extra data to use to spoil above objects from browser */
+    DBWrite(db, "x", badi, &one, 1, DB_INT);
+    DBWrite(db, "y", badc, &one, 1, DB_CHAR);
+
+    DBFreeOptlist(ol);
 }
 
 /* ---------------------------------------------------------------------- */

@@ -194,6 +194,8 @@ check_malformed list_objs phzl nfaces=-1 || exit 1
 check_malformed list_objs phzl lnodelist=999 || exit 1
 check_malformed list_objs phzl lfacelist=999 || exit 1
 check_malformed list_objs phzl nzones=999 || exit 1
+check_malformed list_objs phzl ghost_zone_labels=/list_objs/y || exit 1
+check_malformed list_objs phzl gzoneno=/list_objs/x || exit 1
 
 # CSG and MRG objects.
 check_malformed csg_objs csgmesh ndims=5 || exit 1

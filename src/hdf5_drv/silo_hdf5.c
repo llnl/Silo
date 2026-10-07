@@ -2488,6 +2488,7 @@ db_hdf5_init(void)
         MEMBER_S(str256,        extface);
         MEMBER_S(str256,        facecnt);
         MEMBER_S(str256,        facelist);
+        MEMBER_S(str256,        gzoneno);
         MEMBER_S(int,           gnznodtype);
         MEMBER_S(str256,        ghost_zone_labels);
         MEMBER_S(str256,        alt_zonenum_vars);
@@ -12744,14 +12745,11 @@ db_hdf5_PutZonelist2(DBfile *_dbfile, char const *name, int nzones, int ndims,
             m.shapesize/*out*/, friendly_name(_dbfile,name,"_shapesize", 0));
         db_hdf5_compwr(dbfile, DB_INT, 1, &nshapes, shapetype,
             m.shapetype/*out*/, friendly_name(_dbfile,name,"_shapetype", 0));
-
-        if (_uzl._llong_gzoneno)
-            db_hdf5_compwr(dbfile, DB_LONG_LONG, 1, &nzones, _uzl._gzoneno,
+        if (_uzl._gzoneno)
+        {
+            db_hdf5_compwr(dbfile, _uzl._llong_gzoneno?DB_LONG_LONG:DB_INT, 1, &nzones, _uzl._gzoneno,
                 m.gzoneno/*out*/, friendly_name(_dbfile,name,"_gzoneno", 0));
-        else
-            db_hdf5_compwr(dbfile, DB_INT, 1, &nzones, _uzl._gzoneno,
-                m.gzoneno/*out*/, friendly_name(_dbfile,name,"_gzoneno", 0));
-
+        }
         if (_uzl._ghost_zone_labels)
         {
             db_hdf5_compwr(dbfile, DB_CHAR, 1, &nzones, _uzl._ghost_zone_labels,
@@ -12860,13 +12858,11 @@ db_hdf5_PutPHZonelist(DBfile *_dbfile, char const *name,
             m.facecnt/*out*/, friendly_name(_dbfile,name,"_facecnt", 0));
         db_hdf5_compwr(dbfile, DB_INT, 1, &lfacelist, facelist,
             m.facelist/*out*/, friendly_name(_dbfile,name,"_facelist", 0));
-        if (_phzl._llong_gzoneno)
-            db_hdf5_compwr(dbfile, DB_LONG_LONG, 1, &nzones, _phzl._gzoneno,
+        if (_phzl._gzoneno)
+        {
+            db_hdf5_compwr(dbfile, _phzl._llong_gzoneno?DB_LONG_LONG:DB_INT, 1, &nzones, _phzl._gzoneno,
                 m.gzoneno/*out*/, friendly_name(_dbfile,name,"_gzoneno", 0));
-        else
-            db_hdf5_compwr(dbfile, DB_INT, 1, &nzones, _phzl._gzoneno,
-                m.gzoneno/*out*/, friendly_name(_dbfile,name,"_gzoneno", 0));
-
+        }
         if (_phzl._ghost_zone_labels)
         {
             db_hdf5_compwr(dbfile, DB_CHAR, 1, &nzones, _phzl._ghost_zone_labels,
@@ -12905,8 +12901,8 @@ db_hdf5_PutPHZonelist(DBfile *_dbfile, char const *name,
             MEMBER_S(str(m.extface), extface);
             MEMBER_S(str(m.facecnt), facecnt);
             MEMBER_S(str(m.facelist), facelist);
-            MEMBER_S(str(m.gzoneno), gzoneno);
             if (m.gnznodtype)   MEMBER_S(int, gnznodtype);
+            MEMBER_S(str(m.gzoneno), gzoneno);
             MEMBER_S(str(m.ghost_zone_labels), ghost_zone_labels);
         } OUTPUT(dbfile, DB_PHZONELIST, name, &m);
         
