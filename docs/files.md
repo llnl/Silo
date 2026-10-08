@@ -343,12 +343,12 @@ For example, if Silo is using the HDF5 driver, an application can obtain the act
     To specify parameters other than these default values, the Silo client will have to create and register an appropriate file options set, see [DBRegisterFileOptionsSet](#dbregisterfileoptionsset). 
 
   `DB_HDF5_FAMILY`
-  : Allows for the management of files larger than 2{sup}`32` bytes on 32-bit systems.
+  : Allows for the management of files larger than 2<sup>32</sup> bytes on 32-bit systems.
     The virtual file is decomposed into real files of size small enough to be managed on 32-bit systems.
     This is a VFD that comes pre-packaged with the HDF5 library.
     Two parameters govern the behavior of the family VFD.
     The size of each file in a family of files and the VFD used for the individual files.
-    By default, using `DB_HDF5_FAMILY` as the driver type results in Silo using a size of 1 Gigabyte (2{sup}`32`) and the default VFD for the individual files.
+    By default, using `DB_HDF5_FAMILY` as the driver type results in Silo using a size of 1 Gigabyte (2<sup>32</sup>) and the default VFD for the individual files.
     To specify parameters other than these default values, the Silo client will have to create and register an appropriate file options set, see [DBRegisterFileOptionsSet](#dbregisterfileoptionsset).
 
   `DB_HDF5_LOG`
@@ -373,7 +373,7 @@ For example, if Silo is using the HDF5 driver, an application can obtain the act
     That generally means that posix_memalign should be used to allocate any buffers you use to hold raw data passed in calls to the Silo library.
     The block size indicates the underlying file system block size and the copy buffer size gives the HDF5 library some additional flexibility in dealing with unaligned requests.
     Few systems support the `O_DIRECT` flag and so this VFD is not often available in practice.
-    However, when it is, using `DB_HDF5_DIRECT` as the driver type results in Silo using an alignment of 4 kilobytes (2{sup}`12`), an alignment equal to the block size and a copy buffer size equal to `256` times the block size.
+    However, when it is, using `DB_HDF5_DIRECT` as the driver type results in Silo using an alignment of 4 kilobytes (2<sup>12</sup>), an alignment equal to the block size and a copy buffer size equal to `256` times the block size.
 
   `DB_HDF5_SILO`
   : This is a custom VFD designed specifically to address some of the performance shortcomings of VFDs that come pre-packaged with the HDF5 library.
@@ -386,8 +386,8 @@ For example, if Silo is using the HDF5 driver, an application can obtain the act
     The block size determines the size of individual blocks.
     All I/O requests will be issued in whole blocks.
     The block count determines the number of blocks the silo VFD is permitted to keep in memory at any one time.
-    On BG/P class systems, good values are 1 Megabyte (2{sup}`20`) block size and block count of 16 or 32.
-    By default, the silo VFD uses a block size of 16 Kilobytes (2{sup}`14`) and a block count also of 16.
+    On BG/P class systems, good values are 1 Megabyte (2<sup>20</sup>) block size and block count of 16 or 32.
+    By default, the silo VFD uses a block size of 16 Kilobytes (2<sup>14</sup>) and a block count also of 16.
     To specify parameters other than these default values, the Silo client will have to create and register an appropriate file options set, see [DBRegisterFileOptionsSet](#dbregisterfileoptionsset).
 
   `DB_HDF5_MPIO` and `DB_HDF5_MPIOP`
