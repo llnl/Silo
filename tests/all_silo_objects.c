@@ -540,12 +540,19 @@ put_multi_objects(DBfile *db)
         int zl0[1] = {06021};
         int zl1[1] = {06031};
         int *zonelists[2] = {zl0,zl1};
+        int some_ints[9] = {109,209,309,409,509,609,709,809,909};
+        int nine = 9;
 
         PUT(DBPutMultimeshadj(db, "multimeshadj",
                               2, meshtypes, nneighbors, neighbors, back,
                               lnodelists, (int const * const *)nodelists,
                               lzonelists, (int const * const *)zonelists,
                               NULL));
+
+        /* some extra data to use to spoil above objects from browser */
+        DBWrite(db, "q", some_ints, &nine, 1, DB_INT);
+        nine = 3;
+        DBWrite(db, "r", some_ints, &nine, 1, DB_INT);
     }
 }
 

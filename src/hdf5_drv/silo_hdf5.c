@@ -13468,7 +13468,7 @@ db_hdf5_GetMaterial(DBfile *_dbfile, char const *name)
         for (nels=1, i=0; i<m.ndims; i++) {
             ma->dims[i] = m.dims[i];
             ma->stride[i] = nels;
-            nels *= m.dims[i];
+            nels *= (m.dims[i]>0?m.dims[i]:1);
         }
 
         /* Read the raw data */
@@ -14556,17 +14556,17 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
     PROTECT {
         /* Open object and make sure it's a multimesh */
         if ((o=H5Topen(dbfile->cwg, name, H5P_DEFAULT))<0) {
-            db_perror((char*)name, E_NOTFOUND, me);
+            db_perror(name, E_NOTFOUND, me);
             UNWIND();
         }
         if ((attr=H5Aopen_name(o, "silo_type"))<0 ||
             H5Aread(attr, H5T_NATIVE_INT, &_objtype)<0 ||
             H5Aclose(attr)<0) {
-            db_perror((char*)name, E_CALLFAIL, me);
+            db_perror(name, E_CALLFAIL, me);
             UNWIND();
         }
         if (DB_MULTIMESHADJ!=(DBObjectType)_objtype) {
-            db_perror((char*)name, E_CALLFAIL, me);
+            db_perror(name, E_CALLFAIL, me);
             UNWIND();
         }
 
@@ -14582,7 +14582,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
         /* Create object and initialize meta data */
         if (m.nblocks < 0 || m.lneighbors < 0 ||
             m.totlnodelists < 0 || m.totlzonelists < 0) {
-            db_perror((char*)name, E_MALFORMED, me);
+            db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
         if (NULL==(mmadj=DBAllocMultimeshadj(0))) return NULL;
@@ -14611,9 +14611,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
             {
                 if (mmadj->nneighbors[i] < 0 ||
                     lneighbors > INT_MAX - mmadj->nneighbors[i]) {
-                    FREE(offsetmap);
-                    DBFreeMultimeshadj(mmadj);
-                    db_perror((char*)name, E_CALLFAIL, me);
+                    db_perror(name, E_CALLFAIL, me);
                     UNWIND();
                 }
                 offsetmap[i] = lneighbors;
@@ -14648,15 +14646,15 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                    for (j = 0; j < mmadj->nneighbors[i]; j++) {
                       int len = mmadj->lnodelists[offsetmap[i]+j];
                       if (len < 0 || tmpoff > INT_MAX - len) {
-                          FREE(offsetmap);
-                          FREE(offsetmapn);
-                          FREE(offsetmapz);
-                          DBFreeMultimeshadj(mmadj);
-                          db_perror((char*)name, E_CALLFAIL, me);
+                          db_perror(name, E_CALLFAIL, me);
                           UNWIND();
                       }
                       tmpoff += len;
                    }
+               }
+               if (tmpoff != m.totlnodelists) {
+                   db_perror(name, E_MALFORMED, me);
+                   UNWIND();
                }
                mmadj->totlnodelists = m.totlnodelists;
            }
@@ -14682,15 +14680,15 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                    for (j = 0; j < mmadj->nneighbors[i]; j++) {
                       int len = mmadj->lzonelists[offsetmap[i]+j];
                       if (len < 0 || tmpoff > INT_MAX - len) {
-                          FREE(offsetmap);
-                          FREE(offsetmapn);
-                          FREE(offsetmapz);
-                          DBFreeMultimeshadj(mmadj);
-                          db_perror((char*)name, E_CALLFAIL, me);
+                          db_perror(name, E_CALLFAIL, me);
                           UNWIND();
                       }
                       tmpoff += len;
                    }
+               }
+               if (tmpoff != m.totlzonelists) {
+                   db_perror(name, E_MALFORMED, me);
+                   UNWIND();
                }
                mmadj->totlzonelists = m.totlzonelists;
             }
@@ -14702,20 +14700,18 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
  
         if (m.nodelists[0] && 
             (nldset = H5Dopen(dbfile->cwg, m.nodelists, H5P_DEFAULT)) < 0) {
-            db_perror((char*)name, E_CALLFAIL, me);
+            db_perror(name, E_CALLFAIL, me);
             UNWIND();
         }
 
         if (m.zonelists[0] &&
             (zldset = H5Dopen(dbfile->cwg, m.zonelists, H5P_DEFAULT)) < 0) {
-            db_perror((char*)name, E_CALLFAIL, me);
+            db_perror(name, E_CALLFAIL, me);
             UNWIND();
         }
 
         if ((mtype=silom2hdfm_type(DB_INT))<0) {
-            FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-            DBFreeMultimeshadj(mmadj);
-            db_perror("datatype", E_BADARGS, me);
+            db_perror(name, E_BADARGS, me);
             UNWIND();
         }
 
@@ -14730,11 +14726,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
            blockno = block_map ? block_map[i] : i;
 
            if (blockno < 0 || blockno >= mmadj->nblocks) {
-               FREE(offsetmap);
-               FREE(offsetmapn);
-               FREE(offsetmapz);
-               DBFreeMultimeshadj(mmadj);
-               db_perror((char*)name, E_CALLFAIL, me);
+               db_perror(name, E_CALLFAIL, me);
                UNWIND();
            }
  
@@ -14749,11 +14741,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  int *nlist;
 
                  if (len < 0) {
-                     FREE(offsetmap);
-                     FREE(offsetmapn);
-                     FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror((char*)name, E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
@@ -14766,17 +14754,13 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  /* Build the file space selection */
                  if ((fspace=build_fspace(nldset, 1, &tmpoff, &len, &stride,
                                           ds_size/*out*/))<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror("file data space", E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
                  /* Build the memory data space */
                  if ((mspace=H5Screate_simple(1, ds_size, NULL))<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror("memory data space", E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
@@ -14786,8 +14770,6 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
 
                  /* Read data */
                  if (H5Dread(nldset, mtype, mspace, fspace, P_rdprops, nlist)<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
                      hdf5_to_silo_error(name, me, E_CALLFAIL);
                      UNWIND();
                  }
@@ -14812,11 +14794,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  int *zlist;
 
                  if (len < 0) {
-                     FREE(offsetmap);
-                     FREE(offsetmapn);
-                     FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror((char*)name, E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
@@ -14829,17 +14807,13 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
                  /* Build the file space selection */
                  if ((fspace=build_fspace(zldset, 1, &tmpoff, &len, &stride,
                                           ds_size/*out*/))<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror("file data space", E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
                  /* Build the memory data space */
                  if ((mspace=H5Screate_simple(1, ds_size, NULL))<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
-                     db_perror("memory data space", E_CALLFAIL, me);
+                     db_perror(name, E_CALLFAIL, me);
                      UNWIND();
                  }
 
@@ -14849,8 +14823,6 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
 
                  /* Read data */
                  if (H5Dread(zldset, mtype, mspace, fspace, P_rdprops, zlist)<0) {
-                     FREE(offsetmap); FREE(offsetmapn); FREE(offsetmapz);
-                     DBFreeMultimeshadj(mmadj);
                      hdf5_to_silo_error(name, me, E_CALLFAIL);
                      UNWIND();
                  }
@@ -14864,14 +14836,7 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
               }
            }
         }
- 
-        FREE(offsetmap);
-        FREE(offsetmapn);
-        FREE(offsetmapz);
-        if (nldset != -1)
-            H5Dclose(nldset);
-        if (zldset != -1)
-            H5Dclose(zldset);
+
         H5Tclose(o);
 
     } CLEANUP {
@@ -14879,9 +14844,17 @@ db_hdf5_GetMultimeshadj(DBfile *_dbfile, char const *name, int nmesh,
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
-        DBFreeMultimeshadj(mmadj);
+        /* This is too complex an object to free it properly if its malformed */
+        if (db_errno != E_MALFORMED)
+            DBFreeMultimeshadj(mmadj);
         mmadj = NULL;
     } END_PROTECT;
+
+    FREE(offsetmap);
+    FREE(offsetmapn);
+    FREE(offsetmapz);
+    if (nldset != -1) H5Dclose(nldset);
+    if (zldset != -1) H5Dclose(zldset);
 
     return mmadj;
 }

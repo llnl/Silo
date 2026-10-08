@@ -151,7 +151,19 @@ check_malformed misc_objs defvars ndefs=-1 || exit 1
 # Multi-block objects.
 check_malformed mult_objs multimesh nblocks=-1 || exit 1
 check_malformed mult_objs multimeshadj nblocks=-1 || exit 1
+check_malformed mult_objs multimeshadj nblocks=99 || exit 1
 check_malformed mult_objs multimeshadj lneighbors=-1 || exit 1
+check_malformed mult_objs multimeshadj totlnodelists=3 || exit 1
+check_malformed mult_objs multimeshadj totlzonelists=3 || exit 1
+check_malformed mult_objs multimeshadj meshtypes=/mult_objs/q || exit 1
+check_malformed mult_objs multimeshadj nneighbors=/mult_objs/q || exit 1
+check_malformed mult_objs multimeshadj neighbors=/mult_objs/q || exit 1
+check_malformed mult_objs multimeshadj back=/mult_objs/q || exit 1
+check_malformed mult_objs multimeshadj lnodelists=/mult_objs/q || exit 1
+# We cannot reasonably test corruption of the actual nodelists or zonelists contents
+#check_malformed mult_objs multimeshadj nodelists=/mult_objs/r || exit 1
+check_malformed mult_objs multimeshadj lzonelists=/mult_objs/q || exit 1
+#check_malformed mult_objs multimeshadj zonelists=/mult_objs/r || exit 1
 check_malformed mult_objs multivar nvars=-1 || exit 1
 check_malformed mult_objs multimat nmats=-1 || exit 1
 check_malformed mult_objs multimatspecies nspec=-1 || exit 1
