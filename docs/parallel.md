@@ -251,7 +251,7 @@ The functions described in this section of the manual include...
 
 * **Description:**
 
-  **Note: This object suffers from scalability issues above about 10{sup}5 blocks.**
+  **Note: This object suffers from scalability issues above about 10<sup>5</sup> blocks.**
 
   **The functionality this object provides is now more efficiently and conveniently handled via Mesh Region Grouping (MRG) trees.**
   Users are encouraged to use MRG trees as an alternative to `DBPutMultimeshadj()`.

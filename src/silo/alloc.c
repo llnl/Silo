@@ -910,9 +910,6 @@ DBFreeQuadmesh(DBquadmesh *msh)
 PUBLIC int
 DBIsEmptyQuadmesh(DBquadmesh const *msh)
 {
-#ifndef _WIN32
-#warning CHECK THIS LOGIC. IF ANY DIM>0, IT IS NOT EMPTY
-#endif
     int i, is_empty = 1;
 
     for (i = 0; msh && i < msh->ndims; i++)
@@ -2118,6 +2115,8 @@ DBFreeMrgvar(DBmrgvar *mrgv)
     if (mrgv == 0)
         return;
 
+    FREE(mrgv->mrgt_name);
+
     if (mrgv->compnames)
     {
         for (i = 0; i < mrgv->ncomps; i++)
@@ -2125,20 +2124,26 @@ DBFreeMrgvar(DBmrgvar *mrgv)
         FREE(mrgv->compnames);
     }
 
-    if (strchr(mrgv->reg_pnames[0], '%') == 0)
+    if (mrgv->reg_pnames)
     {
-        for (i = 0; i < mrgv->nregns; i++)
-            FREE(mrgv->reg_pnames[i]);
+        if (strchr(mrgv->reg_pnames[0], '%') == 0)
+        {
+            for (i = 0; i < mrgv->nregns; i++)
+                FREE(mrgv->reg_pnames[i]);
+        }
+        else
+        {
+            FREE(mrgv->reg_pnames[0]);
+        }
+        FREE(mrgv->reg_pnames);
     }
-    else
-    {
-        FREE(mrgv->reg_pnames[0]);
-    }
-    FREE(mrgv->reg_pnames);
 
-    for (i = 0; i < mrgv->ncomps; i++)
-        FREE(mrgv->data[i]);
-    FREE(mrgv->data);
+    if (mrgv->data)
+    {
+        for (i = 0; i < mrgv->ncomps; i++)
+            FREE(mrgv->data[i]);
+        FREE(mrgv->data);
+    }
 
     FREE(mrgv);
 }

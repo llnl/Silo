@@ -142,7 +142,7 @@ Finally, Silo also supports the specification of expressions representing derive
   :---|:---
   `dbfile` | Database file pointer.
   `name` | Name of the mesh.
-  `ndims` | Number of dimensions.
+  `ndims` | Number of *spatial* dimensions. The topological dimension of a collection of points is zero by definition.
   `coords` | Array of length `ndims` containing pointers to coordinate arrays.
   `nels` | Number of elements (points) in mesh.
   `datatype` | Datatype of the coordinate arrays. One of the predefined Silo data types.
@@ -181,8 +181,6 @@ Finally, Silo also supports the specification of expressions representing derive
   `DBOPT_MRGTREE_NAME`|`char*`|Name of the mesh region grouping tree to be associated with this mesh.|`NULL`
   `DBOPT_NODENUM`|`void*`|An array of length nnodes giving a global node number for each node in the mesh. By default, this array is treated as type int.|`NULL`
   `DBOPT_LLONGNZNUM`|`int`|Indicates that the array passed for `DBOPT_NODENUM` option is of long long type instead of int.|0
-  `DBOPT_LO_OFFSET`|`int`|Zero-origin index of first non-ghost node. All points in the mesh before this one are considered ghost. |0
-  `DBOPT_HI_OFFSET`|`int`|Zero-origin index of last non-ghost node. All points in the mesh after this one are considered ghost.|nels-1
   `DBOPT_GHOST_NODE_LABELS`|`char*`|Optional array of char values indicating the ghost labeling (`DB_GHOSTTYPE_NOGHOST` or `DB_GHOSTTYPE_INTDUP`) of each point|`NULL`
   `DBOPT_ALT_NODENUM_VARS`|`char**`|A null terminated list of names of optional array(s) or `DBpointvar` objects indicating (multiple) alternative numbering(s) for nodes.|`NULL`
 
