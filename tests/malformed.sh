@@ -135,9 +135,11 @@ check_malformed()
 check_malformed mat_objs material ndims=5 || exit 1
 check_malformed mat_objs material nmat=7 || exit 1
 check_malformed mat_objs material_mix mixlen=4495 || exit 1
-check_malformed mat_objs material matnos='ed' || exit 1
-check_malformed mat_objs material matlist='ed' || exit 1
-check_malformed mat_objs material_mix mix_next='ed' || exit 1
+check_malformed mat_objs material matnos='"/arrs/intsB"' || exit 1
+check_malformed mat_objs material matlist='"/arrs/intsB"' || exit 1
+check_malformed mat_objs material_mix mix_next='"/arrs/intsB"' || exit 1
+check_malformed mat_objs material_names_colors matnames='"/arrs/strsB"' || exit 1
+check_malformed mat_objs material_names_colors matcolors='"/arrs/strsB"' || exit 1
 
 # Material species and simple objects.
 check_malformed mat_objs matspecies ndims=5 || exit 1
@@ -150,35 +152,43 @@ check_malformed misc_objs defvars ndefs=-1 || exit 1
 
 # Multi-block objects.
 check_malformed mult_objs multimesh nblocks=-1 || exit 1
+check_malformed mult_objs multimesh empty_cnt=99 || exit 1
+check_malformed mult_objs multimesh empty_list='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimesh has_external_zones='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimesh zonecounts='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimesh extents='"/arrs/dblsB"' || exit 1
 check_malformed mult_objs multimeshadj nblocks=-1 || exit 1
 check_malformed mult_objs multimeshadj nblocks=99 || exit 1
 check_malformed mult_objs multimeshadj lneighbors=-1 || exit 1
 check_malformed mult_objs multimeshadj totlnodelists=3 || exit 1
 check_malformed mult_objs multimeshadj totlzonelists=3 || exit 1
-check_malformed mult_objs multimeshadj meshtypes=/mult_objs/q || exit 1
-check_malformed mult_objs multimeshadj nneighbors=/mult_objs/q || exit 1
-check_malformed mult_objs multimeshadj neighbors=/mult_objs/q || exit 1
-check_malformed mult_objs multimeshadj back=/mult_objs/q || exit 1
-check_malformed mult_objs multimeshadj lnodelists=/mult_objs/q || exit 1
+check_malformed mult_objs multimeshadj meshtypes='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimeshadj nneighbors='"/arrs/intsA"' || exit 1
+check_malformed mult_objs multimeshadj neighbors='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimeshadj back='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimeshadj lnodelists='"/arrs/intsA"' || exit 1
 # We cannot reasonably test corruption of the actual nodelists or zonelists contents
-#check_malformed mult_objs multimeshadj nodelists=/mult_objs/r || exit 1
-check_malformed mult_objs multimeshadj lzonelists=/mult_objs/q || exit 1
-#check_malformed mult_objs multimeshadj zonelists=/mult_objs/r || exit 1
+#check_malformed mult_objs multimeshadj nodelists='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multimeshadj lzonelists='"/arrs/intsA"' || exit 1
+#check_malformed mult_objs multimeshadj zonelists='"/arrs/intsB"' || exit 1
 check_malformed mult_objs multivar nvars=-1 || exit 1
+check_malformed mult_objs multivar empty_cnt=99 || exit 1
+check_malformed mult_objs multivar empty_list='"/arrs/intsB"' || exit 1
+check_malformed mult_objs multivar extents='"/arrs/dblsB"' || exit 1
 check_malformed mult_objs multimat nmats=-1 || exit 1
 check_malformed mult_objs multimatspecies nspec=-1 || exit 1
 
 # Point, quad, UCD and list objects.
 check_malformed point_objs pointmesh ndims=5 || exit 1
 check_malformed point_objs pointmesh nels=2 || exit 1
-check_malformed point_objs pointmesh gnodeno=/point_objs/x || exit 1
-check_malformed point_objs pointmesh ghost_node_labels=/point_objs/x || exit 1
+check_malformed point_objs pointmesh gnodeno='"/arrs/intsA"' || exit 1
+check_malformed point_objs pointmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
 check_malformed point_objs pointvar nvals=99 || exit 1
 check_malformed quad_objs quadmesh ndims=5 || exit 1
 check_malformed quad_objs quadmesh min_index={-1,-1,-1} || exit 1
 check_malformed quad_objs quadmesh max_index={99,99,99} || exit 1
-check_malformed quad_objs quadmesh ghost_node_labels=/quad_objs/qs || exit 1
-check_malformed quad_objs quadmesh ghost_zone_labels=/quad_objs/qs || exit 1
+check_malformed quad_objs quadmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
+check_malformed quad_objs quadmesh ghost_zone_labels='"/arrs/chrsB"' || exit 1
 if [ "$ext" = "pdb" ]; then
     check_malformed quad_objs quadmesh dims={2,3} subarr || exit 1
 else
@@ -187,8 +197,8 @@ fi
 check_malformed quad_objs quadvar nvals=99 || exit 1
 check_malformed ucd_objs ucdmesh ndims=5 || exit 1
 check_malformed ucd_objs ucdmesh nnodes=8 || exit 1
-check_malformed ucd_objs ucdmesh ghost_node_labels=/ucd_objs/y || exit 1
-check_malformed ucd_objs ucdmesh gnodeno=/ucd_objs/x || exit 1
+check_malformed ucd_objs ucdmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
+check_malformed ucd_objs ucdmesh gnodeno='"/arrs/intsA"' || exit 1
 check_malformed ucd_objs ucdvar nvals=99 || exit 1
 check_malformed ucd_objs ucdvar nels=9999 || exit 1
 check_malformed ucd_objs ucdvar_mix mixlen=5 || exit 1
@@ -200,21 +210,27 @@ check_malformed ucd_objs zl2 nzones=-1 || exit 1
 check_malformed ucd_objs zl2 nzones=99 || exit 1
 check_malformed ucd_objs zl2 nshapes=99 || exit 1
 check_malformed ucd_objs zl2 lnodelist=99 || exit 1
-check_malformed ucd_objs zl2 ghost_zone_labels=/ucd_objs/y || exit 1
-check_malformed ucd_objs zl2 gzoneno=/ucd_objs/x || exit 1
+check_malformed ucd_objs zl2 ghost_zone_labels='"/arrs/chrsB"' || exit 1
+check_malformed ucd_objs zl2 gzoneno='"/arrs/intsB"' || exit 1
 check_malformed list_objs phzl nfaces=-1 || exit 1
 check_malformed list_objs phzl lnodelist=999 || exit 1
 check_malformed list_objs phzl lfacelist=999 || exit 1
 check_malformed list_objs phzl nzones=999 || exit 1
-check_malformed list_objs phzl ghost_zone_labels=/list_objs/y || exit 1
-check_malformed list_objs phzl gzoneno=/list_objs/x || exit 1
+check_malformed list_objs phzl ghost_zone_labels='"/arrs/chrsB"' || exit 1
+check_malformed list_objs phzl gzoneno='"/arrs/intsB"' || exit 1
 
 # CSG and MRG objects.
 check_malformed csg_objs csgmesh ndims=5 || exit 1
+check_malformed csg_objs csgmesh bndnames='"/arrs/strsA"' || exit 1
 check_malformed csg_objs csgzl nregs=-1 || exit 1
+check_malformed csg_objs csgzl regnames='"/arrs/strsB"' || exit 1
+check_malformed csg_objs csgzl zonenames='"/arrs/strsB"' || exit 1
 check_malformed csg_objs csgvar nvals=99 || exit 1
 check_malformed mrg_objs groupelmap num_segments=-1 || exit 1
+check_malformed mrg_objs groupelmap num_segments=99 || exit 1
 check_malformed mrg_objs mrgtree num_nodes=-1 || exit 1
+check_malformed mrg_objs mrgtree num_nodes=99 || exit 1
+check_malformed mrg_objs mrgvar ncomps=-1 || exit 1
 check_malformed mrg_objs mrgvar ncomps=99 || exit 1
 
 #

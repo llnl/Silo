@@ -9550,6 +9550,14 @@ db_hdf5_PutCsgmesh(DBfile *_dbfile, char const *name, int ndims,
             strcpy(m.zonel_name, zonel_name);
         strcpy(m.mrgtree_name, OPT(_csgm._mrgtree_name));
 
+        if (_csgm._bndnames != NULL) {
+            char *s; int len;
+            DBStringArrayToStringList((char const * const *)_csgm._bndnames, nbounds, &s, &len);
+            db_hdf5_compwr(dbfile, DB_CHAR, 1, &len, s, m.bndnames/*out*/,
+                friendly_name(_dbfile,name, "_bndnames", 0));
+            FREE(s);
+        }
+
         if (_csgm._alt_nodenum_vars != NULL) {
             char *s; int len;
             DBStringArrayToStringList((char const * const *)_csgm._alt_nodenum_vars, -1, &s, &len);
@@ -9577,6 +9585,7 @@ db_hdf5_PutCsgmesh(DBfile *_dbfile, char const *name, int ndims,
             MEMBER_S(str(m.typeflags), typeflags);
             MEMBER_S(str(m.coeffs), coeffs);
             MEMBER_S(str(m.zonel_name), zonel_name);
+            MEMBER_S(str(m.bndnames), bndnames);
             MEMBER_S(str(m.mrgtree_name), mrgtree_name);
             if (m.tv_connectivity) MEMBER_S(int, tv_connectivity);
             if (m.disjoint_mode)   MEMBER_S(int, disjoint_mode);
@@ -9701,7 +9710,7 @@ db_hdf5_GetCsgmesh(DBfile *_dbfile, char const *name)
                 int cnt = -1;
                 csgm->bndnames = DBStringListToStringArray(tmpbndnames, &cnt, !skipFirstSemicolon);
                 FREE(tmpbndnames);
-                if (cnt != csgm->nbounds)
+                if (csgm->bndnames && cnt != csgm->nbounds)
                 {
                     db_perror(name, E_MALFORMED, me);
                     UNWIND();
@@ -17328,13 +17337,15 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         FREE(s);
         DBFreeStringArray(strArray, nStrArray);
         FREE(intArray);
-        for (i = 0; i < num_nodes; i++) {
-            FREE(ltree[i]->name);
-            FREE(ltree[i]->maps_name);
-            FREE(ltree[i]);
+        if (db_errno != E_MALFORMED) {
+            for (i = 0; i < num_nodes; i++) {
+                FREE(ltree[i]->name);
+                FREE(ltree[i]->maps_name);
+                FREE(ltree[i]);
+            }
+            FREE(ltree);
+            DBFreeMrgtree(tree); /* too complex to free if malformed */
         }
-        FREE(ltree);
-        DBFreeMrgtree(tree);
         tree = NULL;
     } END_PROTECT;
 

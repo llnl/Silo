@@ -55,6 +55,56 @@ static int failures = 0;
     } while (0)
 
 /* ---------------------------------------------------------------------- */
+/* Miscellaneous data available to spoil other objects for testing        */
+/* ---------------------------------------------------------------------- */
+#define SZ 11
+static void
+put_misc_arrs(DBfile *db)
+{
+    char chars[SZ];
+    int ints[SZ];
+    float flts[SZ];
+    double dbls[SZ];
+    char strs[] = "bat;bet;bit;bot;but;byt;pat;pet;pit;pot;put\0";
+    int nvals;
+
+    for (int i = 0; i < sizeof(chars)/sizeof(chars[0]); i++)
+    {
+        int const base = 901;
+        chars[i] = (char)i;
+        ints[i] = base+i;
+        flts[i] = (float) ints[i];
+        dbls[i] = (double) ints[i];
+    }
+
+    nvals = SZ;
+    DBWrite(db, "chrsB", chars, &nvals, 1, DB_CHAR);
+    nvals = 2;
+    DBWrite(db, "chrsA", chars, &nvals, 1, DB_CHAR);
+
+    nvals = SZ;
+    DBWrite(db, "intsB", ints, &nvals, 1, DB_INT);
+    nvals = 2;
+    DBWrite(db, "intsA", ints, &nvals, 1, DB_INT);
+
+    nvals = SZ;
+    DBWrite(db, "fltsB", flts, &nvals, 1, DB_FLOAT);
+    nvals = 2;
+    DBWrite(db, "fltsA", flts, &nvals, 1, DB_FLOAT);
+
+    nvals = SZ;
+    DBWrite(db, "dblsB", dbls, &nvals, 1, DB_DOUBLE);
+    nvals = 2;
+    DBWrite(db, "dblsA", dbls, &nvals, 1, DB_DOUBLE);
+
+    nvals = sizeof(strs)/sizeof(strs[0]);
+    DBWrite(db, "strsB", strs, &nvals, 1, DB_CHAR);
+    nvals = 8;
+    strs[nvals-1] = '\0';
+    DBWrite(db, "strsA", strs, &nvals, 1, DB_CHAR);
+}
+
+/* ---------------------------------------------------------------------- */
 /* Small 2-D quad mesh: 3x3 nodes => 2x2 = 4 zones.                       */
 /* ---------------------------------------------------------------------- */
 static void
@@ -80,7 +130,6 @@ put_quad_objects(DBfile *db)
 
     char nnum[9] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     char znum[4] = {0x00, 0x01, 0x02, 0x03};
-    int five = 5;
     int baseindex[3] = {5, 10, 0};
 
     DBoptlist *ol = DBMakeOptlist(20);
@@ -107,9 +156,6 @@ put_quad_objects(DBfile *db)
     PUT(DBPutQuadvar1(db, "quadvar_two", "quadmesh2",
                       qv2, dims_nodes, 2, NULL, 0,
                       DB_FLOAT, DB_NODECENT, NULL));
-
-    /* some extra data to use to spoil above objects from browser */
-    DBWrite(db, "qs", nnum, &five, 1, DB_CHAR);
 
     DBFreeOptlist(ol);
 }
@@ -155,10 +201,6 @@ put_ucd_objects(DBfile *db)
     DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
     DBAddOption(ol, DBOPT_ZONENUM, znum);
 
-    int badi[3] = {999,998,997};
-    char badc[3] = {0xF9,0xF8,0xF7};
-    int three = 3;
-
     PUT(DBPutZonelist(db, "zl_old",
                       4, 2, nodelist, 16, 0,
                       shapesize, shapecnt, 1));
@@ -188,9 +230,6 @@ put_ucd_objects(DBfile *db)
     PUT(DBPutUcdvar1(db, "ucdvar_one", "ucdmesh",
                      uone, 4, NULL, 0, DB_FLOAT, DB_ZONECENT, NULL));
 
-    DBWrite(db, "x", badi, &three, 1, DB_INT);
-    DBWrite(db, "y", badc, &three, 1, DB_CHAR);
-
     DBFreeOptlist(ol);
 }
 
@@ -211,8 +250,6 @@ put_point_objects(DBfile *db)
     float pone[5] = {51,52,53,54,55};
     int nnum[5] = {101,102,103,104,105};
     char gnl[5] = {0x0,0x1,0x2,0x3,0x4};
-    int  bad[3] = {91,92,93};
-    int three = 3;
     
     DBoptlist *ol = DBMakeOptlist(20);
     DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, gnl);
@@ -225,8 +262,6 @@ put_point_objects(DBfile *db)
 
     PUT(DBPutPointvar1(db, "pointvar_one", "pointmesh",
                        pone, 5, DB_FLOAT, NULL));
-
-    DBWrite(db, "x", bad, &three, 1, DB_INT);
 
     DBFreeOptlist(ol);
 }
@@ -251,8 +286,6 @@ put_material_objects(DBfile *db)
     char *matnames[2] = {"copper", "steel"};
     char *matcolors[2] = {"red", "blue"};
     DBoptlist *ol;
-    int seven = 7;
-    int int_data[7] = {1,1,1,1,1,1,1};
 
     /* basic material */
     PUT(DBPutMaterial(db, "material", "quadmesh",
@@ -272,9 +305,6 @@ put_material_objects(DBfile *db)
                       2, matnos, matlist, dims, 2,
                       NULL,NULL,NULL,NULL,0,DB_FLOAT,ol));
     DBFreeOptlist(ol);
-
-    /* some extra data to use to spoil above objects from browser */
-    DBWrite(db, "ed", int_data, &seven, 1, DB_INT);
 
     /*
      * Two materials; first has 1 species, second has 2.
@@ -365,10 +395,7 @@ put_phzonelist(DBfile *db)
     int facecnt[2] = {6,6};
     int facelist[12] = {0,1,2,3,4,5,6,7,8,9,10,11};
     char gzl[2] = {0x0, 0x1};
-    char badc[1] = {0xF9};
     int znum[2] = {500,501};
-    int badi[1] = {999};
-    int one = 1;
 
     DBoptlist *ol = DBMakeOptlist(20);
     DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
@@ -378,10 +405,6 @@ put_phzonelist(DBfile *db)
                         12, nodecnt, 48, nodelist, NULL,
                         2, facecnt, 12, facelist,
                         0, 0, 1, ol));
-
-    /* some extra data to use to spoil above objects from browser */
-    DBWrite(db, "x", badi, &one, 1, DB_INT);
-    DBWrite(db, "y", badc, &one, 1, DB_CHAR);
 
     DBFreeOptlist(ol);
 }
@@ -404,19 +427,31 @@ put_csg_objects(DBfile *db)
     double cval[1] = {61.0};
     void *vals[1] = {cval};
     char *names[1] = {"ccomp0"};
+    char *bndnames[3] = {"bnd1", "bnd2", "bnd3"};
+
+    DBoptlist *ol = DBMakeOptlist(20);
+
+    DBAddOption(ol, DBOPT_BNDNAMES, bndnames);
 
     PUT(DBPutCsgmesh(db, "csgmesh", 3, 1,
                      btypes, NULL, coeffs, 4, DB_FLOAT,
-                     extents, "csgzl", NULL));
+                     extents, "csgzl", ol));
+
+    DBClearOptlist(ol);
+
+    DBAddOption(ol, DBOPT_REGNAMES, bndnames);
+    DBAddOption(ol, DBOPT_ZONENAMES, bndnames);
 
     PUT(DBPutCSGZonelist(db, "csgzl", 1,
                          rtypes, left, right,
                          NULL, 0, DB_INT,
-                         1, zones, NULL));
+                         1, zones, ol));
 
     PUT(DBPutCsgvar(db, "csgvar", "csgmesh", 1,
                     (DBCAS_t)names, vals, 1,
                     DB_DOUBLE, DB_ZONECENT, NULL));
+
+    DBFreeOptlist(ol);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -497,29 +532,93 @@ put_mrg_objects(DBfile *db)
 static void
 put_multi_objects(DBfile *db)
 {
+    DBoptlist *ol = DBMakeOptlist(20);
+
     {
         char *names[3] = {"quadmesh","ucdmesh","pointmesh"};
         int types[3] = {DB_QUADMESH,DB_UCDMESH,DB_POINTMESH};
+        int intsA[3] = {44,55,66};
+        int intsB[3] = {0,1,1};
+        double exts[12] = {0,0,1,1, 0,0,1,1, 0,0,1,1};
+        int mtlist[2] = {0,2};
+        int two = 2, four = 4;
+
+        DBAddOption(ol, DBOPT_EXTENTS_SIZE, &four);
+        DBAddOption(ol, DBOPT_EXTENTS, exts);
+        DBAddOption(ol, DBOPT_ZONECOUNTS, intsA);
+        DBAddOption(ol, DBOPT_HAS_EXTERNAL_ZONES, intsB);
+        DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
+        DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &two);
+
         PUT(DBPutMultimesh(db, "multimesh", 3,
-                           (DBCAS_t)names, types, NULL));
+                           (DBCAS_t)names, types, ol));
+
+        DBClearOptlist(ol);
     }
 
     {
-        char *names[3] = {"quadvar1","ucdvar1","pointvar1"};
-        int types[3] = {DB_QUADVAR,DB_UCDVAR,DB_POINTVAR};
-        PUT(DBPutMultivar(db, "multivar", 3,
-                          (DBCAS_t)names, types, NULL));
+        char *names[4] = {"qv1","qv2","qv3","qv4"};
+        int types[4] = {DB_QUADVAR,DB_QUADVAR,DB_QUADVAR,DB_QUADVAR};
+        int three = 3, four = 4;
+        double exts[16] = {0,0,1,1, 0,0,1,1, 0,0,1,1, 0,0,1,1};
+        int mtlist[3] = {0,1,2};
+
+        DBAddOption(ol, DBOPT_EXTENTS_SIZE, &four);
+        DBAddOption(ol, DBOPT_EXTENTS, exts);
+        DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
+        DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &three);
+
+        PUT(DBPutMultivar(db, "multivar", 4,
+                          (DBCAS_t)names, types, ol));
+
+        DBClearOptlist(ol);
     }
 
     {
-        char *names[2] = {"material","material"};
-        PUT(DBPutMultimat(db, "multimat", 2, (DBCAS_t)names, NULL));
+        int nmatnos = 3;
+        char *names[5] = {"matA","matB","matC","matD","matE"};
+        int matnos[3] = {801,802,803};
+        char *matnames[3] = {"copper","plastic","granite"};
+        char *matcolors[3] = {"red","green","blue"};
+        int mixlens[5] = {111,112,113,114,115};
+        int matcnts[5] = {2,2,3,3,2};
+        int matlists[13] = {801,803, 801,802, 801,802,803, 801,802,803, 802,803};
+        int nmt = 2;
+        int mtlist[2] = {0,1};
+
+        DBAddOption(ol, DBOPT_NMATNOS, &nmatnos);
+        DBAddOption(ol, DBOPT_MATNOS, matnos);
+        DBAddOption(ol, DBOPT_MATNAMES, matnames);
+        DBAddOption(ol, DBOPT_MATCOLORS, matcolors);
+        DBAddOption(ol, DBOPT_MIXLENS, mixlens);
+        DBAddOption(ol, DBOPT_MATCOUNTS, matcnts);
+        DBAddOption(ol, DBOPT_MATLISTS, matlists);
+        DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
+        DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &nmt);
+
+        PUT(DBPutMultimat(db, "multimat", 5, (DBCAS_t)names, ol));
+
+        DBClearOptlist(ol);
     }
 
     {
         char *names[2] = {"matspecies","matspecies"};
+        int nmat = 3;
+        int nmatspec[3] = {2, 3, 4};
+        char *specnames[9] = {"aaa", "aab",    "bba", "bbb", "bbc",    "cca", "ccb", "ccc", "ccd"};
+        char *speccolors[9] = {"red", "green",    "blue", "cyan", "magenta",    "black", "white", "yellow", "orange"};
+        int nmt = 2;
+        int mtlist[2] = {0,1};
+
+        DBAddOption(ol, DBOPT_NMAT, &nmat);
+        DBAddOption(ol, DBOPT_NMATSPEC, nmatspec);
+        DBAddOption(ol, DBOPT_SPECNAMES, specnames);
+        DBAddOption(ol, DBOPT_SPECCOLORS, speccolors);
+        DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
+        DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &nmt);
         PUT(DBPutMultimatspecies(db, "multimatspecies",
-                                 2, (DBCAS_t)names, NULL));
+                                 2, (DBCAS_t)names, ol));
+
     }
 
     /*
@@ -540,8 +639,6 @@ put_multi_objects(DBfile *db)
         int zl0[1] = {06021};
         int zl1[1] = {06031};
         int *zonelists[2] = {zl0,zl1};
-        int some_ints[9] = {109,209,309,409,509,609,709,809,909};
-        int nine = 9;
 
         PUT(DBPutMultimeshadj(db, "multimeshadj",
                               2, meshtypes, nneighbors, neighbors, back,
@@ -549,11 +646,9 @@ put_multi_objects(DBfile *db)
                               lzonelists, (int const * const *)zonelists,
                               NULL));
 
-        /* some extra data to use to spoil above objects from browser */
-        DBWrite(db, "q", some_ints, &nine, 1, DB_INT);
-        nine = 3;
-        DBWrite(db, "r", some_ints, &nine, 1, DB_INT);
     }
+
+    DBFreeOptlist(ol);
 }
 
 int
@@ -593,6 +688,8 @@ main(int argc, char **argv)
         return 1;
     }
 
+    SET_DIR(arrs);
+    put_misc_arrs(db);
     SET_DIR(quad_objs);
     put_quad_objects(db);
     SET_DIR(ucd_objs);
