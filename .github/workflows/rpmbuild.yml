@@ -59,4 +59,7 @@ jobs:
       - name: Build rpm
         working-directory: Silo.rpm
         run: |
-          fedpkg --verbose --debug local
+          rpmbuild -ba Silo.spec \
+            --define "_sourcedir $PWD" \
+            --define "_srcrpmdir $PWD" \
+            --define "_rpmdir $PWD"

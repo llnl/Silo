@@ -209,8 +209,11 @@ num_print(obj_t _self, out_t *f)
             out_puts(f, buf);
         } else {
             char *fmt = sym_bi_gets("fmt_double");
-            if (!fmt || !*fmt) fmt = "%g";
-            out_printf(f, fmt, self->u.d);
+            if (fmt && *fmt)
+                out_printf(f, fmt, self->u.d);
+            else
+                out_printf(f, "%g", self->u.d);
+            free(fmt);
         }
     } else {
 
@@ -232,8 +235,11 @@ num_print(obj_t _self, out_t *f)
             out_puts(f, buf);
         } else {
             char *fmt = sym_bi_gets("fmt_int");
-            if (!fmt || !*fmt) fmt = "%d";
-            out_printf (f, fmt, self->u.i);
+            if (fmt && *fmt)
+                out_printf(f, fmt, self->u.i);
+            else
+                out_printf(f, "%d", self->u.i);
+            free(fmt);
         }
     }
 }
