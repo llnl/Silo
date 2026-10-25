@@ -8303,7 +8303,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         tot_len += sl;
     }
 
-    if (segdata_size > 0 && tot_len != segdata_size)
+    if (tot_len != segdata_size)
     {
         free(gm); /* DBFreeGroupelmap(gm) not safe here. A bit of leak ok. */
         FREE(segData);
@@ -8347,7 +8347,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
             tot_len += sl;
         }
 
-        if (segfracs_size > 0 && tot_len != segfracs_size)
+        if (tot_len != segfracs_size)
         {
             free(gm); /* DBFreeGroupelmap(gm) not safe here. A bit of leak ok. */
             FREE(segData);

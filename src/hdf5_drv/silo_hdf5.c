@@ -17299,7 +17299,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
             db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
-        for (i = 0; i < num_nodes; i++)
+        for (i = 0; i < num_nodes && strArray; i++)
             ltree[i]->name = strArray[i];
         FREE(s);
         FREE(strArray); /* free only top-level array of pointers */
@@ -17310,7 +17310,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         {
             nStrArray = -1;
             strArray = DBStringListToStringArray(s, &nStrArray, !skipFirstSemicolon);
-            for (i = 0, n = 0; i < num_nodes && n < nStrArray; i++)
+            for (i = 0, n = 0; i < num_nodes && strArray && n < nStrArray; i++)
             {
                 if (ltree[i]->narray == 0)
                     continue;
@@ -17320,6 +17320,11 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     ltree[i]->names = (char**) malloc(ltree[i]->narray * sizeof(char*));
                     for (j = 0; j < ltree[i]->narray && n < nStrArray; j++, n++)
                         ltree[i]->names[j] = strArray[n];
+                    if (j != ltree[i]->narray)
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
                 else
                 {
@@ -17328,7 +17333,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     n++;
                 }
             }
-            if (n != nStrArray)
+            if (strArray && n != nStrArray)
             {
                 db_perror(name, E_MALFORMED, me);
                 UNWIND();
@@ -17346,7 +17351,7 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
             db_perror(name, E_MALFORMED, me);
             UNWIND();
         }
-        for (i = 0; i < num_nodes; i++)
+        for (i = 0; i < num_nodes && strArray; i++)
             ltree[i]->maps_name = strArray[i];
         FREE(s);
         FREE(strArray); /* free only top-level array of pointers */
@@ -17363,6 +17368,11 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     ltree[i]->seg_ids = (int*) malloc(ns * sizeof(int));
                     for (j = 0; j < ns && n < seg_ids_size; j++)
                         ltree[i]->seg_ids[j] = intArray[n++];
+                    if (j != ns)
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
             }
             FREE(intArray);
@@ -17385,6 +17395,11 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     ltree[i]->seg_lens = (int*) malloc(ns * sizeof(int));
                     for (j = 0; j < ns && n < seg_lens_size; j++)
                         ltree[i]->seg_lens[j] = intArray[n++];
+                    if (j != ns)
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
             }
             FREE(intArray);
@@ -17407,6 +17422,11 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     ltree[i]->seg_types = (int*) malloc(ns * sizeof(int));
                     for (j = 0; j < ns && n < seg_types_size; j++)
                         ltree[i]->seg_types[j] = intArray[n++];
+                    if (j != ns)
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
             }
             FREE(intArray);
@@ -17429,6 +17449,11 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
                     ltree[i]->children = (DBmrgtnode**) malloc(nc * sizeof(DBmrgtnode*));
                     for (j = 0; j < nc && n < child_ids_size && intArray[n] >= 0 && intArray[n] < num_nodes; j++, n++)
                         ltree[i]->children[j] = ltree[intArray[n]];
+                    if (j != nc)
+                    {
+                        db_perror(name, E_MALFORMED, me);
+                        UNWIND();
+                    }
                 }
             }
             FREE(intArray);
@@ -17447,7 +17472,8 @@ db_hdf5_GetMrgtree(DBfile *_dbfile, char const *name)
         if (s) tree->mrgvar_rnames = DBStringListToStringArray(s, 0, !skipFirstSemicolon);
         FREE(s);
 
-        tree->root = ltree[m.root];
+        if (tree->num_nodes > 0)
+            tree->root = ltree[m.root];
         tree->cwr = tree->root;
 
         H5Tclose(o);
@@ -17659,7 +17685,7 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         }
 
         /* Create object and initialize meta data */
-        gm = (DBgroupelmap *) malloc(sizeof(DBgroupelmap));
+        gm = (DBgroupelmap *) calloc(1, sizeof(DBgroupelmap));
         gm->name = BASEDUP(name);
         gm->num_segments = m.num_segments;
         if ((gm->fracs_data_type = db_hdf5_GetVarType(_dbfile, m.segment_fracs)) < 0)
@@ -17672,9 +17698,9 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         gm->segment_lengths = (int *)_db_hdf5_comprd(dbfile, m.segment_lengths, 1, &seglens_size);
         gm->segment_ids = (int *)_db_hdf5_comprd(dbfile, m.segment_ids, 1, &segids_size);
 
-        if ((gm->groupel_types && grpltypes_size != gm->num_segments) ||
-            (gm->segment_lengths && seglens_size != gm->num_segments) ||
-            (gm->segment_ids && segids_size != gm->num_segments))
+        if (!gm->groupel_types || grpltypes_size != gm->num_segments ||
+            !gm->segment_lengths || seglens_size != gm->num_segments ||
+            !gm->segment_ids || segids_size != gm->num_segments)
         {      
             db_perror(name, E_MALFORMED, me);
             UNWIND();
@@ -17682,12 +17708,14 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
 
         /* read the map segment data */
         gm->segment_data = (int **) calloc(m.num_segments, sizeof(int*));
+        intArray_size = 0;
         intArray = (int *)_db_hdf5_comprd(dbfile, m.segment_data, 1, &intArray_size);
 
         n = 0;
         for (i = 0; (i < m.num_segments) && intArray && gm->segment_lengths; i++)
         {
             int sl = gm->segment_lengths[i];
+            if (sl == 0) continue;
             if (sl > 0)
             {
                 gm->segment_data[i] = (int*) malloc(sl * sizeof(int));
@@ -17695,55 +17723,72 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
                 {
                     if (n >= intArray_size)
                     {
-                        FREE(intArray);
-                        free(gm); /* DBFreeGroupelmap(gm) not safely callable */
                         db_perror(name, E_MALFORMED, me);
                         UNWIND();
                     }
                     gm->segment_data[i][j] = intArray[n++];
                 }
             }
+            else
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
         FREE(intArray);
+        if (n != intArray_size)
+        {
+            db_perror(name, E_MALFORMED, me);
+            UNWIND();
+        }
 
-        intArray = (int *)db_hdf5_comprd(dbfile, m.frac_lengths, 1);
+        n = 0;
+        fracsArray_size = 0;
+        intArray = (int *)_db_hdf5_comprd(dbfile, m.frac_lengths, 1, &intArray_size);
         if (intArray)
         {
-            gm->segment_fracs = (void **)calloc(m.num_segments, sizeof(void*));
-            fracsArray = db_hdf5_comprd(dbfile, m.segment_fracs, 1);
+            if (intArray_size != m.num_segments)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
 
-            /* Acquire actual file size of segment_data */
-            fracsArray_size = db_hdf5_GetVarLength(_dbfile, m.segment_fracs);
-            n = 0;
+            gm->segment_fracs = (void **)calloc(m.num_segments, sizeof(void*));
+            fracsArray = _db_hdf5_comprd(dbfile, m.segment_fracs, 1, &fracsArray_size);
+
             for (i = 0; (i < m.num_segments) && fracsArray; i++)
             {
                 int len = intArray[i];
-                if (len <= 0)
-                    continue;
-
-                gm->segment_fracs[i] = malloc(len * ((gm->fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
-                for (j = 0; j < len; j++)
+                if (len == 0) continue;
+ 
+                if (len > 0)
                 {
-                    if (n >= fracsArray_size)
+                    gm->segment_fracs[i] = malloc(len * ((gm->fracs_data_type==DB_FLOAT)?sizeof(float):sizeof(double)));
+                    for (j = 0; j < len; j++)
                     {
-                        FREE(intArray);
-                        FREE(fracsArray);
-                        free(gm); /* DBFreeGroupelmap(gm) not safely callable */
-                        db_perror(name, E_MALFORMED, me);
-                        UNWIND();
+                        if (n >= fracsArray_size)
+                        {
+                            db_perror(name, E_MALFORMED, me);
+                            UNWIND();
+                        }
+                        if (gm->fracs_data_type == DB_FLOAT)
+                        {
+                            float *pfa = (float *) fracsArray;
+                            float *psf = (float *) gm->segment_fracs[i];
+                            psf[j] = pfa[n++];
+                        }
+                        else
+                        {
+                            double *pfa = (double *) fracsArray;
+                            double *psf = (double *) gm->segment_fracs[i];
+                            psf[j] = pfa[n++];
+                        }
                     }
-                    if (gm->fracs_data_type == DB_FLOAT)
-                    {
-                        float *pfa = (float *) fracsArray;
-                        float *psf = (float *) gm->segment_fracs[i];
-                        psf[j] = pfa[n++];
-                    }
-                    else
-                    {
-                        double *pfa = (double *) fracsArray;
-                        double *psf = (double *) gm->segment_fracs[i];
-                        psf[j] = pfa[n++];
-                    }
+                }
+                else
+                {
+                    db_perror(name, E_MALFORMED, me);
+                    UNWIND();
                 }
             }
         }
@@ -17753,6 +17798,10 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         }
         FREE(intArray);
         FREE(fracsArray);
+        if (n != fracsArray_size)
+        {
+            UNWIND();
+        }
 
         H5Tclose(o);
 
@@ -17761,8 +17810,10 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
             H5Aclose(attr);
             H5Tclose(o);
         } H5E_END_TRY;
+        free(gm); /* DBFreeGroupelmap(gm) not safely callable */
         FREE(intArray);
         FREE(fracsArray);
+        gm = 0;
     } END_PROTECT;
 
     return gm;
