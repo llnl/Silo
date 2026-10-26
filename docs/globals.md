@@ -36,7 +36,7 @@ All of the work to detect and flag malformed objects is done in the read interfa
 The reason for this is that even if a writer constructs perfectly valid objects, there is a chance a third party can corrupt objects after the writer is done with the file.
 In fact, Silo's browser can be used to edit an existing, valid file object to corrupt it and turn it into a malformed object.
 For example, Silo's browser can be used to change the value of the `datatype` member of a `DBucdvar`.
-Condequently, adding a bunch of logic to the *write* interface to prevent malformed objects from being created does very little to protect Silo applications from third parties editing Silo files.
+Consequently, adding a bunch of logic to the *write* interface to prevent malformed objects from being created does little to protect Silo applications from third parties editing and corrupting Silo objects.
 
 The `E_MALFORMED` error code can be produced only during read operations.
 In rare cases, a malformed file object can lead to an `E_CALLFAIL` error condition instead of `E_MALFORMED`.
