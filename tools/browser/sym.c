@@ -551,6 +551,7 @@ sym_self_set (obj_t newval) {
    selfvar = obj_new (C_SYM, "self");
    oldval = sym_vboundp (selfvar);
    sym_vbind (selfvar, newval);
+   selfvar = obj_dest(selfvar);
    return oldval;
 }
 

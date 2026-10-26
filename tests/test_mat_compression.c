@@ -239,10 +239,29 @@ main(int argc, char *argv[])
     {
         int total_file_bytes = 0;
         int total_mem_bytes = 0;
+        int matvalid, tmp1, tmp2, nzones=1;
         int mat_bytes = calc_material_object_size(mat);
 
-        DBCalcDenseArraysFromMaterial(mat, mat->datatype, &narrs, &vfracs);
-        ASSERT(narrs = mat->nmat);
+        /* find index of first mixing zone */
+        for (int i = 0; i < mat->ndims; nzones *= (mat->dims[i]>1?mat->dims[i]:1), i++);
+        for (int i = 0; i < nzones && mat->matlist[i]>0; i++) tmp1=i+1;
+
+        /* Test material validation code by corrupting and checking */
+        tmp2 = mat->mixlen;
+        mat->mixlen = 0;
+        matvalid = DBValidateMaterial(mat);
+        ASSERT(matvalid == tmp1 || matvalid == DB_VALIDATE_BAD);
+        mat->mixlen = tmp2;
+
+        tmp1 = mat->matlist[17];
+        mat->matlist[17] = 253;
+        matvalid = DBValidateMaterial(mat);
+        ASSERT(matvalid == 17 || matvalid == DB_VALIDATE_BAD);
+        mat->matlist[17] = tmp1;
+
+        matvalid = DBCalcDenseArraysFromMaterial(mat, mat->datatype, &narrs, &vfracs);
+        ASSERT(narrs == mat->nmat);
+        ASSERT(matvalid == DB_VALIDATE_GOOD);
         vfrac_varnames = (char **) malloc(narrs * sizeof(char*));
         for (i = 0; i < narrs; i++)
         {

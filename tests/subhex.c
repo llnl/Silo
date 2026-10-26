@@ -254,7 +254,7 @@ main(int argc, char *argv[])
     Pshapesize[0] = 8;	/* ...hexes */
 
     DBSetDeprecateWarnings(0);
-    DBPutZonelist(dbfile, "Pzonelist", 2, 3, Pnodelist, 12, 0, Pshapesize,
+    DBPutZonelist(dbfile, "Pzonelist", 2, 3, Pnodelist, 16, 0, Pshapesize,
                   Pshapecnt, 1);
     DBSetDeprecateWarnings(3);
 

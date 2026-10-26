@@ -1391,13 +1391,13 @@ _lite_PD_setup_chart (HASHTAB *chart, data_standard *fstd, data_standard *hstd,
    _lite_PD_defstr(chart, "char", falign->char_alignment,
                    1L, -1, conv, NULL, NULL);
 
-  if (flag) {
-      PD_COMPARE_CHAR_STD(conv, fstd, hstd, falign, halign);
+   if (flag) {
+      PD_COMPARE_PTR_STD(conv, fstd, hstd, falign, halign);
    } else {
       conv = FALSE;
    }
-   _lite_PD_defstr(chart, "char *", falign->char_alignment,
-                   1L, -1, conv, NULL, NULL);
+   _lite_PD_defstr(chart, "char *", falign->ptr_alignment,
+                   (long) fstd->ptr_bytes, -1, conv, NULL, NULL);
 
    if (flag) {
       PD_COMPARE_SHORT_STD(conv, fstd, hstd, falign, halign);

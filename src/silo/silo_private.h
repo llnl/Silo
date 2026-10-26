@@ -367,7 +367,7 @@ typedef struct context_t {
 #define MAXDIMS_VARWRITE 7
 #define OVER_WRITE      0x0001            /*overwrite DBobject */
 #define FREE_MEM        0x0002            /*free DBobject memory */
-#define NELMTS(X)       (sizeof(X)/sizeof(X[0]))  /*Number of elements */
+#define NELMTS(X)       ((int)(sizeof(X)/sizeof((X)[0])))  /*Number of elements */
 
 #define STR_EQUAL(S1,S2) (!strcmp((S1),(S2)))
 #define STR_BEGINSWITH(S,P) ((strstr((S),(P))==(S))?1:0)
@@ -904,7 +904,7 @@ INTERNAL int UM_CalcExtents (DBVCP2_t, int, int, int, void *,
                                  void *);
 INTERNAL int db_ProcessOptlist (int, DBoptlist const * const);
 INTERNAL int db_VariableNameValid(char const *);
-INTERNAL int db_SplitShapelist (DBucdmesh *um);
+INTERNAL int db_SplitShapelist (DBzonelist *zl);
 INTERNAL int db_ResetGlobalData_Csgmesh ();
 INTERNAL int db_ResetGlobalData_Mrgtree();
 INTERNAL int db_ResetGlobalData_PointMesh (int ndims);
@@ -934,7 +934,7 @@ INTERNAL const int *db_get_used_file_options_sets_ids();
 #undef strdup /*prevent a warning for the following definition*/
 #define strdup(s) _db_safe_strdup(s)
 
-INTERNAL int db_StringListToStringArrayMBOpt(char *strList, char ***strArray, char **alloc_flag, int nblocks);
+INTERNAL int db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***strArray, char **alloc_flag, int nblocks);
 INTERNAL int db_fix_obsolete_centering(int ndims, float const *align, int carfm);
 
 #endif /* !SILO_PRIVATE_H */
