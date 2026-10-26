@@ -8263,7 +8263,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     DEFALL_OBN("segment_ids",     &tmpgm.segment_ids,     DB_INT,   &segids_size);
     DEFALL_OBN("segment_data",    &segData,               DB_INT,   &segdata_size);
     DEFALL_OBN("frac_lengths",    &fracLengths,           DB_INT,   &fraclens_size);
-    DEFALL_OBN("segment_fracs",   &fracsArray,            DB_FLOAT, &segfracs_size);
+    DEFALL_OBN("segment_fracs",   &fracsArray, _datatypeFlagSet(DB_FLOAT), &segfracs_size);
 
     if (PJ_GetObject(dbfile->pdb, (char*)name, &tmp_obj, DB_GROUPELMAP) < 0)
         return NULL;
@@ -8276,7 +8276,8 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         gm->num_segments != grptypes_size ||
         gm->num_segments != seglens_size ||
         gm->num_segments != segids_size ||
-        (fraclens_size > 0 && gm->num_segments != fraclens_size))
+        (fraclens_size > 0 && gm->num_segments != fraclens_size) ||
+        (fracsArray && !(tmpgm.fracs_data_type == DB_FLOAT || tmpgm.fracs_data_type == DB_DOUBLE)))
     {
         free(gm); /* DBFreeGroupelmap(gm) not safe here. A bit of leak ok. */
         FREE(segData);

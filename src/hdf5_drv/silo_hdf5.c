@@ -17736,7 +17736,7 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
             }
         }
         FREE(intArray);
-        if (n != intArray_size)
+        if (intArray && n != intArray_size)
         {
             db_perror(name, E_MALFORMED, me);
             UNWIND();
@@ -17791,6 +17791,11 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
                     UNWIND();
                 }
             }
+            if (fracsArray && n != fracsArray_size)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
         }
         else
         {
@@ -17798,10 +17803,6 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
         }
         FREE(intArray);
         FREE(fracsArray);
-        if (n != fracsArray_size)
-        {
-            UNWIND();
-        }
 
         H5Tclose(o);
 

@@ -503,6 +503,10 @@ check_malformed mrg_objs groupelmap segment_ids='"/arrs/intsA"' || exit 1
 check_malformed mrg_objs groupelmap segment_data='"/arrs/intsA"' || exit 1
 check_malformed mrg_objs groupelmap frac_lengths='"/arrs/intsA"' || exit 1
 check_malformed mrg_objs groupelmap segment_fracs='"/arrs/fltsA"' || exit 1
+if [ "$ext" = "pdb" ]; then
+    check_malformed mrg_objs groupelmap fracs_data_type=$db_short_val || exit 1
+    check_malformed mrg_objs groupelmap segment_fracs='"/arrs/svals5"' || exit 1
+fi
 
 # Various corruptions of mrgtree objects
 check_malformed mrg_objs mrgtree num_nodes=-1 || exit 1
@@ -530,7 +534,10 @@ check_malformed mrg_objs mrgvar ncomps=-1 || exit 1
 check_malformed mrg_objs mrgvar ncomps=99 || exit 1
 check_malformed mrg_objs mrgvar nregns=2 || exit 1
 if [ "$ext" = "pdb" ]; then
+    check_malformed mrg_objs mrgvar datatype=$db_short_val || exit 1
     check_malformed mrg_objs mrgvar value0='"/arrs/fltsA"' || exit 1
+    check_malformed mrg_objs mrgvar value0='"/arrs/svals3"' || exit 1
+    check_malformed mrg_objs mrgvar value1='"/arrs/svals3"' || exit 1
 else
     check_malformed mrg_objs mrgvar data0='"/arrs/fltsA"' || exit 1
 fi
