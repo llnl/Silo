@@ -644,7 +644,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
         if (error || cached_group == NULL)
         {
             char err_str[256];
-            sprintf(err_str,"PJ_get_group: Probably no such object \"%s\".",objname);
+            snprintf(err_str,sizeof(err_str),"PJ_get_group: Probably no such object \"%s\".",objname);
             FREE(varname);
             FREE(filename);
             return db_perror(err_str, E_CALLFAIL, me);
@@ -679,7 +679,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
             if (!matched)
             {
                 char error[256];
-                sprintf(error,"Requested %s object \"%s\" is not a %s.",
+                snprintf(error,sizeof(error),"Requested %s object \"%s\" is not a %s.",
                     cached_group->type, objname_in, DBGetObjtypeName(expected_dbtype));
                 FREE(varname);
                 FREE(filename);
@@ -714,7 +714,7 @@ PJ_GetObject(PDBfile *file_in, char const *objname_in, PJcomplist *tobj, int exp
             char error[256];
             FREE(varname);
             FREE(filename);
-            sprintf(error,"Requested %s object \"%s\" is not a %s.",
+            snprintf(error,sizeof(error),"Requested %s object \"%s\" is not a %s.",
                 cached_group->type, objname_in, DBGetObjtypeName(expected_dbtype));
             db_perror(error, E_NOTFOUND, me);
             return -1;
@@ -2528,7 +2528,7 @@ db_pdb_getobjinfo (PDBfile       *pdb,
 
    *num = *type = 0;
 
-   sprintf(newname, "%s->type", name);
+   snprintf(newname, sizeof(newname), "%s->type", name);
    if (PJ_read(pdb, newname, &ctype) == FALSE) {
       return db_perror("PJ_read", E_CALLFAIL, me);
    }
@@ -2540,7 +2540,7 @@ db_pdb_getobjinfo (PDBfile       *pdb,
        type[type_size-1] = '\0';
    SCFREE(ctype);
 
-   sprintf(newname, "%s->ncomponents", name);
+   snprintf(newname, sizeof(newname), "%s->ncomponents", name);
    PJ_read(pdb, newname, num);
 
    return 0;
@@ -2829,9 +2829,9 @@ db_pdb_NewToc (DBfile *_dbfile)
           * Read the type field of each object and increment
           * the appropriate count.
           */
-         sprintf(name, "%s->type", list[i]);
+         snprintf(name, sizeof(name), "%s->type", list[i]);
          if (!PJ_read(file, name, &ctype)) {
-            sprintf(name, "%s.type", list[i]);
+            snprintf(name, sizeof(name), "%s.type", list[i]);
             if (!PJ_read(file, name, &ctype)) {
                FREE(types);
                FREE(list);
@@ -3219,8 +3219,9 @@ db_pdb_InqVarType(DBfile *_dbfile, char const *varname)
     if (entry == NULL)
     {
         /* This could be a directory.  Add a "/" to the end and try again. */
-        char *newname = (char*)malloc(strlen(varname)+2);
-        sprintf(newname,"%s/",varname);
+        int slen = strlen(varname)+2;
+        char *newname = (char*)malloc(slen);
+        snprintf(newname,slen,"%s/",varname);
         entry = lite_PD_inquire_entry(file, newname, TRUE, NULL);
         free(newname);
 
@@ -3236,10 +3237,10 @@ db_pdb_InqVarType(DBfile *_dbfile, char const *varname)
     else if (STR_BEGINSWITH(entry->type, "Group"))
     {
         /* It's not a directory.  Ask PDB what the type is. */
-        sprintf(name, "%s.type", varname);
+        snprintf(name, sizeof(name), "%s.type", varname);
         if (!PJ_read(file, name, &char_type))
         {
-            sprintf(name, "%s->type", varname);
+            snprintf(name, sizeof(name), "%s->type", varname);
             if (!PJ_read(file, name, &char_type))
                 return(DB_INVALID_OBJECT);
         }
@@ -7362,7 +7363,7 @@ db_pdb_InqMeshtype (DBfile *_dbfile, char const *mname)
    int            type;
    static char   *me = "db_pdb_InqMeshtype";
 
-   sprintf(tmp, "%s->type", mname);
+   snprintf(tmp, sizeof(tmp), "%s->type", mname);
    if (!PJ_read(dbfile->pdb, tmp, &ctype)) {
       return db_perror("PJ_read", E_CALLFAIL, me);
    }
@@ -7401,14 +7402,16 @@ db_pdb_InqVarExists (DBfile *_dbfile, char const *varname)
    char          *newname;
    DBfile_pdb    *dbfile = (DBfile_pdb *) _dbfile;
    syment        *ep;
+   int            len;
 
     /* First, check to see if it exists */
     ep = lite_PD_inquire_entry(dbfile->pdb, (char *)varname, TRUE, NULL);
     if (ep) return 1;
 
     /* This could be a directory.  Add a "/" to the end and try again. */
-    newname = (char*)malloc(strlen(varname)+2);
-    sprintf(newname,"%s/",varname);
+    len = strlen(varname)+2;
+    newname = (char*)malloc(len);
+    snprintf(newname,len,"%s/",varname);
     ep = lite_PD_inquire_entry(dbfile->pdb, newname, TRUE, NULL);
     free(newname);
 
@@ -7813,7 +7816,7 @@ db_pdb_SetDir (DBfile *_dbfile, char const *path)
       db_FreeToc(_dbfile);
    }
    else {
-      sprintf(error_message,"\"%s\" ***%s***",path,lite_PD_err);
+      snprintf(error_message,sizeof(error_message),"\"%s\" ***%s***",path,lite_PD_err);
       return db_perror(error_message, E_NOTDIR, me);
    }
 
@@ -10754,7 +10757,7 @@ db_pdb_PutPointmesh (DBfile *dbfile, char const *name, int ndims, DBVCP2_t _coor
    datatype_str = db_GetDatatypeString(datatype);
    count[0] = nels;
    for (i = 0; i < ndims && nels; i++) {
-      sprintf(tmp, "coord%d", i);
+      snprintf(tmp, sizeof(tmp), "coord%d", i);
       DBWriteComponent(dbfile, obj, tmp, name, datatype_str,
                        coords[i], 1, count);
    }
@@ -10973,7 +10976,7 @@ db_pdb_PutPointvar (DBfile *dbfile, char const *name, char const *meshname, int 
       }
       else {
          for (i = 0; i < nvars; i++) {
-            sprintf(tmp, "%d_data", i);
+            snprintf(tmp, sizeof(tmp), "%d_data", i);
             DBWriteComponent(dbfile, obj, tmp, name, datatype_str,
                              vars[i], 1, count);
          }
@@ -11146,7 +11149,7 @@ db_pdb_PutQuadmesh (DBfile *dbfile, char const *name, char const * const *coordn
             count[0] = dims[i];
 
         /* Do coordinate array, in form: coordN, where n = 0, 1, ... */
-        sprintf(tmp, "coord%d", i);
+        snprintf(tmp, sizeof(tmp), "coord%d", i);
         DBWriteComponent(dbfile, obj, tmp, name, datatype_str,
                          coords[i], nd, count);
     }
@@ -11455,7 +11458,7 @@ db_pdb_PutQuadvar (DBfile *_dbfile, char const *name, char const *meshname, int 
               PJ_write_len(dbfile->pdb, tmp2, datatype_str, vars[i], ndims, count);
       }
 
-      sprintf(tmp1, "value%d", i);
+      snprintf(tmp1, sizeof(tmp1), "value%d", i);
       DBAddVarComponent(obj, tmp1, tmp2);
 
       /* Write the mixed data component if present */
@@ -11466,7 +11469,7 @@ db_pdb_PutQuadvar (DBfile *_dbfile, char const *name, char const *meshname, int 
          PJ_write_len(dbfile->pdb, tmp2, datatype_str, mixvars[i],
                       1, mcount);
 
-         sprintf(tmp1, "mixed_value%d", i);
+         snprintf(tmp1, sizeof(tmp1), "mixed_value%d", i);
          DBAddVarComponent(obj, tmp1, tmp2);
       }
    }
@@ -11782,7 +11785,7 @@ db_pdb_PutCsgvar (DBfile *_dbfile, char const *name, char const *meshname,
       PJ_write_len(dbfile->pdb, tmp2, datatype_str, vars[i],
                    1, count);
 
-      sprintf(tmp1, "value%d", i);
+      snprintf(tmp1, sizeof(tmp1), "value%d", i);
       DBAddVarComponent(obj, tmp1, tmp2);
 
    }
@@ -12040,7 +12043,7 @@ db_pdb_PutUcdmesh (DBfile *dbfile, char const *name, int ndims, char const * con
 
    for (i = 0; (i < ndims) && (nnodes > 0); i++) {
 
-      sprintf(tmp, "coord%d", i);
+      snprintf(tmp, sizeof(tmp), "coord%d", i);
 
       DBWriteComponent(dbfile, obj, tmp, name, datatype_str,
                        coords[i], 1, count);
@@ -12234,8 +12237,8 @@ db_pdb_PutUcdsubmesh (DBfile *dbfile, char const *name, char const *parentmesh,
       char           myComponName[256];
       char           parentComponName[256];
 
-      sprintf(myComponName, "coord%d", i);
-      sprintf(parentComponName, "%s_coord%d", parentmesh, i);
+      snprintf(myComponName, sizeof(myComponName), "coord%d", i);
+      snprintf(parentComponName, sizeof(parentComponName), "%s_coord%d", parentmesh, i);
       DBAddVarComponent(obj,myComponName,parentComponName);
    }
 
@@ -12249,12 +12252,12 @@ db_pdb_PutUcdsubmesh (DBfile *dbfile, char const *name, char const *parentmesh,
    {  char           myComponName[256];
       char           parentComponName[256];
 
-      sprintf(myComponName, "min_extents");
-      sprintf(parentComponName, "%s_min_extents", parentmesh);
+      snprintf(myComponName, sizeof(myComponName), "min_extents");
+      snprintf(parentComponName, sizeof(parentComponName), "%s_min_extents", parentmesh);
       DBAddVarComponent(obj,myComponName,parentComponName);
 
-      sprintf(myComponName, "max_extents");
-      sprintf(parentComponName, "%s_max_extents", parentmesh);
+      snprintf(myComponName, sizeof(myComponName), "max_extents");
+      snprintf(parentComponName, sizeof(parentComponName), "%s_max_extents", parentmesh);
       DBAddVarComponent(obj,myComponName,parentComponName);
    }
 
@@ -12444,7 +12447,7 @@ db_pdb_PutUcdvar (DBfile *_dbfile, char const *name, char const *meshname, int n
       PJ_write_len(dbfile->pdb, tmp2, datatype_str, vars[i],
                    1, count);
 
-      sprintf(tmp1, "value%d", i);
+      snprintf(tmp1, sizeof(tmp1), "value%d", i);
       DBAddVarComponent(obj, tmp1, tmp2);
 
       /* Write the mixed data component if present */
@@ -12455,7 +12458,7 @@ db_pdb_PutUcdvar (DBfile *_dbfile, char const *name, char const *meshname, int n
          PJ_write_len(dbfile->pdb, tmp2, datatype_str, mixvars[i],
                       1, mcount);
 
-         sprintf(tmp1, "mixed_value%d", i);
+         snprintf(tmp1, sizeof(tmp1), "mixed_value%d", i);
          DBAddVarComponent(obj, tmp1, tmp2);
       }
    }
@@ -13232,18 +13235,18 @@ db_pdb_PutMrgvar(DBfile *_dbfile, char const *name, char const *mrgt_name,
 
       if (compnames && compnames[i])
       {
-          sprintf(tmp3, "%s_%s", name, compnames[i]);
+          snprintf(tmp3, sizeof(tmp3), "%s_%s", name, compnames[i]);
           db_mkname(dbfile->pdb, tmp3, suffix, tmp2);
       }
       else
       {
-          sprintf(tmp3, "%s_comp%d", name, i);
+          snprintf(tmp3, sizeof(tmp3), "%s_comp%d", name, i);
           db_mkname(dbfile->pdb, tmp3, suffix, tmp2);
       }
       PJ_write_len(dbfile->pdb, tmp2, datatype_str, data[i],
                    1, &llen);
 
-      sprintf(tmp1, "value%d", i);
+      snprintf(tmp1, sizeof(tmp1), "value%d", i);
       DBAddVarComponent(obj, tmp1, tmp2);
    }
    FREE(datatype_str);
