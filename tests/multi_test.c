@@ -243,6 +243,7 @@ static int check_struct(char *struct1, char *struct2, size_t struct_size, ...)
             int i;                                                       \
             DBfacelist *fl = DBGetFacelist(F, NM);                       \
             ASSERT(fl);                                                  \
+            DBValidateFacelist(fl, -1);                                  \
             CHECK_ARRAY(FL, fl->nodelist, LFL, DB_INT);                  \
             if (ZNO)                                                     \
                 CHECK_ARRAY(ZNO, fl->zoneno, NFS, DB_INT);               \
@@ -281,6 +282,7 @@ static int check_struct(char *struct1, char *struct2, size_t struct_size, ...)
             int i;                                                       \
             DBzonelist *zl = DBGetZonelist(F, NM);                       \
             ASSERT(zl);                                                  \
+            DBValidateZonelist(zl, -1);                                  \
             ASSERT(LZL == zl->lnodelist);                                \
             CHECK_ARRAY(ZL, zl->nodelist, LZL, DB_INT);                  \
             ASSERT(NSH == zl->nshapes);                                  \

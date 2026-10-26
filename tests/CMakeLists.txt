@@ -751,6 +751,9 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
 endif()
 
 if(NOT WIN32)
+    #
+    # testdtypes (shell script wrapped test)
+    #
     add_custom_target(testdtypes ALL)
     add_custom_command(TARGET testdtypes POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -766,6 +769,27 @@ if(NOT WIN32)
             "${silo_test_output_dir}/testdtypes" DB_HDF5)
         set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
     endif()
+
+
+
+    #
+    # malformed (shell script wrapped test)
+    # malformed object handling can result in some known, not easy to fix, small leaks.
+    #
+    add_custom_target(malformed ALL)
+    add_custom_command(TARGET malformed POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/malformed.sh
+        ${silo_test_output_dir})
+    add_test(NAME malformed COMMAND "${silo_test_output_dir}/malformed.sh")
+    set_tests_properties(malformed PROPERTIES DEPENDS all_silo_objects)
+    set_tests_properties(malformed PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
+    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
+        add_test(NAME malformed-hdf5 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5)
+        set_tests_properties(malformed-hdf5 PROPERTIES DEPENDS all_silo_objects-hdf5)
+        set_tests_properties(malformed-hdf5 PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
+    endif()
+
 endif()
 
 if(SILO_ENABLE_SILOCK AND NOT WIN32)

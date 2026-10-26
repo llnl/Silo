@@ -1676,6 +1676,7 @@ V_open (int argc, obj_t argv[]) {
     */
    sym_vbind (var, file);
    var = obj_dest (var);
+   filename = obj_dest(filename);
    file = NIL ; /*do not destroy file*/
    return NIL;
 

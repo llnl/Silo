@@ -11,6 +11,38 @@ For example, see [`DBSetAllowOverwrites()`](#dbsetallowoverwrites) and [`DBSetAl
 When a file is *opened* or *created*, it *inherits* whatever the library's *global* settings are.
 However, a file's settings can be adjusted independently from the library's global settings by calling the equivalent `DBSetXxxFile()` methods.
 
+## Malformed file objects
+
+In version 4.12.2, a new error code was introduced, `E_MALFORMED`.
+This error condition indicates an object *read* from a file is malformed (e.g. inconsistent or corrupted) in some way.
+For example, the `dims[]` member of a node-centered `DBquadvar` object may have value `{20,20}` indicating it should have 400 values.
+However, maybe the associated problem-sized array of values does not contain 400 values.
+Or, maybe the `datatype` member indicates the values are of type `float` but when the associated problem-sized array of values is read they are found to be of type `int`.
+
+Malformed objects can be problematic because they can lead to memory errors and security vulnerabilities.
+In most cases, detecting a malformed object requires very little computational work.
+In rare cases (like a `DBmrgtree` object), it may require visiting all the values in problem-sized arrays.
+
+However, a critical aspect of Silo's performant design is to avoid problem-sized work whenever possible and instead delegate this work to the caller.
+For complicated silo objects (e.g. `DBmaterial` with mixing, `DBzonelist`, etc.), new methods to *validate* the objects have been introduced.
+Readers may, at their discretion, use these methods to check objects read.
+However, these methods necessarily involve problem-sized work and so are not done by Silo automatically.
+
+It is conceivable a new global library behavior could be introduced to indicate whether Silo should *validate* objects as it reads them before returning them to the caller.
+Presently, it is up to the caller to decide whether to validate an object read by appropriate use of Silo's *validate* methods.
+
+Silo's *write* interface does very little to *prevent* a writer from creating malformed objects.
+All of the work to detect and flag malformed objects is done in the read interface.
+The reason for this is that even if a writer constructs perfectly valid objects, there is a chance a third party can corrupt objects after the writer is done with the file.
+In fact, Silo's browser can be used to edit an existing, valid file object to corrupt it and turn it into a malformed object.
+For example, Silo's browser can be used to change the value of the `datatype` member of a `DBucdvar`.
+Consequently, adding a bunch of logic to the *write* interface to prevent malformed objects from being created does little to protect Silo applications from third parties editing and corrupting Silo objects.
+
+The `E_MALFORMED` error code can be produced only during read operations.
+In rare cases, a malformed file object can lead to an `E_CALLFAIL` error condition instead of `E_MALFORMED`.
+In addition, when malformed file objects are encountered, Silo is not always able to fully clean up memory that was allocated as the read progressed.
+So, in rare cases, Silo may leak memory during a malformed object read.
+
 {{ EndFunc }}
 
 ## `DBErrfuncname()`
@@ -548,22 +580,24 @@ However, a file's settings can be adjusted independently from the library's glob
 
   This setting is global to the whole library and effects subsequent read operations.
 
-  If `force` is non-zero, then any datatype'd arrays are converted on read from whatever their native datatype is to float.
-  A datatype'd array is an array that is part of some Silo object struct containing a `datatype` member which indicates the type of data in the array.
-  For example, a `DBucdvar` struct has a `datatype` member to indicate the type of data in its var and mixvar arrays.
-  Such arrays will be converted on read if `force` here is non-zero.
-  However, a `DBmaterial` object struct is *always* integer data.
-  There is no datatype member for such an object and so its data will *never* be converted to float on read regardless of the `force` single status set here.
+  If `force` is non-zero, then any `datatype`'d arrays are converted on read from whatever their native datatype is to float.
+  A `datatype`'d array is an array that is part of some Silo object struct containing a `datatype` member which indicates the type of data in the array.
+  For example, a `DBucdvar` struct has a `datatype` member to indicate the type of data in its `var` and `mixvar` arrays.
+  Such arrays will be converted to `float` on read if `force` here is non-zero.
+  However, a *clean* `DBmaterial` object with no mixed volume fraction arrays is *always* integer data.
+  The `datatype` member for a `DBmaterial` object applies only to the mixed volume fraction data, `mix_vf`.
+  So, for a *clean* `DBmaterial` object, its data will *never* be converted to float on read regardless of the `force` single status set here.
+  For a truly mixed `DBmaterial` object, the `mix_vf` array will be returned as `float` if `force` here is 1, regardless of its datatype stored in the file.
 
   This function's original intention may have been to convert *only* double precision arrays to single precision on read.
   However, the PDB driver was apparently never designed that way and the PDB driver's behavior sort of established the defacto meaning of `DBForceSingle`.
   Consequently, as of Silo version 4.8 the HDF5 driver obeys these same semantics as well.
-  Though, in fact the HDF5 driver was written to support the original intention of `DBForceSingle` and it worked in this (buggy) fashion for many years before real problems with it were encountered.
+  Though, in fact the HDF5 driver was written to support the original intention of `DBForceSingle` and it worked in this (inconsistent with PDB driver) fashion for many years before real problems with it were encountered.
 
   This method is typically used by downstream, post-processing tools to reduce memory requirements.
+  In most cases, `datatype`'d data in Silo files is floating point data often in double precision.
+  In these circumstances, forcing single precision has the effect of reducing the memory requirements by a factor of 2.
   By default, Silo does not have single precision forcing enabled.
-  When it is enabled, only the methods that result in reading of floating point data from a Silo file are effected.
-  Finally, note that write methods are **not** effected.
 
   It might be nice for data producers to also use this method during write.
   That would be a potentially useful enhancement request because it alleviates software developers from having to write the conversion code before handing to Silo.
