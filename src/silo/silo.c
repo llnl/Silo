@@ -158,7 +158,7 @@ int SILO_VERS_TAG = 0;
    any previous versions.*/
 int Silo_version_4_12_0_pre2 = 0;
 int Silo_version_4_12_0_pre1 = 0;
-int Silo_version_4_12_0 = 0;
+int Silo_version_4_12 = 0;
 int Silo_version_4_12_1 = 0;
 
 /* Symbols for error handling */
