@@ -151,8 +151,10 @@ put_quad_objects(DBfile *db)
     char *qsnames[2] = {"qscomp0", "qscomp1"};
 
     DBoptlist *ol = DBMakeOptlist(20);
+#ifdef DBOPT_GHOST_NODE_LABELS
     DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, nnum);
     DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, znum);
+#endif
     DBAddOption(ol, DBOPT_BASEINDEX, baseindex);
 
     PUT(DBPutQuadmesh(db, "quadmesh",
@@ -162,6 +164,10 @@ put_quad_objects(DBfile *db)
     PUT(DBPutQuadmesh(db, "quadmesh2",
                       (DBCAS_t)coordnames2, coords2, dims_nodes, 2,
                       DB_FLOAT, DB_NONCOLLINEAR, ol));
+
+    PUT(DBPutQuadmesh(db, "quadmesh3",
+                      (DBCAS_t)coordnames2, coords2, dims_nodes, 2,
+                      DB_FLOAT, DB_NONCOLLINEAR, 0));
 
     PUT(DBPutQuadvar(db, "quadvar", "quadmesh", 2,
                      (DBCAS_t)qnames, qvals, dims_zones, 2,
@@ -220,7 +226,9 @@ put_ucd_objects(DBfile *db)
     int znum[4] = {100,101,102,103};
 
     DBoptlist *ol = DBMakeOptlist(20);
+#ifdef DBOPT_GHOST_NODE_LABELS
     DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
+#endif
     DBAddOption(ol, DBOPT_ZONENUM, znum);
 
     PUT(DBPutZonelist(db, "zl_old",
@@ -231,12 +239,21 @@ put_ucd_objects(DBfile *db)
                        4, 2, nodelist, 16, 0,
                        1, 2, shapetype, shapesize, shapecnt, 1, ol));
 
+    PUT(DBPutZonelist2(db, "zl3",
+                       4, 2, nodelist, 16, 0,
+                       1, 2, shapetype, shapesize, shapecnt, 1, 0));
+
     DBClearOptlist(ol);
+#ifdef DBOPT_GHOST_NODE_LABELS
     DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, gnl);
+#endif
     DBAddOption(ol, DBOPT_NODENUM, nnum);
 
     PUT(DBPutUcdmesh(db, "ucdmesh", 2, (DBCAS_t)coordnames, coords,
                      9, 4, "zl2", NULL, DB_FLOAT, ol));
+
+    PUT(DBPutUcdmesh(db, "ucdmesh2", 2, (DBCAS_t)coordnames, coords,
+                     9, 4, "zl2", NULL, DB_FLOAT, 0));
 
     PUT(DBPutUcdsubmesh(db, "ucdsubmesh", "ucdmesh",
                         4, "zl2", NULL, NULL));
@@ -274,10 +291,14 @@ put_point_objects(DBfile *db)
     char gnl[5] = {0x0,0x1,0x2,0x3,0x4};
     
     DBoptlist *ol = DBMakeOptlist(20);
+#ifdef DBOPT_GHOST_NODE_LABELS
     DBAddOption(ol, DBOPT_GHOST_NODE_LABELS, gnl);
+#endif
     DBAddOption(ol, DBOPT_NODENUM, nnum);
 
     PUT(DBPutPointmesh(db, "pointmesh", 2, coords, 5, DB_FLOAT, ol));
+
+    PUT(DBPutPointmesh(db, "pointmesh2", 2, coords, 5, DB_FLOAT, 0));
 
     PUT(DBPutPointvar(db, "pointvar", "pointmesh", 2,
                       pvals, 5, DB_FLOAT, NULL));
@@ -339,11 +360,17 @@ put_material_objects(DBfile *db)
         char *specnames[3] = {"Iron", "Copper", "Zinc"};
         char *speccolors[3] = {"red", "yellow", "blue"};
 
+#ifdef DBOPT_SPECNAMES
         DBAddOption(ol, DBOPT_SPECNAMES, specnames);
         DBAddOption(ol, DBOPT_SPECCOLORS, speccolors);
+#endif
         PUT(DBPutMatspecies(db, "matspecies", "material",
                             2, nmatspec, speclist, dims, 2,
                             3, species_mf, NULL, 0, DB_FLOAT, ol));
+
+        PUT(DBPutMatspecies(db, "matspecies2", "material",
+                            2, nmatspec, speclist, dims, 2,
+                            3, species_mf, NULL, 0, DB_FLOAT, 0));
     }
 
     DBFreeOptlist(ol);
@@ -426,13 +453,20 @@ put_phzonelist(DBfile *db)
     int znum[2] = {500,501};
 
     DBoptlist *ol = DBMakeOptlist(20);
+#ifdef DBOPT_GHOST_NODE_LABELS
     DBAddOption(ol, DBOPT_GHOST_ZONE_LABELS, gzl);
+#endif
     DBAddOption(ol, DBOPT_ZONENUM, znum);
 
     PUT(DBPutPHZonelist(db, "phzl",
                         12, nodecnt, 48, nodelist, NULL,
                         2, facecnt, 12, facelist,
                         1, 1, 1, ol));
+
+    PUT(DBPutPHZonelist(db, "phzl2",
+                        12, nodecnt, 48, nodelist, NULL,
+                        2, facecnt, 12, facelist,
+                        1, 1, 1, 0));
 
     DBFreeOptlist(ol);
 }
@@ -465,6 +499,10 @@ put_csg_objects(DBfile *db)
                      btypes, NULL, coeffs, 4, DB_FLOAT,
                      extents, "csgzl", ol));
 
+    PUT(DBPutCsgmesh(db, "csgmesh2", 3, 1,
+                     btypes, NULL, coeffs, 4, DB_FLOAT,
+                     extents, "csgzl", 0));
+
     DBClearOptlist(ol);
 
     DBAddOption(ol, DBOPT_REGNAMES, bndnames);
@@ -474,6 +512,11 @@ put_csg_objects(DBfile *db)
                          rtypes, left, right,
                          NULL, 0, DB_INT,
                          1, zones, ol));
+
+    PUT(DBPutCSGZonelist(db, "csgzl2", 1,
+                         rtypes, left, right,
+                         NULL, 0, DB_INT,
+                         1, zones, 0));
 
     PUT(DBPutCsgvar(db, "csgvar", "csgmesh", 1,
                     (DBCAS_t)names, vals, 1,
@@ -575,11 +618,16 @@ put_multi_objects(DBfile *db)
         DBAddOption(ol, DBOPT_EXTENTS, exts);
         DBAddOption(ol, DBOPT_ZONECOUNTS, intsA);
         DBAddOption(ol, DBOPT_HAS_EXTERNAL_ZONES, intsB);
+#ifdef DBOPT_MB_EMPTY_LIST
         DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
         DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &two);
+#endif
 
         PUT(DBPutMultimesh(db, "multimesh", 3,
                            (DBCAS_t)names, types, ol));
+
+        PUT(DBPutMultimesh(db, "multimesh2", 3,
+                           (DBCAS_t)names, types, 0));
 
         DBClearOptlist(ol);
     }
@@ -593,11 +641,16 @@ put_multi_objects(DBfile *db)
 
         DBAddOption(ol, DBOPT_EXTENTS_SIZE, &four);
         DBAddOption(ol, DBOPT_EXTENTS, exts);
+#ifdef DBOPT_MB_EMPTY_LIST
         DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
         DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &three);
+#endif
 
         PUT(DBPutMultivar(db, "multivar", 4,
                           (DBCAS_t)names, types, ol));
+
+        PUT(DBPutMultivar(db, "multivar2", 4,
+                          (DBCAS_t)names, types, 0));
 
         DBClearOptlist(ol);
     }
@@ -621,10 +674,14 @@ put_multi_objects(DBfile *db)
         DBAddOption(ol, DBOPT_MIXLENS, mixlens);
         DBAddOption(ol, DBOPT_MATCOUNTS, matcnts);
         DBAddOption(ol, DBOPT_MATLISTS, matlists);
+#ifdef DBOPT_MB_EMPTY_LIST
         DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
         DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &nmt);
+#endif
 
         PUT(DBPutMultimat(db, "multimat", 5, (DBCAS_t)names, ol));
+
+        PUT(DBPutMultimat(db, "multimat2", 5, (DBCAS_t)names, NULL));
 
         DBClearOptlist(ol);
     }
@@ -640,12 +697,19 @@ put_multi_objects(DBfile *db)
 
         DBAddOption(ol, DBOPT_NMAT, &nmat);
         DBAddOption(ol, DBOPT_NMATSPEC, nmatspec);
+#ifdef DBOPT_SPECNAMES
         DBAddOption(ol, DBOPT_SPECNAMES, specnames);
         DBAddOption(ol, DBOPT_SPECCOLORS, speccolors);
+#endif
+#ifdef DBOPT_MB_EMPTY_LIST
         DBAddOption(ol, DBOPT_MB_EMPTY_LIST, mtlist);
         DBAddOption(ol, DBOPT_MB_EMPTY_COUNT, &nmt);
+#endif
         PUT(DBPutMultimatspecies(db, "multimatspecies",
                                  2, (DBCAS_t)names, ol));
+
+        PUT(DBPutMultimatspecies(db, "multimatspecies2",
+                                 2, (DBCAS_t)names, 0));
 
     }
 
@@ -705,7 +769,11 @@ main(int argc, char **argv)
         }
     }
 
+#ifdef DB_ALL_AND_DRVR
     DBShowErrors(DB_ALL_AND_DRVR, NULL);
+#else
+    DBShowErrors(DB_ALL, NULL);
+#endif
     DBSetFriendlyHDF5Names(1);
 
     db = DBCreate(filename, DB_CLOBBER, DB_LOCAL,
