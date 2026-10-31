@@ -95,18 +95,26 @@ db_short_val=$(grep DB_SHORT $silo_header | tr -s ' ' | cut -d'=' -f2 | tr -d ',
 #
 # Find text executable to generate data and then resulting data file
 #
-all_objs=$(find_file -x all_silo_objects tests/bin/all_silo_objects)
-[ $? -eq 0 ] || exit 1
-$all_objs $1
-[ $? -eq 0 ] || exit 1
-all_objs_file=$(find_file -r all_objects.$ext tests/all_objects.$ext)
-[ $? -eq 0 ] || exit 1
+if [ -z "$2" ]; then
+    all_objs=$(find_file -x all_silo_objects tests/bin/all_silo_objects)
+    [ $? -eq 0 ] || exit 1
+    $all_objs $1
+    [ $? -eq 0 ] || exit 1
+    all_objs_file=$(find_file -r all_objects.$ext tests/all_objects.$ext)
+    [ $? -eq 0 ] || exit 1
+    old_silo=0
+else
+    all_objs_file=$(find_file -r $2.$ext tests/$2.$ext)
+    [ $? -eq 0 ] || exit 1
+    old_silo=1
+fi
 
 #
 # Corrupt one object at a time with browser's low-level write mode, then
 # confirm that the corresponding high-level DBGetXxx path reports
 # E_MALFORMED.
 #
+malformed_filename=malformed_$$.$ext
 check_malformed()
 {
     dirname=$1
@@ -125,37 +133,53 @@ check_malformed()
     fi    
 
     # Create temp file to corrupt
-    cp $all_objs_file malformed.$ext || return 1
+    cp $all_objs_file $malformed_filename || return 1
 
-    echo "\n\n\n******************************************************************" >&2
+    echo ""
+    echo ""
+    echo ""
+    echo "******************************************************************" >&2
     echo "Working on $dirname/$objname for $cname_assign" >&2
     echo "******************************************************************" >&2
 
     # Confirm we can read the object fine as is. Read it "normally" and with lowlevel 1 (-l 1)
-    echo "\nConfirm read of valid object..." >&2
-    $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" malformed.$ext >&2
+    echo ""
+    echo "Confirm read of valid object..." >&2
+    $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" $malformed_filename >&2
     [ $? -eq 0 ] || {
-        echo "ERROR: expected valid read for $dirname/$objname before corrupting with $cname_assign" >&2
+        if [ $old_silo -eq 0 ]; then
+            echo "ERROR: expected valid high-level read for $dirname/$objname before corrupting with $cname_assign" >&2
+        else
+            echo "ERROR: expected valid high-level read for $dirname/$objname" >&2
+        fi
         return 1
     }
+    echo ""
     echo "Lowlevel read of valid object..." >&2
-    $browser -q --proper-exit-code -l 1 -e "cd $dirname" -e "$objname" malformed.$ext >&2
+    $browser -q --proper-exit-code -l 1 -e "cd $dirname" -e "$objname" $malformed_filename >&2
     [ $? -eq 0 ] || {
-        echo "ERROR: expected valid lowlevel read for $dirname/$objname before corrupting with $cname_assign" >&2
+        if [ $old_silo -eq 0 ]; then
+            echo "ERROR: expected valid lowlevel read for $dirname/$objname before corrupting with $cname_assign" >&2
+        else
+            echo "ERROR: expected valid lowlevel read for $dirname/$objname" >&2
+        fi
         return 1
     }
+    [ $old_silo -eq 0 ] || return 0
 
     # Corrupt the specific object
-    echo "\nCorrupt the object..." >&2
-    $browser --proper-exit-code -q -W -l 1 -e "cd $dirname" -e "${objname}${sep}${cname_assign}" malformed.$ext
+    echo ""
+    echo "Corrupt the object..." >&2
+    $browser --proper-exit-code -q -W -l 1 -e "cd $dirname" -e "${objname}${sep}${cname_assign}" $malformed_filename
     [ $? -eq 0 ] || {
         echo "ERROR: Attempted corruption of $dirname/$objname with $cname_assign failed" >&2
         return 1
     }
 
     # Now, try to display that corrupted object in a new browser instance
-    echo "\nConfirm malformed error triggered on corrupted object..." >&2
-    $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" malformed.$ext
+    echo ""
+    echo "Confirm malformed error triggered on corrupted object..." >&2
+    $browser -q --proper-exit-code -e "cd $dirname" -e "$objname" $malformed_filename
     result=$?
     [ $result -eq $ecode ] || {
         echo "ERROR: expected E_MALFORMED ($e_malformed_code) but got $result for $dirname/$objname after $cname_assign" >&2
@@ -207,7 +231,9 @@ fi
 
 # Various corruptions of Matspecies objects
 check_malformed mat_objs matspecies ndims=5 || exit 1
+check_malformed mat_objs matspecies2 ndims=5 || exit 1
 check_malformed mat_objs matspecies nmat=-1 || exit 1
+check_malformed mat_objs matspecies2 nmat=-1 || exit 1
 check_malformed mat_objs matspecies nspecies_mf=99 || exit 1
 check_malformed mat_objs matspecies nmatspec='"/arrs/intsA"' || exit 1
 check_malformed mat_objs matspecies speccolors='"/arrs/strsA"' || exit 1
@@ -256,6 +282,7 @@ check_malformed misc_objs defvars defns='"/arrs/strsB"' || exit 1
 
 # Various corruptions of multimesh objects
 check_malformed mult_objs multimesh nblocks=-1 || exit 1
+check_malformed mult_objs multimesh2 nblocks=-1 || exit 1
 check_malformed mult_objs multimesh empty_cnt=99 || exit 1
 check_malformed mult_objs multimesh empty_list='"/arrs/intsB"' || exit 1
 check_malformed mult_objs multimesh has_external_zones='"/arrs/intsB"' || exit 1
@@ -264,6 +291,7 @@ check_malformed mult_objs multimesh extentssize=99 || exit 1
 check_malformed mult_objs multimesh extents='"/arrs/dblsB"' || exit 1
 check_malformed mult_objs multimesh meshnames='"/arrs/strsB"' || exit 1
 check_malformed mult_objs multimesh meshtypes='"/arrs/intsA"' || exit 1
+check_malformed mult_objs multimesh2 meshtypes='"/arrs/intsA"' || exit 1
 
 # Various corruptions of multimeshdj objects
 check_malformed mult_objs multimeshadj nblocks=-1 || exit 1
@@ -285,16 +313,20 @@ check_malformed mult_objs multimeshadj lzonelists='"/arrs/intsA"' || exit 1
 
 # Various corruptions of multivar objects
 check_malformed mult_objs multivar nvars=-1 || exit 1
+check_malformed mult_objs multivar2 nvars=-1 || exit 1
 check_malformed mult_objs multivar empty_cnt=99 || exit 1
 check_malformed mult_objs multivar empty_list='"/arrs/intsB"' || exit 1
 check_malformed mult_objs multivar extentssize=99 || exit 1
 check_malformed mult_objs multivar extents='"/arrs/dblsB"' || exit 1
 check_malformed mult_objs multivar varnames='"/arrs/strsB"' || exit 1
 check_malformed mult_objs multivar vartypes='"/arrs/intsA"' || exit 1
+check_malformed mult_objs multivar2 vartypes='"/arrs/intsA"' || exit 1
 
 # Various corruptions of multimat objects
 check_malformed mult_objs multimat nmats=-1 || exit 1
+check_malformed mult_objs multimat2 nmats=-1 || exit 1
 check_malformed mult_objs multimat nmats=99 || exit 1
+check_malformed mult_objs multimat2 nmats=99 || exit 1
 check_malformed mult_objs multimat nmatnos=99 || exit 1
 check_malformed mult_objs multimat empty_cnt=99 || exit 1
 check_malformed mult_objs multimat matnos='"/arrs/intsB"' || exit 1
@@ -312,7 +344,9 @@ fi
 
 # Various corruptions of multimatspecies objects
 check_malformed mult_objs multimatspecies nspec=-1 || exit 1
+check_malformed mult_objs multimatspecies2 nspec=-1 || exit 1
 check_malformed mult_objs multimatspecies nspec=99 || exit 1
+check_malformed mult_objs multimatspecies2 nspec=99 || exit 1
 check_malformed mult_objs multimatspecies nmat=99 || exit 1
 check_malformed mult_objs multimatspecies nmatspec='"/arrs/intsB"' || exit 1
 check_malformed mult_objs multimatspecies specnames='"/arrs/strsB"' || exit 1
@@ -322,11 +356,14 @@ check_malformed mult_objs multimatspecies empty_cnt=99 || exit 1
 
 # Various corruptions of pointmesh objects
 check_malformed point_objs pointmesh ndims=5 || exit 1
+check_malformed point_objs pointmesh2 ndims=5 || exit 1
 check_malformed point_objs pointmesh nels=2 || exit 1
+check_malformed point_objs pointmesh2 nels=2 || exit 1
 check_malformed point_objs pointmesh gnodeno='"/arrs/intsA"' || exit 1
 check_malformed point_objs pointmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
 check_malformed point_objs pointmesh coord0='"/arrs/fltsA"' || exit 1
 check_malformed point_objs pointmesh coord1='"/arrs/fltsB"' || exit 1
+check_malformed point_objs pointmesh2 coord1='"/arrs/fltsB"' || exit 1
 check_malformed point_objs pointmesh gnodeno='"/arrs/intsA"' || exit 1
 check_malformed point_objs pointmesh ghost_node_labels='"/arrs/intsA"' || exit 1
 if [ "$ext" = "pdb" ]; then
@@ -353,6 +390,8 @@ fi
 
 # Various corruptions of quadmesh objects
 check_malformed quad_objs quadmesh ndims=5 || exit 1
+check_malformed quad_objs quadmesh2 ndims=5 || exit 1
+check_malformed quad_objs quadmesh3 ndims=5 || exit 1
 check_malformed quad_objs quadmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
 check_malformed quad_objs quadmesh ghost_zone_labels='"/arrs/chrsB"' || exit 1
 # odd issue in PDB driver with max index names
@@ -360,6 +399,7 @@ if [ "$ext" = "pdb" ]; then
     check_malformed quad_objs quadmesh datatype=$db_short_val || exit 1
     check_malformed quad_objs quadmesh coord0='"/arrs/svals3"' || exit 1
     check_malformed quad_objs quadmesh coord1='"/arrs/svals3"' || exit 1
+    check_malformed quad_objs quadmesh3 coord1='"/arrs/svals3"' || exit 1
     check_malformed quad_objs quadmesh min_index=\{-1,-1\} subarr || exit 1
     check_malformed quad_objs quadmesh max_index_n=\{99,99\} subarr || exit 1
     check_malformed quad_objs quadmesh dims=\{2,3\} subarr || exit 1
@@ -367,6 +407,7 @@ else
     check_malformed quad_objs quadmesh min_index=\{-1,-1,-1\} || exit 1
     check_malformed quad_objs quadmesh max_index=\{99,99,99\} || exit 1
     check_malformed quad_objs quadmesh dims=\{2,3,0\} || exit 1
+    check_malformed quad_objs quadmesh3 dims=\{2,3,0\} || exit 1
 fi
 
 # Various corruptions of quadvar objects
@@ -391,7 +432,9 @@ check_malformed quad_objs quadvar mixed_value1='"/arrs/fltsA"' || exit 1
 
 # Various corruptions of ucdmesh objects
 check_malformed ucd_objs ucdmesh ndims=5 || exit 1
+check_malformed ucd_objs ucdmesh2 ndims=5 || exit 1
 check_malformed ucd_objs ucdmesh nnodes=8 || exit 1
+check_malformed ucd_objs ucdmesh2 nnodes=8 || exit 1
 check_malformed ucd_objs ucdmesh coord0='"/arrs/dblsA"' || exit 1
 check_malformed ucd_objs ucdmesh coord1='"/arrs/dblsA"' || exit 1
 check_malformed ucd_objs ucdmesh ghost_node_labels='"/arrs/chrsA"' || exit 1
@@ -458,7 +501,9 @@ check_malformed list_objs phzl gzoneno='"/arrs/intsB"' || exit 1
 
 # Various corruptions of csgmesh objects
 check_malformed csg_objs csgmesh ndims=5 || exit 1
+check_malformed csg_objs csgmesh2 ndims=5 || exit 1
 check_malformed csg_objs csgmesh nbounds=2 || exit 1
+check_malformed csg_objs csgmesh2 nbounds=2 || exit 1
 check_malformed csg_objs csgmesh lcoeffs=2 || exit 1
 check_malformed csg_objs csgmesh coeffs='"/arrs/intsA"' || exit 1
 check_malformed csg_objs csgmesh typeflags='"/arrs/intsA"' || exit 1
@@ -472,13 +517,16 @@ fi
 
 # Various corruptions of csg zonelist objects
 check_malformed csg_objs csgzl nregs=-1 || exit 1
+check_malformed csg_objs csgzl2 nregs=-1 || exit 1
 check_malformed csg_objs csgzl nregs=99 || exit 1
+check_malformed csg_objs csgzl2 nregs=99 || exit 1
 check_malformed csg_objs csgzl nzones=-1 || exit 1
 check_malformed csg_objs csgzl nzones=99 || exit 1
 check_malformed csg_objs csgzl regnames='"/arrs/strsB"' || exit 1
 check_malformed csg_objs csgzl zonenames='"/arrs/strsB"' || exit 1
 check_malformed csg_objs csgzl typeflags='"/arrs/intsA"' || exit 1
 check_malformed csg_objs csgzl leftids='"/arrs/intsA"' || exit 1
+check_malformed csg_objs csgzl2 leftids='"/arrs/intsA"' || exit 1
 check_malformed csg_objs csgzl rightids='"/arrs/intsA"' || exit 1
 check_malformed csg_objs csgzl zonelist='"/arrs/intsA"' || exit 1
 
@@ -546,6 +594,6 @@ check_malformed mrg_objs mrgvar compnames='"/arrs/strsB"' || exit 1
 #
 # Cleanup
 #
-rm -rf malformed.$ext
+rm -rf $malformed_filename
 
 exit 0

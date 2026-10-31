@@ -15546,7 +15546,7 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
-        if (m.nmats < 0 || m.nmatnos < 0 || m.empty_cnt < 0)
+        if (m.nmats < 0 || m.empty_cnt < 0)
         {
             db_perror(name, E_MALFORMED, me);
             UNWIND();
@@ -15566,10 +15566,23 @@ db_hdf5_GetMultimat(DBfile *_dbfile, char const *name)
         mm->nmatnos = m.nmatnos;
         mm->mmesh_name = OPTDUP(m.mmesh_name);
         mm->matnos = (int *)_db_hdf5_comprd(dbfile, m.matnos, 1, &matnos_size);
-        if (mm->matnos && matnos_size != m.nmatnos)
+        if (mm->matnos)
         {
-            db_perror(name, E_MALFORMED, me);
-            UNWIND();
+            if (mm->nmatnos < 0 || matnos_size != mm->nmatnos)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+        }
+        else
+        {
+            if (mm->nmatnos < -1)
+            {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+            if (mm->nmatnos == -1)
+                mm->nmatnos = 0; /* fix possible bug from older Silo versions */
         }
 
         /* Read the raw data */
