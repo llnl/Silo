@@ -414,14 +414,19 @@ put_misc_objects(DBfile *db)
 static void
 put_facelist(DBfile *db)
 {
-    int nodelist[8] = {0,1, 1,2, 2,3, 3,0};
-    int shapesize[1] = {2};
-    int shapecnt[1] = {4};
-    int zoneno[4] = {03001,03002,03003,03004};
+    int nodelist[18] = {0,1,2,  1,2,3,  2,3,4,5,  4,5,6,7,  6,7,8,9};
+    int shapesize[2] = {3,4};
+    int shapecnt[2] = {2,3};
+    int zoneno[5] = {03001,03002,03003,03004,03005};
 
     PUT(DBPutFacelist(db, "facelist",
-                      4, 2, nodelist, 8, 0, zoneno,
-                      shapesize, shapecnt, 1,
+                      5, 2, nodelist, 18, 0, zoneno,
+                      shapesize, shapecnt, 2,
+                      NULL, NULL, 0));
+
+    PUT(DBPutFacelist(db, "facelist3D",
+                      5, 3, nodelist, 18, 0, zoneno,
+                      shapesize, shapecnt, 2,
                       NULL, NULL, 0));
 }
 
