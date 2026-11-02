@@ -762,26 +762,26 @@ if(NOT WIN32)
 
     add_test(NAME malformed COMMAND "${silo_test_output_dir}/malformed.sh")
     set_tests_properties(malformed PROPERTIES DEPENDS all_silo_objects)
-    set_tests_properties(malformed PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
-
     add_test(NAME malformed-4.6 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_461)
     add_test(NAME malformed-4.7 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_472)
     add_test(NAME malformed-4.8 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_48)
     add_test(NAME malformed-4.9 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_491)
     add_test(NAME malformed-4.10 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_4102)
     add_test(NAME malformed-4.11 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_4111)
+    set_tests_properties(malformed malformed-4.6 malformed-4.7 malformed-4.8 malformed-4.9 malformed-4.10 malformed-4.11
+        PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
 
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         add_test(NAME malformed-hdf5 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5)
         set_tests_properties(malformed-hdf5 PROPERTIES DEPENDS all_silo_objects-hdf5)
-        set_tests_properties(malformed-hdf5 PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
- 
         add_test(NAME malformed-hdf5-4.6 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_461)
         add_test(NAME malformed-hdf5-4.7 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_472)
         add_test(NAME malformed-hdf5-4.8 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_48)
         add_test(NAME malformed-hdf5-4.9 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_491)
         add_test(NAME malformed-hdf5-4.10 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_4102)
         add_test(NAME malformed-hdf5-4.11 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_4111)
+        set_tests_properties(malformed-hdf5 malformed-hdf5-4.6 malformed-hdf5-4.7 malformed-hdf5-4.8 malformed-hdf5-4.9 malformed-hdf5-4.10 malformed-hdf5-4.11
+            PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
     endif()
 
 endif()
