@@ -104,7 +104,7 @@ if [ -z "$2" ]; then
     [ $? -eq 0 ] || exit 1
     old_silo=""
 else
-    all_objs_file=$(find_file -r $2.$ext tests/$2.$ext)
+    all_objs_file=$(find_file -r $2.$ext tests/$2.$ext tests/bin/$2.$ext)
     [ $? -eq 0 ] || exit 1
     old_silo=$(echo $2 | cut -d'_' -f3)
     if [ "${#old_silo}" -gt 2 ]; then
