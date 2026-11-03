@@ -862,6 +862,8 @@ main(int argc, char *argv[])
                    !strncmp(argv[i], "DB_H5VFD", 8)) {
             driver = StringToDriver(argv[i]);
             file_ext = ".h5";
+        } else if (!strcmp(argv[i], "zfp")) {
+            DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=5");
         } else if (!strcmp(argv[i], "gzip1")) {
             DBSetCompression("METHOD=GZIP LEVEL=1");
         } else if (!strcmp(argv[i], "gzip9")) {
