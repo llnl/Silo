@@ -200,15 +200,35 @@ string(REGEX MATCH "([0-9]+)" _silo_test_skip_retval "${_skip_retval_line}")
 
 add_custom_target(copy_test_data ALL)
 set_target_properties(copy_test_data PROPERTIES FOLDER testing)
-add_custom_command(TARGET copy_test_data POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_CURRENT_SOURCE_DIR}/pion0244.silo
-    ${silo_test_output_dir})
+set(silo_test_data_files
+    pion0244.silo
+    z1plt.silo
+    box_in_a_box.silo
+    all_objects_461.h5
+    all_objects_461.pdb
+    all_objects_472.h5
+    all_objects_472.pdb
+    all_objects_48.h5
+    all_objects_48.pdb
+    all_objects_491.h5
+    all_objects_491.pdb
+    all_objects_4102.h5
+    all_objects_4102.pdb
+    all_objects_4111.h5
+    all_objects_4111.pdb
+)
+
+list(TRANSFORM silo_test_data_files
+    PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/"
+)
 
 add_custom_command(TARGET copy_test_data POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_CURRENT_SOURCE_DIR}/z1plt.silo
-    ${silo_test_output_dir})
+        ${silo_test_data_files}
+        ${silo_test_output_dir}
+    COMMAND_EXPAND_LISTS
+    VERBATIM
+)
 
 add_custom_command(TARGET copy_test_data POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -236,10 +256,6 @@ if(SILO_ENABLE_PYTHON_MODULE AND Python_EXECUTABLE)
     add_custom_command(TARGET copy_test_data POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/testonehex
-        ${silo_test_output_dir})
-    add_custom_command(TARGET copy_test_data POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/box_in_a_box.silo
         ${silo_test_output_dir})
     add_custom_command(TARGET copy_test_data POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -734,8 +750,6 @@ if(NOT WIN32)
         set_tests_properties(testdtypes PROPERTIES DEPENDS specmix-hdf5)
     endif()
 
-
-
     #
     # malformed (shell script wrapped test)
     # malformed object handling can result in some known, not easy to fix, small leaks.
@@ -745,13 +759,29 @@ if(NOT WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/malformed.sh
         ${silo_test_output_dir})
+
     add_test(NAME malformed COMMAND "${silo_test_output_dir}/malformed.sh")
     set_tests_properties(malformed PROPERTIES DEPENDS all_silo_objects)
-    set_tests_properties(malformed PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
+    add_test(NAME malformed-4.6 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_461)
+    add_test(NAME malformed-4.7 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_472)
+    add_test(NAME malformed-4.8 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_48)
+    add_test(NAME malformed-4.9 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_491)
+    add_test(NAME malformed-4.10 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_4102)
+    add_test(NAME malformed-4.11 COMMAND "${silo_test_output_dir}/malformed.sh" DB_PDB all_objects_4111)
+    set_tests_properties(malformed malformed-4.6 malformed-4.7 malformed-4.8 malformed-4.9 malformed-4.10 malformed-4.11
+        PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
+
     if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         add_test(NAME malformed-hdf5 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5)
         set_tests_properties(malformed-hdf5 PROPERTIES DEPENDS all_silo_objects-hdf5)
-        set_tests_properties(malformed-hdf5 PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
+        add_test(NAME malformed-hdf5-4.6 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_461)
+        add_test(NAME malformed-hdf5-4.7 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_472)
+        add_test(NAME malformed-hdf5-4.8 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_48)
+        add_test(NAME malformed-hdf5-4.9 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_491)
+        add_test(NAME malformed-hdf5-4.10 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_4102)
+        add_test(NAME malformed-hdf5-4.11 COMMAND "${silo_test_output_dir}/malformed.sh" DB_HDF5 all_objects_4111)
+        set_tests_properties(malformed-hdf5 malformed-hdf5-4.6 malformed-hdf5-4.7 malformed-hdf5-4.8 malformed-hdf5-4.9 malformed-hdf5-4.10 malformed-hdf5-4.11
+            PROPERTIES ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::detect_leaks=0")
     endif()
 
 endif()
