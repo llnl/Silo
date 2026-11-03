@@ -2611,19 +2611,19 @@ DB_SETGET(int, EvalNameschemes, evalNameschemes, DB_INTBOOL_NOT_SET)
 static void _db_set_compression_params(char **dst, char const *s)
 {
     if (s && *s == '\0') {
-        if (*dst)
+        if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
         *dst = ALLOC_N(char, 12);
         strcpy(*dst, "METHOD=GZIP");
     }   
     else if (s) {
-        if (*dst)
+        if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
         *dst = ALLOC_N(char,strlen(s)+1);
         strcpy(*dst, s);
     }
     else {
-        if (*dst)
+        if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
         *dst=0;
     }

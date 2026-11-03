@@ -799,6 +799,8 @@ fill_rect3d_mat(float x[], float y[], float z[], int matlist[], int nx,
     *mixlen = mixlen2;
 }
 
+static int vary_compression = 0;
+
 /*-------------------------------------------------------------------------
  * Function:    main
  *
@@ -913,6 +915,8 @@ main(int argc, char *argv[])
             compat = DB_COMPAT_OVER_PERF;
         } else if (!strcmp(argv[i], "perf-over-compat")) {
             compat = DB_PERF_OVER_COMPAT;
+        } else if (!strcmp(argv[i], "vary-compression")) {
+            vary_compression = 1;
         } else {
             fprintf(stderr, "%s: unknown argument `%s'\n", argv[0], argv[i]);
             exit(1);
@@ -1304,6 +1308,9 @@ build_multi(DBfile *dbfile, int meshtype, int vartype, int dim, int nblocks_x,
     int             extentssize;
     int            *tmpList;
     double         *tmpExtents;
+
+    if (vary_compression)
+        DBSetCompression("METHOD=GZIP LEVEL=7");
 
     /* 
      * Initialize the names and create the directories for the blocks.
@@ -1933,6 +1940,9 @@ build_block_rect2d(DBfile *dbfile, char dirnames[MAXBLOCKS][STRLEN],
             has_external_zones[block] = 1;
         zonecounts[block] = (dims[0]-1)*(dims[1]-1);
 
+        if (vary_compression)
+            DBSetCompressionFile(dbfile, "ERRMODE=FALLBACK METHOD=GZIP LEVEL=3");
+
         TESTQMESH(dbfile, meshname, coordnames, coords, dims, ndims, DB_FLOAT, DB_COLLINEAR, optlist);
 
         TESTQVAR(dbfile, var1name, meshname, d2, zdims, ndims, DB_FLOAT, DB_ZONECENT, optlist);
@@ -1945,13 +1955,20 @@ build_block_rect2d(DBfile *dbfile, char dirnames[MAXBLOCKS][STRLEN],
 
         DBFreeOptlist(optlist);
 
-        /*
-         * Test explicit call to free compression resources for a mesh
-         */
-        if (driver == DB_HDF5 && block % 6 == 0)
-            DBFreeCompressionResources(dbfile,0);        /* all mesh case */
-        else if (driver == DB_HDF5 && block % 2 == 0)
-            DBFreeCompressionResources(dbfile,meshname); /* specific mesh case */
+        if (vary_compression)
+        {
+            DBSetCompression(0);
+        }
+        else
+        {
+            /*
+             * Test explicit call to free compression resources for a mesh
+             */
+            if (driver == DB_HDF5 && block % 6 == 0)
+                DBFreeCompressionResources(dbfile,0);        /* all mesh case */
+            else if (driver == DB_HDF5 && block % 2 == 0)
+                DBFreeCompressionResources(dbfile,meshname); /* specific mesh case */
+        }
 
         if (DBSetDir(dbfile, "..") == -1)
         {
