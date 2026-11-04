@@ -8274,6 +8274,26 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     gm = (DBgroupelmap*) calloc(1,sizeof(DBgroupelmap));
     *gm = tmpgm;
 
+    /* In versions 4.6 and 4.7 of Silo, groupelmaps with optional fractional data were not
+       handled correctly during write. As a result, groupelmaps with fractional data from
+       those versions of the library are malformed by construction. Worse, the fractional
+       data was never written to the file so there is no resolution that can return the
+       original writer's *whole* groupelmap object. Here, if the groupelmap has no fractional
+       data, we can proceed "normally". If it has fractional data, we essentialy ignore it and
+       proceed as thought it has none. */
+    if (fracLengths || fracsArray)
+    {
+        int is46 = strncmp(_dbfile->pub.file_lib_version,"4.6",3) == 0;
+        int is47 = strncmp(_dbfile->pub.file_lib_version,"4.7",3) == 0;
+        if (is46 || is47)
+        {
+            FREE(fracLengths);
+            FREE(fracsArray);
+            fraclens_size = 0;
+            segfracs_size = 0;
+        }
+    }
+
     if (seglens_size < 0 || segids_size < 0 || segdata_size < 0 || fraclens_size < 0 ||
         segfracs_size < 0 || gm->num_segments < 0 || 
         gm->num_segments != grptypes_size ||
