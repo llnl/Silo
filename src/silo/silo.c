@@ -305,36 +305,36 @@ static void const *db_static_void_ptr_not_set = (void*) "db_static_void_ptr_not_
 #define DB_CHAR_PTR_NOT_SET ((char const *)db_static_char_ptr_not_set)
 #define DB_VOID_PTR_NOT_SET ((void const *)db_static_void_ptr_not_set)
 
-SILO_Globals_t SILO_Globals = {
-    DBAll, /* dataReadMask */
-    TRUE,  /* allowOverwrites */
-    FALSE, /* allowEmptyObjects */
-    FALSE, /* enableChecksums */
-    FALSE, /* enableFriendlyHDF5Names */
-    FALSE, /* enableGrabDriver */
-#ifndef _WIN32
-#warning FIX THIS
-#endif
-    FALSE, /* darshanEnabled */
-    FALSE, /* allowLongStrComponents */
-    3,     /* maxDeprecateWarnings */
-    0,     /* compressionParams (null) */
-    2.0,   /* compressionMinratio */
-    0,     /* compressionErrmode (fallback) */
-    0,     /* compatability mode */
-    0,     /* evalNameschemes */
-    {      /* file options sets [32 of them] */
-        0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0
-    },
-    DB_TOP,/* _db_err_level */
-    0,     /* _db_err_func */
-    DB_NONE,/* _db_err_level_drvr */
-    0,     /* Jstk */
-    DEFAULT_DRIVER_PRIORITIES
-};
+#define SILO_GLOBALS_INIT {                          \
+    DBAll, /* dataReadMask */                        \
+    TRUE,  /* allowOverwrites */                     \
+    FALSE, /* allowEmptyObjects */                   \
+    FALSE, /* enableChecksums */                     \
+    FALSE, /* enableFriendlyHDF5Names */             \
+    FALSE, /* enableGrabDriver */                    \
+    FALSE, /* darshanEnabled */                      \
+    FALSE, /* allowLongStrComponents */              \
+    3,     /* maxDeprecateWarnings */                \
+    0,     /* compressionParams (null) */            \
+    2.0,   /* compressionMinratio */                 \
+    0,     /* compressionErrmode (fallback) */       \
+    0,     /* compatability mode */                  \
+    0,     /* evalNameschemes */                     \
+    {      /* file options sets [32 of them] */      \
+        0, 0, 0, 0, 0, 0, 0, 0,                      \
+	0, 0, 0, 0, 0, 0, 0, 0,                      \
+        0, 0, 0, 0, 0, 0, 0, 0,                      \
+	0, 0, 0, 0, 0, 0, 0, 0                       \
+    },                                               \
+    DB_TOP,/* _db_err_level */                       \
+    0,     /* _db_err_func */                        \
+    DB_NONE,/* _db_err_level_drvr */                 \
+    0,     /* Jstk */                                \
+    DEFAULT_DRIVER_PRIORITIES                        \
+}
+
+SILO_Globals_t SILO_Globals = SILO_GLOBALS_INIT;
+static const SILO_Globals_t SILO_Globals_init = SILO_GLOBALS_INIT;
 
 INTERNAL int
 db_FullyDeprecatedConvention(const char *name)
@@ -2572,7 +2572,10 @@ static Typ db_SetGet ## NM ## File(DBfile *f, Typ val, int set) \
     API_BEGIN("DB(Set|Get)" #NM "File", Typ, -1) {              \
         if (!f)                                                 \
             API_ERROR("DBfile*", E_BADARGS);                    \
-        retval = f->pub.file_scope_globals->nM;                 \
+        if (!f->pub.file_scope_globals)                         \
+            retval = NotSet;                                    \
+        else                                                    \
+            retval = f->pub.file_scope_globals->nM;             \
         if (set)                                                \
             f->pub.file_scope_globals->nM = val;                \
         if (retval == NotSet)                                   \
@@ -2610,22 +2613,18 @@ DB_SETGET(int, EvalNameschemes, evalNameschemes, DB_INTBOOL_NOT_SET)
 /* The compression stuff has some custom initialization */
 static void _db_set_compression_params(char **dst, char const *s)
 {
-    if (s && *s == '\0') {
+    if (s == 0 || *s == '\0')
+    {
         if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
-        *dst = ALLOC_N(char, 12);
-        strcpy(*dst, "METHOD=GZIP");
-    }   
-    else if (s) {
-        if (*dst && *dst != db_static_char_ptr_not_set)
-            FREE(*dst);
+
+        if (dst != &SILO_Globals.compressionParams)
+            *dst = (char*)DB_CHAR_PTR_NOT_SET;
+    }
+    else
+    {
         *dst = ALLOC_N(char,strlen(s)+1);
         strcpy(*dst, s);
-    }
-    else {
-        if (*dst && *dst != db_static_char_ptr_not_set)
-            FREE(*dst);
-        *dst=0;
     }
 }
 
@@ -2656,7 +2655,10 @@ static char const *db_SetGetCompressionFile(DBfile *f, char const *val, int set)
     API_BEGIN("DB(Set|Get)CompressionFile", char const *, 0) {
         if (!f)
             API_ERROR("DBfile*", E_BADARGS);
-        retval = f->pub.file_scope_globals->compressionParams;
+        if (!f->pub.file_scope_globals)
+            retval = DB_CHAR_PTR_NOT_SET;
+        else
+            retval = f->pub.file_scope_globals->compressionParams;
         if (set)
             _db_set_compression_params(&(f->pub.file_scope_globals->compressionParams), val);
         if (retval == DB_CHAR_PTR_NOT_SET)
@@ -4133,6 +4135,13 @@ DBFileName(const DBfile *dbfile)
     return name;
 }
 
+#define INHERIT_SILO_GLOBAL(field, NotSetVal)                      \
+    if (SILO_Globals.field == SILO_Globals_init.field)             \
+        dbfile->pub.file_scope_globals->field = NotSetVal;         \
+    else                                                           \
+        dbfile->pub.file_scope_globals->field = SILO_Globals.field
+
+
 static void
 db_InitFileGlobals(DBfile *dbfile, int mode)
 {
@@ -4152,28 +4161,26 @@ db_InitFileGlobals(DBfile *dbfile, int mode)
        inheret *and* track all behaviors from Silo's globals. The first time
        any of these values are changed to a NOT_SET value, then forevermore, 
        that particular behavior is governed by the file */
-    dbfile->pub.file_scope_globals->dataReadMask            = DB_MASK_NOT_SET;
-    dbfile->pub.file_scope_globals->allowOverwrites         = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->allowEmptyObjects       = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableChecksums         = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableFriendlyHDF5Names = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableGrabDriver        = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->darshanEnabled          = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->allowLongStrComponents  = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->maxDeprecateWarnings    = DB_INTBOOL_NOT_SET;
-#ifndef _WIN32
-#warning ADD compressionMinSize
-#endif
-    dbfile->pub.file_scope_globals->compressionMinratio     = DB_FLOAT_NOT_SET;
-#ifndef _WIN32
-#warning CORRECT INITIALIZATION OF compressionErrmode
-#endif
-    dbfile->pub.file_scope_globals->compressionErrmode      = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->compatibilityMode       = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->compressionParams       = (char*) DB_CHAR_PTR_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_level           = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_func            = DB_VOID_PTR_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_level_drvr      = DB_INTBOOL_NOT_SET;
+    INHERIT_SILO_GLOBAL(dataReadMask,            DB_MASK_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowOverwrites,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowOverwrites,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowEmptyObjects,       DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableChecksums,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableFriendlyHDF5Names, DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableGrabDriver,        DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(darshanEnabled,          DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowLongStrComponents,  DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(maxDeprecateWarnings,    DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(compressionMinratio,     DB_FLOAT_NOT_SET);
+    INHERIT_SILO_GLOBAL(compressionErrmode,      DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(compatibilityMode,       DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_level,           DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_func,            DB_VOID_PTR_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_level_drvr,      DB_INTBOOL_NOT_SET);
+    if (SILO_Globals.compressionParams)
+        dbfile->pub.file_scope_globals->compressionParams = STRDUP(SILO_Globals.compressionParams);
+    else
+        dbfile->pub.file_scope_globals->compressionParams = (char*)DB_CHAR_PTR_NOT_SET;
 
     /* Jstk only relevant for lib as a whole, not specific to a file */
     dbfile->pub.file_scope_globals->Jstk = 0;
