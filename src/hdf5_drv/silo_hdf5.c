@@ -207,11 +207,11 @@ extern void zfp_init_zfp();
 
 #define COMPRESSION_ERRMODE_FALLBACK 0
 #define COMPRESSION_ERRMODE_FAIL     1
-#define COMPRESSION_LOSS_ALLOWED 0x00000001
-/* HTB = Hypercube Topology Based (hzip) */
-#define COMPRESSION_HTB_ALLOWED  0x00000002
-#define COMPRESSION_ALL_ALLOWED  0xFFFFFFFF
-#define COMPRESSION_NONE_ALLOWED 0x00000000 
+#define COMPRESSION_LOSS_ALLOWED    0x00000001
+#define COMPRESSION_HTB_ALLOWED     0x00000002 /* Hypercube Topology Based */
+#define COMPRESSION_TYPNUM_ALLOWED  0x00000004 /* Typed numerical based */
+#define COMPRESSION_ALL_ALLOWED     0xFFFFFFFF
+#define COMPRESSION_NONE_ALLOWED    0x00000000 
 
 #define FALSE           0
 #define TRUE            1
@@ -3494,7 +3494,7 @@ db_hdf5_set_compression(DBfile *dbfile, hsize_t npoints, hid_t mtype, hid_t ftyp
            (H5Z_FILTER_CONFIG_ENCODE_ENABLED|H5Z_FILTER_CONFIG_DECODE_ENABLED))==
            (H5Z_FILTER_CONFIG_ENCODE_ENABLED|H5Z_FILTER_CONFIG_DECODE_ENABLED))
        {
-          unsigned int cdvals[2] = {H5_SZIP_NN_OPTION_MASK, 16}
+          unsigned int cdvals[2] = {H5_SZIP_NN_OPTION_MASK, 16};
           if ((ptr = strstr(DBGetCompressionFile(dbfile), "BLOCK=")) != NULL)
           {
              unsigned int block;
