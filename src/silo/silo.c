@@ -4632,6 +4632,7 @@ DBClose(DBfile *dbfile)
 
 	tmp_file_scope_globals = dbfile->pub.file_scope_globals; 
         retval = (dbfile->pub.close) (dbfile);
+        _db_set_compression_params(&tmp_file_scope_globals->compressionParams, 0);
         free(tmp_file_scope_globals);
         API_RETURN(retval);
     }
