@@ -224,7 +224,7 @@ main(int argc, char *argv[])
             fapl = H5Pcreate(H5P_FILE_ACCESS);
             H5Pset_alignment(fapl, 0, 1024);
             fcpl = H5Pcreate(H5P_FILE_CREATE);
-            H5Pset_sizes(fcpl, 2, 2);
+            H5Pset_sizes(fcpl, 4, 4);
 
             custom_opts = DBMakeOptlist(2);
             DBAddOption(custom_opts, DBOPT_H5_FAPL_HID_T, &fapl);
@@ -373,6 +373,8 @@ main(int argc, char *argv[])
     sprintf(mesh_command, "mesh hex; contour v");
     len = strlen(mesh_command) + 1;
     DBWrite(dbfile, "_meshtvinfo", mesh_command, &len, 1, DB_CHAR);
+
+done:
 
     DBClose(dbfile);
 
