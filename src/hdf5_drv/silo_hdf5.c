@@ -3525,7 +3525,7 @@ db_hdf5_set_compression(DBfile *dbfile, hsize_t npoints, hid_t mtype, hid_t ftyp
 #ifdef HAVE_HZIP
     else if ((ptr = strstr(DBGetCompressionFile(dbfile), "METHOD=HZIP")) != NULL) 
     {
-       if (flags & COMPRESSION_HTB_ALLOWED)
+       if (zflags & COMPRESSION_HTB_ALLOWED)
        {
            if ((ptr = strstr(DBGetCompressionFile(dbfile), "CODEC=")) != NULL)
            {
