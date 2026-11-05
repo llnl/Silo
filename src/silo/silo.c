@@ -2623,6 +2623,9 @@ static void _db_set_compression_params(char **dst, char const *s)
     }
     else
     {
+        if (*dst && *dst != db_static_char_ptr_not_set)
+            FREE(*dst);
+
         *dst = ALLOC_N(char,strlen(s)+1);
         strcpy(*dst, s);
     }
