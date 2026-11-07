@@ -895,7 +895,7 @@ So, in rare cases, Silo may leak memory during a malformed object read.
   Any Silo clients attempting to read compressed data may do so without concern for whether the data in the file is compressed or not.
   If the data is compressed, decompression will occur automatically during read.
   This is true as long as the Silo library to which the client reading the data was compiled and linked has the necessary decompression code.
-  Because writer and reader need not be compiled and linked to the same exact Silo library installation, each could be compiled with differing compression capabilities making it impossible to read data in some situations.
+  Because writer and reader need not be compiled and linked to the same exact Silo library installation, each could be compiled with differing compression capabilities making it impossible to read data in some software configurations.
 
   To the extent possible, the public installations of Silo on LLNL systems have all been enabled with compatible compression features.
   However, because many application developers have taken to creating their own installations of Silo, it is important to consider the effect of disabling (or enabling) various compression features.
@@ -903,21 +903,43 @@ So, in rare cases, Silo may leak memory during a malformed object read.
   Compression features are controlled by an arbitrary string, whose contents are described in more detail below.
   By default, the Silo library does not have compression enabled.
   A number of different compression techniques are available.
-  Some operate in a mesh-and-variable-and-data-type-agnostic way while others depend on the type of data and sometimes even the type of mesh.
+  Broadly speaking, compression methods available in Silo are either data agnostic or depend to some some extent on the kinds of data being processed.
+  In addition, some compression methods are *lossy* and not suitable for some kinds of data (e.g. integer zonelist indexing data).
 
   Some compression settings are global to all compression methods.
-  There are two global parameters that control behavior of compression algorithms.
+  There are some global parameters that control behavior of compression algorithms.
   These must appear in the compression `options` string *before* any compression-specific parameters.
 
   The first is the error mode (`"ERRMODE=<word>"`) which controls how the Silo library responds when it encounters an error during compression and/or is unable to compress the data.
   The two options for `<word>` are `FALLBACK` or `FAIL`.
   Including `"ERRMODE=FALLBACK"` in the compression `options` string tells Silo that whenever compression fails, it should simply fallback to writing uncompressed data.
   Including `"ERRMODE=FAIL"` in the compression `options` string tells Silo to fail the write and return `E_COMPRESSION` error for the operation.
+  Default behavior is `FALLBACK`.
 
-  The second is the minimum compression ratio to be achieved by compressing the data.
+  The second is the minimum size in bytes of a dataset to which compression should be applied.
+  It is specified as `"MINSIZE=<int>"`.
+  Any components of data objects below this size will not be compressed.
+
+  The third is the minimum compression ratio to be achieved by compressing the data.
   It is specified as `"MINRATIO=<float>"`.
   For example, including `"MINRATIO=2.5"` in the compression `options` string tells Silo that all data must be compressed by at least a factor of 2.5:1.
   If it is unable the compress by at least this amount, Silo will either fallback or fail the write depending on the `ERRMODE` setting.
+  `MINRATIO` is applicable only to the hzip compression method.
+
+  Finally, different compression approaches can be specified by separating them with a semi-colon `;` in the `options` argument.
+  This allows Silo applications to build up something more like a compression *strategy*.
+  For example, in the compression `options` string below (note the ';' separating the substrings)...
+      ```
+      DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
+ 
+      ```
+  Silo will first try applying ZFP compression with rate parameter of 4.
+  If Silo decides it cannot apply that compression to a given dataset, it will try the next set of compression parameters in the `options` string.
+
+  When building up a compression strategy string this way, it is best to build from compression methods which apply to more specific kinds of data *before* compression methods which work more agnostically.
+  Silo will continue to try to apply the specified methods until it succeeds or runs out of options.
+  Note, this does not mean Silo attempts to write the data multiple times, each time trying a different compression method.
+  It means Silo takes what it knows about a given compression method and data it is trying to write and decides before the write if the specified compression can work.
 
   The remaining paragraphs describe compression algorithm specific options.
 
@@ -937,7 +959,7 @@ So, in rare cases, Silo may leak memory during a malformed object read.
   : is enabled using `"METHOD=SZIP"` in the `options` string.
     The SZIP compression algorithm is designed specifically for scientific data.
     SZIP recognizes the `BLOCK=<int>`, and `MASK={EC|NN}` parameters.
-    The `BLOCK=<int>`, takes an integer value from 0 to 32, which is a blocking size and must be even and not greater than 32, with typical values being 8, 10, 16, or 32.
+    The `BLOCK=<int>`, takes an *even* integer value from 2 to 32, with typical values being 8, 10, 16, or 32.
 
     This parameter affects the compression ratio; the more values vary, the smaller this number should be to achieve better performance.
     The `MASK=EC` setting, selects entropy coding method, this is best suited for data that has been processed, working best for small numbers.
@@ -947,6 +969,7 @@ So, in rare cases, Silo may leak memory during a malformed object read.
     This means that you should take care not to have compression turned on when doing small writes.
     To achieve optimal performance for SZIP compression, it is recommended that one select a value for `BLOCK` that is an integral divisor of the dataset's fastest-changing dimension.
     Note that the SZIP compression encoder *may* be licensed for non-commercial use only while the decoder (e.g. decompression) is unlimited.
+    There is a newer, alternative implementation of SZIP available as libaec that has more flexible licensing.
     Note that SZIP decompression is **not** guaranteed to be available to all Silo clients; only those for which the Silo library was configured with SZIP compression capability enabled.
     Like GZIP, SZIP compression is applied to float and integer data independently of the types of meshes and variables.
 
@@ -1000,6 +1023,9 @@ So, in rare cases, Silo may leak memory during a malformed object read.
     Optionally, use `"PATH=<path-to-plugin-dir>"` to specify a path where the plugin shared library can be found.
 
     This last option allows Silo data producers to use any HDF5 compression filter plugin available but not necessarily built into the Silo library.
+    However, because Silo has no builtin knowledge of whatever compression method is specified here, it can wind up applying the method in cases where it may not be appropriate.
+    For example, if the method is lossy, Silo won't know that it is lossy and could wind up applying it to zonelist data.
+    The solution here is to bound the use of such methods with calls to set and the reset compression params over code blocks where the caller knows the data being written is compatible with the compression.
 
 {{ EndFunc }}
 

@@ -165,7 +165,7 @@ main(int argc, char *argv[])
           zmix = 1;
           has_loss = 1;
        } else if (!strcmp(argv[i], "generic")) {
-          DBSetCompression("ERRMODE=FAIL METHOD=HDF5_PLUGIN ID=1 NAME=deflate CDVALS=8");
+          DBSetCompression("ERRMODE=FAIL METHOD=HDF5_PLUGIN ID=1 CDVALS=2");
        /* These test fail/fallback behavior. We target a compresion ratio
           of 1000:1 and FAIL or FALLBACK if we can't hit...which we can't. */
        } else if (!strcmp(argv[i], "minratio1000")) {
@@ -229,7 +229,7 @@ main(int argc, char *argv[])
             {
                 double x = 2 * M_PI * (double) i / (double) (fdims[0]-1);
                 double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-                fval[i] = (float) ((j+1) * (1 + sin(x)) + n);
+                fval[i] = (float) ((j%3) * (j+1) * (1 + sin(x)) + n);
             }
 
             if (zmix)
@@ -274,7 +274,7 @@ main(int argc, char *argv[])
             {
                 double x = 2 * M_PI * (double) i / (double) (ddims[0]-1);
                 double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-                dval[i] = (double) ((j+1) * (1 + sin(x)) + n);
+                dval[i] = (double) ((j%3) * (j+1) * (1 + sin(x)) + n);
             }
 
             if (zmix)
@@ -416,7 +416,7 @@ main(int argc, char *argv[])
           {
              double x = 2 * M_PI * (double) i / (double) (ddims[0]-1);
              double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-             dval[i] = (double) ((j+1) * (1 + sin(x)) + n);
+             dval[i] = (double) ((j%3) * (j+1) * (1 + sin(x)) + n);
              if (dval[i] != drval[i])
              {
                 if (!has_loss) nerrors++;
