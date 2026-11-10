@@ -905,6 +905,9 @@ main(int argc, char *argv[])
             compat = DB_PERF_OVER_COMPAT;
             concurrent = DB_CONCURRENT;
 #endif
+        } else if (!strcmp(argv[i], "small-array-size")) {
+            int small_array_size = strtol(argv[++i],0,10);
+            DBSetSmallArrayByteSize(small_array_size);
         } else if (!strcmp(argv[i], "missing-value")) {
             missing_value = strtod(argv[++i],0);
         } else if (!strcmp(argv[i], "time-series")) {
@@ -916,6 +919,7 @@ main(int argc, char *argv[])
         } else if (!strcmp(argv[i], "perf-over-compat")) {
             compat = DB_PERF_OVER_COMPAT;
         } else if (!strcmp(argv[i], "zmix")) {
+            DBSetSmallArrayByteSize(128);
             zmix = 1;
         } else if (!strcmp(argv[i], "zstrat")) {
             DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
@@ -1312,7 +1316,7 @@ build_multi(DBfile *dbfile, int meshtype, int vartype, int dim, int nblocks_x,
     double         *tmpExtents;
 
     if (zmix)
-        DBSetCompression("METHOD=GZIP LEVEL=7");
+        DBSetCompression("METHOD=GZIP LEVEL=9");
 
     /* 
      * Initialize the names and create the directories for the blocks.
@@ -1943,7 +1947,28 @@ build_block_rect2d(DBfile *dbfile, char dirnames[MAXBLOCKS][STRLEN],
         zonecounts[block] = (dims[0]-1)*(dims[1]-1);
 
         if (zmix)
-            DBSetCompressionFile(dbfile, "ERRMODE=FALLBACK METHOD=GZIP LEVEL=3");
+        {
+            switch (block%3)
+            {
+                case 0:
+                    DBSetCompressionFile(dbfile, "ERRMODE=FALLBACK METHOD=GZIP LEVEL=3");
+                    break;
+                case 1:
+#ifdef HAVE_HZIP
+                    DBSetCompressionFile(dbfile, 0);
+                    DBSetCompression("ERRMODE=FALLBACK METHOD=HZIP BITS=16");
+#else
+                    DBSetCompressionFile(dbfile, 0);
+                    DBSetCompression("ERRMODE=FALLBACK METHOD=GZIP LEVEL=1");
+#endif
+                    break;
+                case 2:
+                    DBSetCompression(0);
+                    break;
+            }
+            
+        }
+
 
         TESTQMESH(dbfile, meshname, coordnames, coords, dims, ndims, DB_FLOAT, DB_COLLINEAR, optlist);
 
