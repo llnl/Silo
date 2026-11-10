@@ -642,7 +642,9 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         set_tests_properties(multi_test-hzip PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
         add_test(NAME multi_test-hzip-read COMMAND $<TARGET_FILE:multi_test> testread DB_HDF5)
         set_tests_properties(multi_test-hzip-read PROPERTIES DEPENDS multi_test-hzip)
-        list(APPEND MULTI_BLOCK_TESTS multi_test-hzip multi_test-hzip-read)
+        add_test(NAME multi_test-zstrat COMMAND $<TARGET_FILE:multi_test> zstrat DB_HDF5)
+        add_test(NAME multi_test-zmix COMMAND $<TARGET_FILE:multi_test> zmix DB_HDF5)
+        list(APPEND MULTI_BLOCK_TESTS multi_test-hzip multi_test-hzip-read multi_test-zstrat multi_test-zmix)
 
         add_custom_target(testhzip ALL)
         add_custom_command(TARGET testhzip POST_BUILD
