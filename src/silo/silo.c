@@ -320,6 +320,7 @@ static void const *db_static_void_ptr_not_set = (void*) "db_static_void_ptr_not_
     0,     /* compressionErrmode (fallback) */       \
     0,     /* compatability mode */                  \
     0,     /* evalNameschemes */                     \
+    2048,  /* smallArrayByteSize */                  \
     {      /* file options sets [32 of them] */      \
         0, 0, 0, 0, 0, 0, 0, 0,                      \
 	0, 0, 0, 0, 0, 0, 0, 0,                      \
@@ -2609,6 +2610,7 @@ DB_SETGET(int, CompatibilityMode, compatibilityMode, DB_INTBOOL_NOT_SET)
 #warning WHAT ABOUT FORCESINGLE SHOWERRORS
 #endif
 DB_SETGET(int, EvalNameschemes, evalNameschemes, DB_INTBOOL_NOT_SET)
+DB_SETGET(int, SmallArrayByteSize, smallArrayByteSize, DB_INTBOOL_NOT_SET)
 
 /* The compression stuff has some custom initialization */
 static void _db_set_compression_params(char **dst, char const *s)
@@ -4177,6 +4179,8 @@ db_InitFileGlobals(DBfile *dbfile, int mode)
     INHERIT_SILO_GLOBAL(compressionMinratio,     DB_FLOAT_NOT_SET);
     INHERIT_SILO_GLOBAL(compressionErrmode,      DB_INTBOOL_NOT_SET);
     INHERIT_SILO_GLOBAL(compatibilityMode,       DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(evalNameschemes,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(smallArrayByteSize,      DB_INTBOOL_NOT_SET);
     INHERIT_SILO_GLOBAL(_db_err_level,           DB_INTBOOL_NOT_SET);
     INHERIT_SILO_GLOBAL(_db_err_func,            DB_VOID_PTR_NOT_SET);
     INHERIT_SILO_GLOBAL(_db_err_level_drvr,      DB_INTBOOL_NOT_SET);

@@ -1513,3 +1513,73 @@ Longer than normal component strings can result in creating objects in Silo file
 * **Description:**
 
 {{ EndFunc }}
+
+## `DBSetSmallArrayByteSize()`
+## `DBSetSmallArrayByteSizeFile()`
+
+* **Summary:** Set size threshold for arrays too small for special processing
+
+* **C Signature:**
+
+  ```
+  int DBSetSmallArrayByteSize(int nbytes)
+  int DBSetSmallArrayByteSizeFile(DBfile *dbfile, int nbytes)
+  ```
+
+* **Fortran Signature:**
+
+  ```
+  None
+  ```
+
+* **Arguments:**
+
+  Arg&nbsp;name | Description
+  :---|:---
+  `dbfile` | The file for which small array size threshold should be set.
+  `nbytes` | Size in bytes of small array size threshold. Default is 2048 bytes. Maximum allowed is 64 KiB.
+
+* **Returned value:**
+
+  Previous setting for `nbytes`.
+
+* **Description:**
+
+  Special processing includes things like compression, checksumming, chunking, etc.
+  The small array size threshold sets the size, in bytes, of arrays that are considered too small to worry about special features.
+  On the PDB driver, this setting is ignore because the PDB driver offers very little special processing.
+  On the HDF5 driver, this setting also controls whether the array is stored in HDF5 using [`COMPACT`](https://support.hdfgroup.org/documentation/hdf5/latest/_l_b_dset_layout.html#title4) storage.
+
+{{ EndFunc }}
+
+## `DBGetSmallArrayByteSize()`
+## `DBGetSmallArrayByteSizeFile()`
+
+* **Summary:** Get small array byte size threshold
+
+* **C Signature:**
+
+  ```
+  int DBGetSmallArrayByteSize()
+  int DBGetSmallArrayByteSizeFile(DBfile *dbfile)
+  ```
+
+* **Fortran Signature:**
+
+  ```
+  None
+  ```
+
+* **Arguments:**
+
+  Arg&nbsp;name | Description
+  :---|:---
+  `dbfile` | The file for which small array byte size threshold is desired.
+
+* **Returned value:**
+
+  The current small array byte size threshold of the library or file.
+
+* **Description:**
+
+{{ EndFunc }}
