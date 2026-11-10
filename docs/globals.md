@@ -929,10 +929,12 @@ So, in rare cases, Silo may leak memory during a malformed object read.
   Finally, different compression approaches can be specified by separating them with a semi-colon `;` in the `options` argument.
   This allows Silo applications to build up something more like a compression *strategy*.
   For example, in the compression `options` string below (note the ';' separating the substrings)...
-      ```
-      DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
+
+  ```
+  DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
  
-      ```
+  ```
+
   Silo will first try applying ZFP compression with rate parameter of 4.
   If Silo decides it cannot apply that compression to a given dataset, it will try the next set of compression parameters in the `options` string.
 
