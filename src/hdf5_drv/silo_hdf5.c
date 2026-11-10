@@ -3464,7 +3464,7 @@ db_hdf5_set_compression(char const *zparams, hsize_t npoints, hid_t mtype, hid_t
         strncpy(chararray, ptr+9, 5); 
         chararray[5] = '\0';
         mcr = (float) strtod(chararray, &check);
-        if (errno == 0 && mcr > 1.0)
+        if (errno == 0 && mcr >= 0.0)
             SILO_Globals.compressionMinratio = mcr;
         else
         {
@@ -3596,7 +3596,7 @@ db_hdf5_set_compression(char const *zparams, hsize_t npoints, hid_t mtype, hid_t
            return -1;
        }
 
-       if (!(zflags & (COMPRESSION_HYPTOPO_ALLOWED | COMPRESSION_NUMERIC_ALLOWED)))
+       if (!(zflags & COMPRESSION_HYPTOPO_ALLOWED))
        {
            if (opt_flag == H5Z_FLAG_OPTIONAL)
                return 0;
@@ -3948,6 +3948,14 @@ db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[],
     for (int i = 0; i < rank; i++)
         npoints *= size[i];
 
+    /* For small datasets, we store them in compact storage which
+       does not permit any filters */
+    if ((H5Tget_size(ftype) * npoints) < DBGetSmallArrayByteSizeFile(dbfile))
+    {
+        H5Pset_layout(P_ckcrprops, H5D_COMPACT);
+        return 0;
+    }
+
     if (DBGetCompressionFile(dbfile))
     {
         zstatus = db_hdf5_set_compression_loop(dbfile, npoints, mtype, ftype, zflags);
@@ -3971,12 +3979,6 @@ db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[],
             chunking_was_set = 1;
         }
         H5Pset_fletcher32(P_ckcrprops);
-    }
-
-    if (zstatus == 0)
-    {
-        if (!chunking_was_set && (H5Tget_size(ftype) * npoints) < (2 * 1024))
-            H5Pset_layout(P_ckcrprops, H5D_COMPACT);
     }
 
     return 0;
@@ -4765,14 +4767,13 @@ PRIVATE int
 db_hdf5_compwr(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
                void const *buf, char *name/*in,out*/, char const *fname)
 {
-    int compressionFlags = COMPRESSION_NUMERIC_ALLOWED | 
-                           COMPRESSION_BASEDIM_ALLOWED;
+    int compressionFlags = COMPRESSION_ALL_ALLOWED;
 
     if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
-        compressionFlags |= COMPRESSION_LOSSY_ALLOWED;
+        compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
 
     return db_hdf5_compwrz(dbfile, dtype, rank, _size, buf, name, fname,
-               compressionFlags);
+               COMPRESSION_NONE_ALLOWED);
 }
 
 /*-------------------------------------------------------------------------
@@ -12757,7 +12758,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         if (ndims == 2)
         {
             ntopo = 2;
-            for (i = 0; i < nshapes; i++)
+            for (i = 1; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 4)
@@ -12767,7 +12768,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         else if (ndims == 3)
         {
             ntopo = 3;
-            for (i = 0; i < nshapes; i++)
+            for (i = 1; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 8)
@@ -12862,7 +12863,7 @@ db_hdf5_PutZonelist2(DBfile *_dbfile, char const *name, int nzones, int ndims,
 {
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     DBzonelist_mt       m;
-    int                 compressionFlags = COMPRESSION_ALL_ALLOWED;
+    int                 compressionFlags = COMPRESSION_ALL_ALLOWED & ~COMPRESSION_LOSSY_ALLOWED;
 
     memset(&m, 0, sizeof m);
     PROTECT {
