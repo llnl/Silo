@@ -1018,16 +1018,23 @@ So, in rare cases, Silo may leak memory during a malformed object read.
 
   HDF5 Plugin compression
   : is enabled using `"METHOD=HDF5_PLUGIN"` in the `options` string.
-    One of either the `"ID=..."` or `"NAME=..."` options below is required.
     Use `"ID=<filter-id>"` to set the specific HDF5 filter to be used.
-    Use `"NAME=<filter-name>"` to set the specific HDF5 filter to be used.
-    Use `"CDVALS=<uint0>,<uint1>,...,<uintK>"` to specify filter parameters.
+    Use `"CDVALS=<uint0>,<uint1>,...,<uintK>"`, a comma-separated list of unsigned int values to specify filter parameters.
     Optionally, use `"PATH=<path-to-plugin-dir>"` to specify a path where the plugin shared library can be found.
 
-    This last option allows Silo data producers to use any HDF5 compression filter plugin available but not necessarily built into the Silo library.
+    If the plugin allows *lossy* compression, include the keyword `"LOSSY"` in the compression string as in...
+
+    ```
+    DBSetCompression("METHOD=HDF5_PLUGIN ID=32013 CDVALS=2,8 LOSSY")
+    ```
+
+    In the example above, the `HDF5_PLUGIN` approach is being applied for the ZFP (`ID=32013`) filter in *precision* mode (`cdvals[0]=2`) with a precision of `8`.
+    Because ZFP compression is lossy in precision mode, we add `LOSSY` to the string.
+
+    This last method allows Silo data producers to use any HDF5 compression filter plugin available but not necessarily built into the Silo library.
     However, because Silo has no builtin knowledge of whatever compression method is specified here, it can wind up applying the method in cases where it may not be appropriate.
-    For example, if the method is lossy, Silo won't know that it is lossy and could wind up applying it to zonelist data.
-    The solution here is to bound the use of such methods with calls to set and the reset compression params over code blocks where the caller knows the data being written is compatible with the compression.
+    For example, if the method is lossy, Silo will know it is lossy *ONLY IF* the keyword `"LOSSY"` appears in the compression string.
+    Alternatively, the caller can bound the use of such methods with calls to set and the reset compression params over code blocks where the caller knows the data being written is compatible with the compression being used..
 
 {{ EndFunc }}
 
