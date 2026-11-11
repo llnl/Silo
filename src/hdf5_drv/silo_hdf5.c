@@ -214,7 +214,7 @@ extern void zfp_init_zfp();
 #define COMPRESSION_SIMTOPO_ALLOWED 0x00000004 /* Simplicial complex topology (tris/tets) aware (meshoptimizer) */
 #define COMPRESSION_HYPTOPO_ALLOWED 0x00000008 /* Hypercube topology aware (hexs/quads) (hzip) */
 #define COMPRESSION_BASEDIM_ALLOWED 0x00000010 /* Base dimensional aware (zfp, fpzip) */
-#define COMPRESSION_RANGDIM_ALLOWED 0x00000020 /* Range dimensional aware */
+#define COMPRESSION_RANGDIM_ALLOWED 0x00000020 /* Range dimensional aware (zfp) */
 #define COMPRESSION_ALL_ALLOWED     0xFFFFFFFF
 
 #define FALSE           0
@@ -3813,6 +3813,14 @@ db_hdf5_set_compression(char const *zparams, hsize_t npoints, hid_t mtype, hid_t
         unsigned int cdvals[100];
         int const cdmaxvals = sizeof(cdvals)/sizeof(cdvals[0]);
         int cdnvals = 0;
+
+        if (((ptr = strstr(zparams, "LOSSY")) != NULL) && !(zflags & COMPRESSION_LOSSY_ALLOWED))
+        {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data object not compatible with lossy hdf5 plugin", E_COMPRESSION, me);
+           return -1;
+        }
 
         if ((ptr = strstr(zparams, "ID=")) != NULL)
         {
