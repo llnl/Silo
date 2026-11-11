@@ -119,6 +119,7 @@ main(int argc, char *argv[])
     int            show_errors = DB_TOP;
     double         noise = 0.3;
     int            compat = DB_COMPAT_OVER_PERF;
+    int            zmix = 0;
 
     /* Parse command-line */
     for (i=1; i<argc; i++) {
@@ -160,8 +161,12 @@ main(int argc, char *argv[])
        } else if (!strcmp(argv[i], "lossy3")) {
           DBSetCompression("METHOD=FPZIP LOSS=3");
           has_loss = 1;
+       } else if (!strcmp(argv[i], "zmix")) {
+          zmix = 1;
+          has_loss = 1;
        } else if (!strcmp(argv[i], "generic")) {
-          DBSetCompression("ERRMODE=FAIL METHOD=HDF5_PLUGIN ID=1 NAME=deflate CDVALS=8");
+          /* ID=1 is the deflate filter */
+          DBSetCompression("ERRMODE=FAIL METHOD=HDF5_PLUGIN ID=1 CDVALS=2");
        /* These test fail/fallback behavior. We target a compresion ratio
           of 1000:1 and FAIL or FALLBACK if we can't hit...which we can't. */
        } else if (!strcmp(argv[i], "minratio1000")) {
@@ -225,7 +230,20 @@ main(int argc, char *argv[])
             {
                 double x = 2 * M_PI * (double) i / (double) (fdims[0]-1);
                 double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-                fval[i] = (float) ((j+1) * (1 + sin(x)) + n);
+                fval[i] = (float) ((j%3) * (j+1) * (1 + sin(x)) + n);
+            }
+
+            if (zmix)
+            {
+                switch (j%7)
+                {
+                    case 0: DBSetCompression("METHOD=GZIP LEVEL=7"); break;
+                    case 1: DBSetCompressionFile(dbfile, "METHOD=ZFP RATE=5.5"); break;
+                    case 2: DBSetCompressionFile(dbfile, 0); DBSetCompression("METHOD=ZFP RATE=8.25"); break;
+                    case 3: DBSetCompression(0); break;
+                    case 4: DBSetCompression("METHOD=GZIP LEVEL=1"); break;
+                    default: break;
+                }
             }
 
             if (DBWrite(dbfile, tmpname, fval, fdims, ndims, DB_FLOAT) < 0)
@@ -257,7 +275,20 @@ main(int argc, char *argv[])
             {
                 double x = 2 * M_PI * (double) i / (double) (ddims[0]-1);
                 double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-                dval[i] = (double) ((j+1) * (1 + sin(x)) + n);
+                dval[i] = (double) ((j%3) * (j+1) * (1 + sin(x)) + n);
+            }
+
+            if (zmix)
+            {
+                switch (j%7)
+                {
+                    case 0: DBSetCompression("METHOD=GZIP LEVEL=7"); break;
+                    case 1: DBSetCompressionFile(dbfile, "METHOD=ZFP RATE=5.5"); break;
+                    case 2: DBSetCompressionFile(dbfile, 0); DBSetCompression("METHOD=ZFP RATE=8.25"); break;
+                    case 3: DBSetCompression(0); break;
+                    case 4: DBSetCompression("METHOD=GZIP LEVEL=1"); break;
+                    default: break;
+                }
             }
 
             if (DBWrite(dbfile, tmpname, dval, ddims, ndims, DB_DOUBLE) < 0)
@@ -386,7 +417,7 @@ main(int argc, char *argv[])
           {
              double x = 2 * M_PI * (double) i / (double) (ddims[0]-1);
              double n = noise * ((double) random() / ((double)((long long)1<<31)-1) - 0.5);
-             dval[i] = (double) ((j+1) * (1 + sin(x)) + n);
+             dval[i] = (double) ((j%3) * (j+1) * (1 + sin(x)) + n);
              if (dval[i] != drval[i])
              {
                 if (!has_loss) nerrors++;

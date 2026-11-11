@@ -799,6 +799,8 @@ fill_rect3d_mat(float x[], float y[], float z[], int matlist[], int nx,
     *mixlen = mixlen2;
 }
 
+static int zmix = 0;
+
 /*-------------------------------------------------------------------------
  * Function:    main
  *
@@ -905,6 +907,9 @@ main(int argc, char *argv[])
             compat = DB_PERF_OVER_COMPAT;
             concurrent = DB_CONCURRENT;
 #endif
+        } else if (!strcmp(argv[i], "small-array-size")) {
+            int small_array_size = strtol(argv[++i],0,10);
+            DBSetSmallArrayByteSize(small_array_size);
         } else if (!strcmp(argv[i], "missing-value")) {
             missing_value = strtod(argv[++i],0);
         } else if (!strcmp(argv[i], "time-series")) {
@@ -915,6 +920,11 @@ main(int argc, char *argv[])
             compat = DB_COMPAT_OVER_PERF;
         } else if (!strcmp(argv[i], "perf-over-compat")) {
             compat = DB_PERF_OVER_COMPAT;
+        } else if (!strcmp(argv[i], "zmix")) {
+            DBSetSmallArrayByteSize(128);
+            zmix = 1;
+        } else if (!strcmp(argv[i], "zstrat")) {
+            DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
         } else {
             fprintf(stderr, "%s: unknown argument `%s'\n", argv[0], argv[i]);
             exit(1);
@@ -1306,6 +1316,9 @@ build_multi(DBfile *dbfile, int meshtype, int vartype, int dim, int nblocks_x,
     int             extentssize;
     int            *tmpList;
     double         *tmpExtents;
+
+    if (zmix)
+        DBSetCompression("METHOD=GZIP LEVEL=9");
 
     /* 
      * Initialize the names and create the directories for the blocks.
@@ -1935,6 +1948,30 @@ build_block_rect2d(DBfile *dbfile, char dirnames[MAXBLOCKS][STRLEN],
             has_external_zones[block] = 1;
         zonecounts[block] = (dims[0]-1)*(dims[1]-1);
 
+        if (zmix)
+        {
+            switch (block%3)
+            {
+                case 0:
+                    DBSetCompressionFile(dbfile, "ERRMODE=FALLBACK METHOD=GZIP LEVEL=3");
+                    break;
+                case 1:
+#ifdef HAVE_HZIP
+                    DBSetCompressionFile(dbfile, 0);
+                    DBSetCompression("ERRMODE=FALLBACK METHOD=HZIP BITS=16");
+#else
+                    DBSetCompressionFile(dbfile, 0);
+                    DBSetCompression("ERRMODE=FALLBACK METHOD=GZIP LEVEL=1");
+#endif
+                    break;
+                case 2:
+                    DBSetCompression(0);
+                    break;
+            }
+            
+        }
+
+
         TESTQMESH(dbfile, meshname, coordnames, coords, dims, ndims, DB_FLOAT, DB_COLLINEAR, optlist);
 
         TESTQVAR(dbfile, var1name, meshname, d2, zdims, ndims, DB_FLOAT, DB_ZONECENT, optlist);
@@ -1947,13 +1984,20 @@ build_block_rect2d(DBfile *dbfile, char dirnames[MAXBLOCKS][STRLEN],
 
         DBFreeOptlist(optlist);
 
-        /*
-         * Test explicit call to free compression resources for a mesh
-         */
-        if (driver == DB_HDF5 && block % 6 == 0)
-            DBFreeCompressionResources(dbfile,0);        /* all mesh case */
-        else if (driver == DB_HDF5 && block % 2 == 0)
-            DBFreeCompressionResources(dbfile,meshname); /* specific mesh case */
+        if (zmix)
+        {
+            DBSetCompression(0);
+        }
+        else
+        {
+            /*
+             * Test explicit call to free compression resources for a mesh
+             */
+            if (driver == DB_HDF5 && block % 6 == 0)
+                DBFreeCompressionResources(dbfile,0);        /* all mesh case */
+            else if (driver == DB_HDF5 && block % 2 == 0)
+                DBFreeCompressionResources(dbfile,meshname); /* specific mesh case */
+        }
 
         if (DBSetDir(dbfile, "..") == -1)
         {

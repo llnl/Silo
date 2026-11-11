@@ -207,7 +207,15 @@ extern void zfp_init_zfp();
 
 #define COMPRESSION_ERRMODE_FALLBACK 0
 #define COMPRESSION_ERRMODE_FAIL     1
-#define ALLOW_MESH_COMPRESSION 0x00000001
+
+#define COMPRESSION_NONE_ALLOWED    0x00000000 
+#define COMPRESSION_LOSSY_ALLOWED   0x00000001 /* Compression can be lossy (fpzip, zfp) */
+#define COMPRESSION_NUMERIC_ALLOWED 0x00000002 /* Numeric data value aware (zfp, fpzip, szip) */
+#define COMPRESSION_SIMTOPO_ALLOWED 0x00000004 /* Simplicial complex topology (tris/tets) aware (meshoptimizer) */
+#define COMPRESSION_HYPTOPO_ALLOWED 0x00000008 /* Hypercube topology aware (hexs/quads) (hzip) */
+#define COMPRESSION_BASEDIM_ALLOWED 0x00000010 /* Base dimensional aware (zfp, fpzip) */
+#define COMPRESSION_RANGDIM_ALLOWED 0x00000020 /* Range dimensional aware (zfp) */
+#define COMPRESSION_ALL_ALLOWED     0xFFFFFFFF
 
 #define FALSE           0
 #define TRUE            1
@@ -237,7 +245,7 @@ H5_VERS_INFO;
 PRIVATE int db_hdf5_fullname(DBfile_hdf5 *dbfile, char *name, char *full);
 PRIVATE int hdf2silo_type(hid_t type);
 PRIVATE int db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
-              int const *dims, int ndims, int datatype, int nofilters);
+              int const *dims, int ndims, int datatype, int compressionFlags);
 PRIVATE int db_hdf5_getslink(hid_t cwg, char const *in_candidate_link, char *out_target);
 
 /* callbacks prototypes for file image ops */
@@ -2165,8 +2173,6 @@ db_hdf5_init(void)
     H5Tset_size(T_str256, 256);
 
     P_ckcrprops = H5Pcreate(H5P_DATASET_CREATE); /* never freed */
-    if (DBGetEnableChecksums())
-       H5Pset_fletcher32(P_ckcrprops);
 
     /* for H5Dread calls, H5P_DEFAULT results in *enabled*
        checksums. So, we build the DISabled version here. */
@@ -3342,22 +3348,45 @@ hdf2hdf_type(hid_t ftype)
     return mtype;
 }
 
-static int
-_filter_present(hid_t dcpl, H5Z_filter_t filter_id)
+/* Returns 0 on success, -1 on error. */
+static int h5pl_prepend_unique(const char *path)
 {
-    int nfilters = H5Pget_nfilters(dcpl);
+    unsigned int npaths;
 
-    for (int i = 0; i < nfilters; i++)
+    if (!path || !*path)
+        return -1;
+
+    if (H5PLsize(&npaths) < 0)
+        return -1;
+
+    for (unsigned int i = 0; i < npaths; i++)
     {
-#if defined H5_USE_16_API || !HDF5_VERSION_GE(1,8,0)
-        if (H5Pget_filter(dcpl,(unsigned)i,0,0,0,0,0) == filter_id)
-#else
-        if (H5Pget_filter(dcpl,(unsigned)i,0,0,0,0,0,NULL) == filter_id)
-#endif
-            return 1;
+        ssize_t len = H5PLget(i, NULL, 0);
+        char *existing;
+
+        if (len < 0)
+            return -1;
+
+        existing = (char *) malloc((size_t)len + 1);
+        if (!existing)
+            return -1;
+
+        if (H5PLget(i, existing, (size_t)len + 1) < 0)
+        {
+            free(existing);
+            return -1;
+        }
+
+        if (strcmp(existing, path) == 0)
+        {
+            free(existing);
+            return 0; /* Already present */
+        }
+
+        free(existing);
     }
 
-    return 0;
+    return H5PLprepend(path) < 0 ? -1 : 0;
 }
 
 /*-------------------------------------------------------------------------
@@ -3367,9 +3396,9 @@ _filter_present(hid_t dcpl, H5Z_filter_t filter_id)
  *
  * Bugs:        
  *
- * Return:      Success:        0
- *
- *              Failure:        -1
+ * Return:      Success:        1
+ *              No z applied:   0
+ *              Failure:       -1
  *
  * Programmer:  Thomas R. Treadway, Tue Feb 27 15:27:11 PST 2007
  *
@@ -3379,384 +3408,421 @@ _filter_present(hid_t dcpl, H5Z_filter_t filter_id)
  *   Added globals for minimum compression ratio and error mode.
  *   Added support for HZIP and FPZIP. Added flags to control whether
  *   HZIP compression filter gets added or not.
+ *
+ *   Mark C. Miller, Sat Nov  7 10:30:13 PST 2026
+ *   Various adjustments to improve behavior for variety of edge cases.
+ *      1. Apply minsize threshold correctly.
+ *      2. Set all filters via generic H5Pset_filter to handle
+ *         optional/mandatory flag.
+ *      3. Check filter availability before setting.
+ *      4. Check data compatability with compressor via compressionFlags.
+ *      5. Return 0 (no compression), 1 (success) and -1 (failure).
+ *      
  *-------------------------------------------------------------------------
  */
 PRIVATE int
-db_hdf5_set_compression(DBfile *dbfile, int flags)
+db_hdf5_set_compression(char const *zparams, hsize_t npoints, hid_t mtype, hid_t ftype, int zflags)
 {
     static char *me = "db_hdf5_set_compression";
     char *ptr;
     char chararray[32];
     char *check;
-    int level, block, nfilters;
+    int level, block;
     int nbits, prec;
-    int have_gzip = FALSE;
-    int have_szip = FALSE;
-    int have_fpzip = FALSE;
-    int have_hzip = FALSE;
-    int have_zfp = FALSE;
     int i;
-    H5Z_filter_t filtn;
-    unsigned int filter_config_flags, opt_flag;
+    unsigned int filter_config_flags, opt_flag = H5Z_FLAG_OPTIONAL;
 
-    /* Check what filters already exist */
-    have_gzip = _filter_present(P_ckcrprops, H5Z_FILTER_DEFLATE);
-#ifdef H5_HAVE_FILTER_SZIP
-    have_szip = _filter_present(P_ckcrprops, H5Z_FILTER_SZIP);
-#endif
-    have_fpzip = _filter_present(P_ckcrprops, DB_HDF5_FPZIP_ID);
-    have_hzip = _filter_present(P_ckcrprops, DB_HDF5_HZIP_ID);
-#ifdef HAVE_ZFP
-    have_zfp = _filter_present(P_ckcrprops, H5Z_FILTER_ZFP);
-#endif
+    /* We don't process compression options if they are all disabled in current call stack */
+    if (zflags == 0x00000000) return 0;
 
-#ifndef _MSC_VER
-#warning WHAT ABOUT NULL RETURN FROM DBGETCOMPRESSION
-#endif
-/* Handle some global compression parameters */
-    if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "ERRMODE=")) != (char *)NULL) 
+    /* Handle some global compression parameters */
+    if ((ptr = strstr(zparams, "ERRMODE=")) != NULL) 
     {
-        (void)strncpy(chararray, ptr+8, 4); 
+        strncpy(chararray, ptr+8, 4); 
         chararray[4] = '\0';
         if (strcmp(chararray, "FALL") == 0)
+        {
             SILO_Globals.compressionErrmode = COMPRESSION_ERRMODE_FALLBACK;
+            opt_flag = H5Z_FLAG_OPTIONAL;
+        }
         else if (strcmp(chararray, "FAIL") == 0)
+        {
             SILO_Globals.compressionErrmode = COMPRESSION_ERRMODE_FAIL;
-        else
-        {
-            db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-            return (-1);
+            opt_flag = H5Z_FLAG_MANDATORY;
         }
-    }
-    if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "MINRATIO=")) != (char *)NULL) 
-    {
-        float mcr;
-        (void)strncpy(chararray, ptr+9, 5); 
-        chararray[5] = '\0';
-        mcr = (float) strtod(chararray, &check);
-        if (mcr > 1.0)
-            SILO_Globals.compressionMinratio = mcr;
         else
         {
-            db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-            return (-1);
-        }
-    }
-#ifndef _MSC_VER
-#warning FIX MISSING .compressionMinsize member
-#endif
-#if 0
-    if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "MINSIZE=")) != (char *)NULL) 
-    {
-        unsigned int minsize;
-        strncpy(chararray, ptr+8, 8); 
-        chararray[8] = '\0';
-        minsize = strtol(chararray, &check, 10);
-        if (minsize > 0)
-            SILO_Globals.compressionMinsize = minsize;
-        else
-        {
-            db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
+            db_perror(zparams, E_COMPRESSION, me);
             return -1;
         }
     }
-#endif
 
-#ifndef _MSC_VER
-#warning QUERY FILE LEVEL COMPRESSION PARAMS HERE
-#endif
-    opt_flag = SILO_Globals.compressionErrmode == COMPRESSION_ERRMODE_FALLBACK ?
-                   H5Z_FLAG_OPTIONAL : H5Z_FLAG_MANDATORY;
+    if ((ptr = strstr(zparams, "MINRATIO=")) != NULL) 
+    {
+        float mcr;
+        errno = 0;
+        strncpy(chararray, ptr+9, 5); 
+        chararray[5] = '\0';
+        mcr = (float) strtod(chararray, &check);
+        if (errno == 0 && mcr >= 0.0)
+            SILO_Globals.compressionMinratio = mcr;
+        else
+        {
+            db_perror(zparams, E_COMPRESSION, me);
+            return -1;
+        }
+    }
+
+    if ((ptr = strstr(zparams, "MINSIZE=")) != NULL) 
+    {
+        unsigned long long minsize;
+        strncpy(chararray, ptr+8, 8); 
+        chararray[8] = '\0';
+        errno = 0;
+        minsize = strtoll(chararray, &check, 10);
+        if (errno == 0 && npoints < minsize) return 0;
+    }
 
     /* Select the compression algorthm */
-    if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "METHOD=GZIP")) != (char *)NULL) 
+    if ((ptr = strstr(zparams, "METHOD=GZIP")) != NULL) 
     {
-       if (have_gzip == FALSE)
+       unsigned int level = 4; /* default level */
+
+       if (!H5Zfilter_avail(H5Z_FILTER_DEFLATE))
        {
-          if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "LEVEL=")) != (char *)NULL)
-          {
-             (void)strncpy(chararray, ptr+6, 1); 
-             chararray[1] = '\0';
-             level = (int) strtol(chararray, &check, 10);
-             if ((chararray != check) && (level >= 0) && (level <=9))
-             {
-                if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                    H5Pset_deflate(P_ckcrprops, level)<0)
-                {
-                   db_perror("H5Pset_deflate", E_CALLFAIL, me);
-                   return (-1);
-                }
-             }
-             else
-             {
-                db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-                return (-1);
-             }
-          }
-          else
-          {
-             if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                 H5Pset_deflate(P_ckcrprops, 1)<0)
-             {
-                db_perror("H5Pset_deflate", E_CALLFAIL, me);
-                return (-1);
-             }
-          }
-       }  /* if (have_gzip == FALSE) */
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("gzip/deflate not available", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if ((ptr = strstr(zparams, "LEVEL=")) != NULL)
+       {
+          unsigned int val = level;
+          strncpy(chararray, ptr+6, 1); 
+          chararray[1] = '\0';
+          errno = 0;
+          val = (unsigned int) strtol(chararray, &check, 10);
+          if (errno == 0 && chararray != check && val >= 0 && val <=9)
+              level = val;
+       }
+
+       if (H5Tget_class(ftype) == H5T_FLOAT)
+       {
+           if (H5Pset_shuffle(P_ckcrprops)<0)
+           {
+               db_perror("H5Pset_shuffle for gzip/deflate w/float", E_CALLFAIL, me);
+               return -1;
+           }
+       }
+
+       /* use generic filter interface for GZIP to ensure fail/fallback behavior */
+       if (H5Pset_filter(P_ckcrprops, H5Z_FILTER_DEFLATE, opt_flag, 1, &level)<0)
+       {
+           db_perror("gzip/deflate filter setup", E_CALLFAIL, me);
+           return -1;
+       }
+
+       return 1;
     }
-#ifdef H5_HAVE_FILTER_SZIP
-    else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile),
-       "METHOD=SZIP"))!=(char *)NULL)
+
+    if ((ptr = strstr(zparams, "METHOD=SZIP"))!=NULL)
     {
-       if (have_szip == FALSE)
+       unsigned int cdvals[2] = {H5_SZIP_NN_OPTION_MASK, 16};
+       H5T_class_t cls = H5Tget_class(ftype);
+       size_t nbytes = H5Tget_size(ftype);
+       int typeok = FALSE;
+       unsigned int szflags = 0;
+
+       if (!(H5Zfilter_avail(H5Z_FILTER_SZIP) > 0 &&
+           H5Zget_filter_info(H5Z_FILTER_SZIP, &szflags) >= 0 &&
+           (szflags & H5Z_FILTER_CONFIG_ENCODE_ENABLED)))
        {
-          filtn = H5Z_FILTER_SZIP;
-          if (H5Zget_filter_info(filtn, &filter_config_flags)<0)
-          {
-             db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-             return (-1);
-          }
-          if ((filter_config_flags &
-          (H5Z_FILTER_CONFIG_ENCODE_ENABLED|H5Z_FILTER_CONFIG_DECODE_ENABLED))==
-          (H5Z_FILTER_CONFIG_ENCODE_ENABLED|H5Z_FILTER_CONFIG_DECODE_ENABLED))
-          {
-             if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-                "BLOCK=")) != (char *)NULL)
-             {
-                (void)strncpy(chararray, ptr+6, 2); 
-                chararray[2] = '\0';
-                block = (int) strtol(chararray, &check, 10);
-                if ((chararray != check) && (block >= 0) && (block <=32))
-                { 
-                   if (strstr(DBGetCompressionFile(dbfile), 
-                      "MASK=EC") != NULL)
-                   {
-                      if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                          H5Pset_szip(P_ckcrprops, H5_SZIP_EC_OPTION_MASK,block)<0)
-                      {
-                         db_perror("H5Pset_szip", E_CALLFAIL, me);
-                         return (-1);
-                      }
-                   }
-                   else if(strstr(DBGetCompressionFile(dbfile),
-                      "MASK=NN")!=NULL)
-                   {
-                      if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                          H5Pset_szip(P_ckcrprops, H5_SZIP_NN_OPTION_MASK,block)<0)
-                      {
-                         db_perror("H5Pset_szip", E_CALLFAIL, me);
-                         return (-1);
-                      }
-                   }
-                   else
-                   {
-                      if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                          H5Pset_szip(P_ckcrprops, H5_SZIP_NN_OPTION_MASK, block)<0)
-                      {
-                         db_perror("H5Pset_szip", E_CALLFAIL, me);
-                         return (-1);
-                      }
-                   }
-                }
-                else
-                {
-                   db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-                   return (-1);
-                }
-             }
-             else
-             {
-                if (H5Pset_shuffle(P_ckcrprops)<0 ||
-                    H5Pset_szip(P_ckcrprops, H5_SZIP_NN_OPTION_MASK, 4)<0)
-                {
-                   db_perror("H5Pset_szip", E_CALLFAIL, me);
-                   return (-1);
-                }
-             }
-          }  /* if ((filter_config_flags & */
-       }  /* if (have_szip == FALSE) */
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("szip not available", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if (cls == H5T_INTEGER && (nbytes == 1 || nbytes == 2 || nbytes == 4 || nbytes == 8))
+           typeok = TRUE;
+
+       if (cls == H5T_FLOAT && (nbytes == 4 || nbytes == 8))
+           typeok = TRUE;
+
+       if (!(zflags & COMPRESSION_NUMERIC_ALLOWED) || !typeok)
+       {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data type not compatible with szip", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if ((ptr = strstr(zparams, "BLOCK=")) != NULL)
+       {
+          unsigned int block;
+          strncpy(chararray, ptr+6, 2);
+          chararray[2] = '\0';
+          errno = 0;
+          block = (unsigned int) strtol(chararray, &check, 10);
+          if (errno == 0 && chararray != check && block >= 2 && block <= 32 && (block%2 == 0))
+              cdvals[1] = block;
+       }
+
+       if (strstr(zparams, "MASK=EC") != NULL)
+           cdvals[0] = H5_SZIP_EC_OPTION_MASK;
+
+       if (strstr(zparams, "MASK=NN") != NULL)
+           cdvals[0] = H5_SZIP_NN_OPTION_MASK;
+
+       /* use generic filter interface to ensure fail/fallback behavior */
+       if (H5Pset_filter(P_ckcrprops, H5Z_FILTER_SZIP, opt_flag, 2, cdvals)<0)
+       {
+          db_perror("szip filter setup", E_CALLFAIL, me);
+          return -1;
+       }
+
+       return 1;
     }
-#endif
+
 #ifdef HAVE_HZIP
-    else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "METHOD=HZIP")) != (char *)NULL) 
+    if ((ptr = strstr(zparams, "METHOD=HZIP")) != NULL) 
     {
-       if (have_hzip == FALSE && (flags & ALLOW_MESH_COMPRESSION))
+       if (!H5Zfilter_avail(DB_HDF5_HZIP_ID))
        {
-           if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-              "CODEC=")) != (char *)NULL)
-           {
-              (void)strncpy(chararray, ptr+6, 4); 
-              chararray[4] = '\0';
-#ifdef HAVE_LIBZ
-              if (strcmp(chararray, "zlib") == 0)
-              {
-                  db_hdf5_hzip_params.codec = HZM_CODEC_ZLIB;
-                  db_hdf5_hzip_params.params = &hzm_codec_zlib;
-              }
-              else
-#endif
-              if (strcmp(chararray, "base") == 0)
-              {
-                  db_hdf5_hzip_params.codec = HZM_CODEC_BASE;
-                  db_hdf5_hzip_params.params = &hzm_codec_base;
-              }
-              else
-              {
-                  db_perror("hzip codec not recongized", E_COMPRESSION, me);
-                  return (-1);
-              }
-           }
-           if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-              "BITS=")) != (char *)NULL)
-           {
-              (void)strncpy(chararray, ptr+5, 2); 
-              chararray[2] = '\0';
-              nbits = (int) strtol(chararray, &check, 10);
-              if ((chararray != check) && (nbits >= 0) && (nbits <=64))
-              {
-#ifdef HAVE_LIBZ
-                  if (db_hdf5_hzip_params.codec == HZM_CODEC_ZLIB)
-                      ((struct HZMCODECzlib *) db_hdf5_hzip_params.params)->bits = nbits;
-                  else
-#endif
-                  if (db_hdf5_hzip_params.codec == HZM_CODEC_BASE)
-                      ((struct HZMCODECbase *) db_hdf5_hzip_params.params)->bits = nbits;
-              }
-              else
-              {
-                 db_perror("invalid nbits for hzip", E_COMPRESSION, me);
-                 return (-1);
-              }
-           }
-
-           if (H5Pset_filter(P_ckcrprops, DB_HDF5_HZIP_ID, opt_flag, 0, 0)<0)
-           {
-               db_perror("hzip filter setup", E_CALLFAIL, me);
-               return (-1);
-           }
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("hzip filter not available", E_COMPRESSION, me);
+           return -1;
        }
-    }
-#endif
-#ifdef HAVE_FPZIP
-    else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "METHOD=FPZIP")) != (char *)NULL) 
-    {
-       if (have_fpzip == FALSE)
-       {
-          if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "LOSS=")) != (char *)NULL)
-          {
-             (void)strncpy(chararray, ptr+5, 2); 
-             chararray[2] = '\0';
-             prec = (int) strtol(chararray, &check, 10);
-             if ((chararray != check) && (prec >= 0) && (prec <=3))
-             {
-                db_hdf5_fpzip_params.loss = prec;
-             }
-             else
-             {
-                db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-                return (-1);
-             }
-          }
 
-          if (H5Pset_filter(P_ckcrprops, DB_HDF5_FPZIP_ID, opt_flag, 0, 0)<0)
-          {
-              db_perror("H5Pset_filter", E_CALLFAIL, me);
-              return (-1);
-          }
-       }
-    }
-#endif
-#ifdef HAVE_ZFP
-    else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "METHOD=ZFP")) != (char *)NULL) 
-    {
-       if (have_zfp == FALSE)
+       if (!(zflags & COMPRESSION_HYPTOPO_ALLOWED))
        {
-          double tmpdbl = -1;
-          unsigned int tmpuint = 0;
-          unsigned int cd_values[H5Z_ZFP_CD_NELMTS_MEM];
-          int cd_nelmts = H5Z_ZFP_CD_NELMTS_MEM;
-          
-          if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "RATE=")) != (char *)NULL)
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data config not compatible with hzip", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if ((ptr = strstr(zparams, "CODEC=")) != NULL)
+       {
+          strncpy(chararray, ptr+6, 4); 
+          chararray[4] = '\0';
+#ifdef HAVE_LIBZ
+          if (strcmp(chararray, "zlib") == 0)
           {
-             strncpy(chararray, ptr+5, 8); 
-             chararray[8] = '\0';
-             errno = 0;
-             tmpdbl = strtod(chararray, &check);
-             if (chararray != check && errno == 0 && tmpdbl > 0)
-                 H5Pset_zfp_rate_cdata(tmpdbl, cd_nelmts, cd_values);
+              db_hdf5_hzip_params.codec = HZM_CODEC_ZLIB;
+              db_hdf5_hzip_params.params = &hzm_codec_zlib;
           }
-          else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "PRECISION=")) != (char *)NULL)
+          else
+#endif
+          if (strcmp(chararray, "base") == 0)
           {
-             strncpy(chararray, ptr+10, 2); 
-             chararray[2] = '\0';
-             errno = 0;
-             tmpuint = (unsigned int) strtoul(chararray, &check, 10);
-             if (chararray != check && errno == 0 && tmpuint > 0)
-                 H5Pset_zfp_precision_cdata(tmpuint, cd_nelmts, cd_values);
-          }
-          else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "ACCURACY=")) != (char *)NULL)
-          {
-             strncpy(chararray, ptr+9, 8); 
-             chararray[8] = '\0';
-             errno = 0;
-             tmpdbl = strtod(chararray, &check);
-             if (chararray != check && errno == 0 && tmpdbl > 0)
-                 H5Pset_zfp_accuracy_cdata(tmpdbl, cd_nelmts, cd_values);
-          }
-          else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-             "EXPERT=")) != (char *)NULL)
-          {
-             int nvals, minexp; unsigned int minbits, maxbits, maxprec;
-             strncpy(chararray, ptr+7, 20); 
-             chararray[20] = '\0';
-             errno = 0;
-             nvals = sscanf(chararray, "%u,%u,%u,%d", &minbits, &maxbits, &maxprec, &minexp);
-             if (nvals == 4 && errno == 0)
-                 H5Pset_zfp_expert_cdata(minbits, maxbits, maxprec, minexp, cd_nelmts, cd_values);
-          }
-          else if ((ptr=(char *)strstr(SILO_Globals.compressionParams, 
-             "REVERSIBLE")) != (char *)NULL)
-          {
-              H5Pset_zfp_reversible_cdata(cd_nelmts, cd_values);
+              db_hdf5_hzip_params.codec = HZM_CODEC_BASE;
+              db_hdf5_hzip_params.params = &hzm_codec_base;
           }
           else
           {
-              db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
+              db_perror("hzip codec not recongized", E_COMPRESSION, me);
               return -1;
           }
+       }
 
-          if (H5Pset_filter(P_ckcrprops, H5Z_FILTER_ZFP, opt_flag, cd_nelmts, cd_values)<0)
+       if ((ptr = strstr(zparams, "BITS=")) != NULL)
+       {
+          strncpy(chararray, ptr+5, 2); 
+          chararray[2] = '\0';
+          errno = 0;
+          nbits = (int) strtol(chararray, &check, 10);
+          if (errno == 0 && chararray != check && nbits >= 0 && nbits <=64)
           {
-              db_perror("H5Pset_filter", E_CALLFAIL, me);
-              return (-1);
+#ifdef HAVE_LIBZ
+              if (db_hdf5_hzip_params.codec == HZM_CODEC_ZLIB)
+                  ((struct HZMCODECzlib *) db_hdf5_hzip_params.params)->bits = nbits;
+              else
+#endif
+              if (db_hdf5_hzip_params.codec == HZM_CODEC_BASE)
+                  ((struct HZMCODECbase *) db_hdf5_hzip_params.params)->bits = nbits;
+          }
+          else
+          {
+             db_perror("invalid nbits for hzip", E_COMPRESSION, me);
+             return -1;
           }
        }
+
+       if (H5Pset_filter(P_ckcrprops, DB_HDF5_HZIP_ID, opt_flag, 0, 0)<0)
+       {
+           db_perror("hzip filter setup", E_CALLFAIL, me);
+           return -1;
+       }
+
+       return 1;
     }
 #endif
-    else if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-       "METHOD=HDF5_PLUGIN")) != (char *)NULL) 
+
+#ifdef HAVE_FPZIP
+    if ((ptr = strstr(zparams, "METHOD=FPZIP")) != NULL) 
+    {
+       if (!H5Zfilter_avail(DB_HDF5_FPZIP_ID))
+       {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("fpzip filter not available", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if (H5Tget_class(ftype) != H5T_FLOAT ||
+          !(zflags & (COMPRESSION_NUMERIC_ALLOWED |
+                      COMPRESSION_BASEDIM_ALLOWED)))
+       {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data config not compatible with fpzip", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if ((ptr = strstr(zparams, "LOSS=")) != NULL)
+       {
+          strncpy(chararray, ptr+5, 2); 
+          chararray[2] = '\0';
+          errno = 0;
+          prec = (int) strtol(chararray, &check, 10);
+          if (errno == 0 && chararray != check && prec >= 0 && prec <= 3)
+          {
+             db_hdf5_fpzip_params.loss = prec;
+          }
+          else
+          {
+             db_perror(zparams, E_COMPRESSION, me);
+             return -1;
+          }
+
+          if (prec>0 && !(zflags & COMPRESSION_LOSSY_ALLOWED))
+          {
+              if (opt_flag == H5Z_FLAG_OPTIONAL)
+                  return 0;
+              db_perror("data object not compatible with lossy fpzip", E_COMPRESSION, me);
+              return -1;
+          }
+       }
+
+       if (H5Pset_filter(P_ckcrprops, DB_HDF5_FPZIP_ID, opt_flag, 0, 0)<0)
+       {
+           db_perror("fpzip filter setup", E_CALLFAIL, me);
+           return -1;
+       }
+
+       return 1;
+    }
+#endif
+
+#ifdef HAVE_ZFP
+    if ((ptr = strstr(zparams, "METHOD=ZFP")) != NULL) 
+    {
+       double tmpdbl = -1;
+       unsigned int tmpuint = 0;
+       unsigned int cd_values[H5Z_ZFP_CD_NELMTS_MEM];
+       int cd_nelmts = H5Z_ZFP_CD_NELMTS_MEM;
+
+       if (!H5Zfilter_avail(H5Z_FILTER_ZFP))
+       {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("zfp filter not available", E_COMPRESSION, me);
+           return -1;
+       }
+
+       if (!(zflags & (COMPRESSION_BASEDIM_ALLOWED | COMPRESSION_NUMERIC_ALLOWED)))
+       {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data config not compatible with zfp", E_COMPRESSION, me);
+           return -1;
+       }
+       
+       if ((ptr = strstr(zparams, "RATE=")) != NULL)
+       {
+          strncpy(chararray, ptr+5, 8); 
+          chararray[8] = '\0';
+          errno = 0;
+          tmpdbl = strtod(chararray, &check);
+          if (chararray != check && errno == 0 && tmpdbl > 0)
+              H5Pset_zfp_rate_cdata(tmpdbl, cd_nelmts, cd_values);
+       }
+       else if ((ptr = strstr(zparams, "PRECISION=")) != NULL)
+       {
+          strncpy(chararray, ptr+10, 2); 
+          chararray[2] = '\0';
+          errno = 0;
+          tmpuint = (unsigned int) strtoul(chararray, &check, 10);
+          if (chararray != check && errno == 0 && tmpuint > 0)
+              H5Pset_zfp_precision_cdata(tmpuint, cd_nelmts, cd_values);
+       }
+       else if ((ptr = strstr(zparams, "ACCURACY=")) != NULL)
+       {
+          strncpy(chararray, ptr+9, 8); 
+          chararray[8] = '\0';
+          errno = 0;
+          tmpdbl = strtod(chararray, &check);
+          if (chararray != check && errno == 0 && tmpdbl > 0)
+              H5Pset_zfp_accuracy_cdata(tmpdbl, cd_nelmts, cd_values);
+       }
+       else if ((ptr = strstr(zparams, "EXPERT=")) != NULL)
+       {
+          int nvals, minexp; unsigned int minbits, maxbits, maxprec;
+          strncpy(chararray, ptr+7, 20); 
+          chararray[20] = '\0';
+          errno = 0;
+          nvals = sscanf(chararray, "%u,%u,%u,%d", &minbits, &maxbits, &maxprec, &minexp);
+          if (nvals == 4 && errno == 0)
+              H5Pset_zfp_expert_cdata(minbits, maxbits, maxprec, minexp, cd_nelmts, cd_values);
+       }
+       else if ((ptr = strstr(SILO_Globals.compressionParams, "REVERSIBLE")) != NULL)
+       {
+           H5Pset_zfp_reversible_cdata(cd_nelmts, cd_values);
+       }
+       else
+       {
+           db_perror(zparams, E_COMPRESSION, me);
+           return -1;
+       }
+
+       if (cd_values[0]!=H5Z_ZFP_MODE_REVERSIBLE && !(zflags & COMPRESSION_LOSSY_ALLOWED))
+       {
+          if (opt_flag == H5Z_FLAG_OPTIONAL)
+              return 0;
+          db_perror("data object not compatible with lossy zfp", E_COMPRESSION, me);
+          return -1;
+       }
+
+       if (H5Pset_filter(P_ckcrprops, H5Z_FILTER_ZFP, opt_flag, cd_nelmts, cd_values)<0)
+       {
+           db_perror("zfp filter setup", E_CALLFAIL, me);
+           return -1;
+       }
+
+       return 1;
+    }
+#endif
+
+    if ((ptr = strstr(zparams, "METHOD=HDF5_PLUGIN")) != NULL) 
     {
         unsigned int tmpuint = 0;
         H5Z_filter_t filtid = 0;
-        char filtname[64] = "";
         unsigned int cdvals[100];
         int const cdmaxvals = sizeof(cdvals)/sizeof(cdvals[0]);
         int cdnvals = 0;
 
-        if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-           "ID=")) != (char *)NULL)
+        if (((ptr = strstr(zparams, "LOSSY")) != NULL) && !(zflags & COMPRESSION_LOSSY_ALLOWED))
+        {
+           if (opt_flag == H5Z_FLAG_OPTIONAL)
+               return 0;
+           db_perror("data object not compatible with lossy hdf5 plugin", E_COMPRESSION, me);
+           return -1;
+        }
+
+        if ((ptr = strstr(zparams, "ID=")) != NULL)
         {
             strncpy(chararray, ptr+3, 5); 
             chararray[5] = '\0';
@@ -3764,64 +3830,90 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
             filtid = (H5Z_filter_t) strtol(chararray, &check, 10);
             if (chararray == check || errno != 0 || filtid < 0 || filtid > 64000)
             {
-               db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-               return (-1);
+               db_perror(zparams, E_COMPRESSION, me);
+               return -1;
             }
         }
 
-        if (!_filter_present(P_ckcrprops, filtid))
+        if (!H5Zfilter_avail(filtid))
         {
-            if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-               "NAME=")) != (char *)NULL)
-            {
-                int len = (int) strcspn(ptr+5, " ")+1;
-                if (len >= (int) sizeof(filtname))
-                {
-                   db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-                   return (-1);
-                }
-                strncpy(filtname, ptr+5, len); 
-            }
-
-            if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-               "CDVALS=")) != (char *)NULL)
-            {
-                int i = 0;
-                errno = 0;
-                for (char *tok = strtok(ptr+7, ",");
-                    (tok != NULL) && (i < cdmaxvals) && (errno==0);
-                    tok = strtok(NULL, ","), i++)
-                    cdvals[i] = (unsigned int) strtoul(tok, NULL, 10);
-                cdnvals = errno == 0 ? i : -1;
-            }
-
-            if ((ptr=(char *)strstr(DBGetCompressionFile(dbfile), 
-               "PATH=")) != (char *)NULL)
-            {
-                char filtpath[1024] = "";
-                int len = (int) strcspn(ptr+5, " ")+1;
-                if (len >= (int) sizeof(filtpath))
-                {
-                   db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-                   return (-1);
-                }
-                strncpy(filtpath, ptr+5, len); 
-                H5PLprepend(filtpath);
-            }
-
-            if (H5Pset_filter(P_ckcrprops, filtid, opt_flag, cdnvals, cdvals)<0)
-            {
-                db_perror("H5Pset_filter", E_CALLFAIL, me);
-                return (-1);
-            }
+            if (opt_flag == H5Z_FLAG_OPTIONAL)
+                return 0;
+            db_perror(DBSPrintf("filter plugin id %d not available",filtid), E_COMPRESSION, me);
+            return -1;
         }
+
+        if ((ptr = strstr(zparams, "CDVALS=")) != NULL)
+        {
+            int i = 0;
+            errno = 0;
+            for (char *tok = strtok(ptr+7, ",");
+                (tok != NULL) && (i < cdmaxvals) && (errno==0);
+                tok = strtok(NULL, ","), i++)
+                cdvals[i] = (unsigned int) strtoul(tok, NULL, 10);
+            cdnvals = errno == 0 ? i : -1;
+        }
+        if (cdnvals < 0)
+        {
+            db_perror(zparams, E_COMPRESSION, me);
+            return -1;
+        }
+
+        if ((ptr = strstr(zparams, "PATH=")) != NULL)
+        {
+            char filtpath[1024] = "";
+            int len = (int) strcspn(ptr+5, " ")+1;
+            if (len >= (int) sizeof(filtpath))
+            {
+               db_perror(zparams, E_COMPRESSION, me);
+               return -1;
+            }
+            strncpy(filtpath, ptr+5, len); 
+            h5pl_prepend_unique(filtpath);
+        }
+
+        if (H5Pset_filter(P_ckcrprops, filtid, opt_flag, cdnvals, cdvals)<0)
+        {
+            db_perror("plugin filter setup", E_CALLFAIL, me);
+            return -1;
+        }
+
+        return 1;
     }
-    else
-    {
-       db_perror(DBGetCompressionFile(dbfile), E_COMPRESSION, me);
-       return (-1);
-    }
+
     return 0;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    db_hdf5_set_compression_loop
+ *
+ * Purpose:     Set the HDF5 compression properties looping over param sets
+ *              in the compression string.
+ *
+ * Return:      Success:        1
+ *              No z applied:   0
+ *              Failure:       -1
+ *
+ * Programmer:  Mark C. Miller, Sat Nov  7 10:47:39 PST 2026
+ *
+ *-------------------------------------------------------------------------
+ */
+PRIVATE int
+db_hdf5_set_compression_loop(DBfile *dbfile, hsize_t npoints, hid_t mtype, hid_t ftype, int zflags)
+{
+    char *zparams = STRDUP(DBGetCompressionFile(dbfile));
+    char *token = strtok(zparams, ";");
+    int retval = 0;
+
+    while (token && retval != 1)
+    {
+        retval = db_hdf5_set_compression(token, npoints, mtype, ftype, zflags);
+        token = strtok(NULL, ";");
+    }
+
+    FREE(zparams);
+
+    return retval;
 }
 
 /*-------------------------------------------------------------------------
@@ -3839,39 +3931,64 @@ db_hdf5_set_compression(DBfile *dbfile, int flags)
  *
  * Modifications:
  *
+ * Checksum (fletcher32) should be AFTER any (potentially lossy)
+ * compression and NOT before. We're checksumming the data as stored to
+ * the file, not as given by the caller. Filter's (lossy or not) can
+ * change the data before its written to the file.
  *
  *-------------------------------------------------------------------------
  */
 PRIVATE int
-db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[])
+db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[],
+    hid_t mtype, hid_t ftype, int zflags)
 {
     static char *me = "db_hdf5_set_properties";
     P_crprops = H5P_DEFAULT;
-    if (DBGetEnableChecksumsFile(dbfile) && 
-        !DBGetCompressionFile(dbfile))
+    int chunking_was_set = 0;
+    hsize_t npoints = 1;
+    int zstatus;
+
+    /* flush out any old dataset creation properties */
+    H5Pclose(P_ckcrprops);
+    P_ckcrprops = H5Pcreate(H5P_DATASET_CREATE);
+    P_crprops = P_ckcrprops;
+
+    for (int i = 0; i < rank; i++)
+        npoints *= size[i];
+
+    /* For small datasets, we store them in compact storage which
+       does not permit any filters */
+    if ((H5Tget_size(ftype) * npoints) < DBGetSmallArrayByteSizeFile(dbfile))
     {
-        H5Pset_chunk(P_ckcrprops, rank, size);
-        P_crprops = P_ckcrprops;
+        H5Pset_layout(P_ckcrprops, H5D_COMPACT);
+        return 0;
     }
-    else if (DBGetEnableChecksumsFile(dbfile) && 
-        DBGetCompressionFile(dbfile))
+
+    if (DBGetCompressionFile(dbfile))
     {
-        H5Pset_chunk(P_ckcrprops, rank, size);
-        if (db_hdf5_set_compression(dbfile, 0)<0) {
-            db_perror("db_hdf5_set_compression", E_CALLFAIL, me);
-            return(-1);
+        zstatus = db_hdf5_set_compression_loop(dbfile, npoints, mtype, ftype, zflags);
+        if (zstatus > 0)
+        {
+            H5Pset_chunk(P_ckcrprops, rank, size);
+            chunking_was_set = 1;
         }
-        P_crprops = P_ckcrprops;
-    }
-    else if (DBGetCompressionFile(dbfile))
-    {
-        H5Pset_chunk(P_ckcrprops, rank, size);
-        if (db_hdf5_set_compression(dbfile, 0)<0) {
+        else if (zstatus < 0)
+        {
             db_perror("db_hdf5_set_compression", E_CALLFAIL, me);
-            return(-1);
+            return -1;
         }
-        P_crprops = P_ckcrprops;
     }
+
+    if (DBGetEnableChecksumsFile(dbfile))
+    {
+        if (!chunking_was_set)
+        {
+            H5Pset_chunk(P_ckcrprops, rank, size);
+            chunking_was_set = 1;
+        }
+        H5Pset_fletcher32(P_ckcrprops);
+    }
+
     return 0;
 }
 /*-------------------------------------------------------------------------
@@ -4577,18 +4694,7 @@ db_hdf5_compwrz(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
             UNWIND();
         }
  
-        if (db_hdf5_set_properties((DBfile*) dbfile, rank, size) < 0 ) {
-            db_perror("db_hdf5_set_properties", E_CALLFAIL, me);
-            UNWIND();
-        }
-        if (DBGetCompressionFile((DBfile*)dbfile) && compressionFlags)
-        {
-            if (db_hdf5_set_compression((DBfile*)dbfile, compressionFlags)<0)
-            {
-                db_perror("db_hdf5_set_compression", E_CALLFAIL, me);
-                UNWIND();
-            }
-        }
+        db_hdf5_set_properties((DBfile*) dbfile, rank, size, mtype, ftype, compressionFlags);
 
         if (DBGetFriendlyHDF5NamesFile((DBfile*)dbfile) == 2)
         {
@@ -4627,24 +4733,6 @@ db_hdf5_compwrz(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
         H5Dclose(dset);
         H5Sclose(space);
 
-        /* remove any mesh specific filters if we have 'em */
-        if (DBGetCompressionFile((DBfile*)dbfile) && compressionFlags)
-        {
-            int i;
-            for (i=0; i<H5Pget_nfilters(P_crprops); i++)
-            {
-#if defined H5_USE_16_API || !HDF5_VERSION_GE(1,8,0)
-                if (H5Pget_filter(P_crprops,(unsigned)i,0,0,0,0,0) == DB_HDF5_HZIP_ID)
-#else
-                if (H5Pget_filter(P_crprops,(unsigned)i,0,0,0,0,0,NULL) == DB_HDF5_HZIP_ID)
-#endif
-                {
-                    H5Premove_filter(P_crprops, DB_HDF5_HZIP_ID);
-                    break;
-                }
-            }
-        }
-
     } CLEANUP {
         H5E_BEGIN_TRY {
             H5Dclose(dset);
@@ -4664,13 +4752,36 @@ db_hdf5_compwrz(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
  *              Failure:        -1
  *
  * Created: Mark C. Miller, Thu Jul 17 15:03:55 PDT 2008
+ *
+ * Modifications
+ * 
+ *   Mark C. Miller, Sat Nov  7 10:18:06 PST 2026
+ *   Added compression flags indicating what kinds of compression are
+ *   allowed on the data pitched at the level of abstraction of this
+ *   method's API. We won't allow lossy on integer data here. That is
+ *   because this component write method is part of writing data for
+ *   high-level objects. So, it is part of writing data for a zonelist
+ *   for example. And, we can't have loss on zonelist data. Same thing
+ *   for mixed material arrays (matlist, mix_mat, mix_next) but can allow
+ *   loss on mix_vf (which is either float or double). The other component
+ *   write method, db_hdf5_comprz does not make any assumptions and
+ *   instead expects caller to pass in compression flags appropriate for
+ *   the object it is being used within. Both compwr and compwrz are called
+ *   from within various DBPutXxx methods to write array data for high
+ *   level objects.
  *-------------------------------------------------------------------------
  */
 PRIVATE int
 db_hdf5_compwr(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
                void const *buf, char *name/*in,out*/, char const *fname)
 {
-    return db_hdf5_compwrz(dbfile, dtype, rank, _size, buf, name, fname, 0);
+    int compressionFlags = COMPRESSION_ALL_ALLOWED;
+
+    if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
+        compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
+
+    return db_hdf5_compwrz(dbfile, dtype, rank, _size, buf, name, fname,
+               COMPRESSION_NONE_ALLOWED);
 }
 
 /*-------------------------------------------------------------------------
@@ -5887,7 +5998,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
     int         size;
     char        hdf5VString[64];
     unsigned    majno, minno, relno;
-    const       int nofilters = 1;
+    const       int compressionFlags = COMPRESSION_NONE_ALLOWED;
     
     /* Open root group as CWG */
     if ((dbfile->cwg=H5Gopen(dbfile->fid, "/", H5P_DEFAULT))<0) {
@@ -5919,7 +6030,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
     if (finfo) {
         /* Write file info as a variable in the file */
         size = strlen(finfo)+1;
-        if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_fileinfo", (void*)finfo, &size, 1, DB_CHAR, nofilters)<0) {
+        if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_fileinfo", (void*)finfo, &size, 1, DB_CHAR, compressionFlags)<0) {
             db_perror("fileinfo", E_CALLFAIL, me);
             return silo_db_close((DBfile*) dbfile);
         }
@@ -5935,7 +6046,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
         snprintf(hdf5VString, sizeof(hdf5VString), "hdf5-%d.%d.%d%s%s", H5_VERS_MAJOR, H5_VERS_MINOR, H5_VERS_RELEASE,
             strlen(H5_VERS_SUBRELEASE) ? "-" : "", H5_VERS_SUBRELEASE);
         size = strlen(hdf5VString)+1;
-        if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5incinfo", hdf5VString, &size, 1, DB_CHAR, nofilters)<0) {
+        if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5incinfo", hdf5VString, &size, 1, DB_CHAR, compressionFlags)<0) {
             db_perror("_hdf5incinfo", E_CALLFAIL, me);
             return silo_db_close((DBfile*) dbfile);
         }
@@ -5943,7 +6054,7 @@ db_hdf5_finish_create(DBfile_hdf5 *dbfile, int target, char const *finfo)
 
     snprintf(hdf5VString, sizeof(hdf5VString), "hdf5-%d.%d.%d", majno, minno, relno);
     size = strlen(hdf5VString)+1;
-    if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5libinfo", hdf5VString, &size, 1, DB_CHAR, nofilters)<0) {
+    if (db_hdf5_WriteCKZ((DBfile*)dbfile, "_hdf5libinfo", hdf5VString, &size, 1, DB_CHAR, compressionFlags)<0) {
         db_perror("_hdf5libinfo", E_CALLFAIL, me);
         return silo_db_close((DBfile*) dbfile);
     }
@@ -8789,13 +8900,17 @@ SILO_CALLBACK int
 db_hdf5_Write(DBfile *_dbfile, char const *vname, void const *var,
               int const *dims, int ndims, int datatype)
 {
-    const int nofilters = 0;
-    return db_hdf5_WriteCKZ(_dbfile, vname, var, dims, ndims, datatype, nofilters);
+    int compressionFlags = COMPRESSION_ALL_ALLOWED;
+
+    if (!strncmp(vname, SILO_VSTRING_NAME, sizeof(SILO_VSTRING_NAME)) && datatype == DB_CHAR)
+        compressionFlags = COMPRESSION_NONE_ALLOWED;
+ 
+    return db_hdf5_WriteCKZ(_dbfile, vname, var, dims, ndims, datatype, compressionFlags);
 }
 
 PRIVATE int
 db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
-              int const *dims, int ndims, int datatype, int nofilters)
+              int const *dims, int ndims, int datatype, int compressionFlags)
 {
    DBfile_hdf5  *dbfile = (DBfile_hdf5*)_dbfile;
    static char  *me = "db_hdf5_Write";
@@ -8836,9 +8951,6 @@ db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
            /* Now, reset the space for the actual data being written */
            for (i=0; i<ndims; i++) new_ds_size[i] = dims[i];
            H5Sset_extent_simple(space, ndims, new_ds_size, ds_size);
-#ifndef _MSC_VER
-#warning WHAT IF EXISTING DATASET WAS COMPRESSED
-#endif
        } else {
            /* Create memory and file data space (both identical) */
            for (i=0; i<ndims; i++) ds_size[i] = dims[i];
@@ -8847,26 +8959,12 @@ db_hdf5_WriteCKZ(DBfile *_dbfile, char const *vname, void const *var,
                UNWIND();
            }
 
-           if (nofilters == 0)
-           {
-               if (db_hdf5_set_properties(_dbfile, ndims, ds_size) < 0 ) {
-                   db_perror("db_hdf5_set_properties", E_CALLFAIL, me);
-                   UNWIND();
-               }
+           db_hdf5_set_properties(_dbfile, ndims, ds_size, mtype, ftype, compressionFlags);
 
-               /* Create dataset if it doesn't already exist */
-               if ((dset=H5Dcreate(dbfile->cwg, vname, ftype, space, H5P_DEFAULT, P_crprops, H5P_DEFAULT))<0) {
-                   db_perror(vname, E_CALLFAIL, me);
-                   UNWIND();
-               }
-           }
-           else
-           {
-               /* Create dataset if it doesn't already exist */
-               if ((dset=H5Dcreate(dbfile->cwg, vname, ftype, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT))<0) {
-                   db_perror(vname, E_CALLFAIL, me);
-                   UNWIND();
-               }
+           /* Create dataset if it doesn't already exist */
+           if ((dset=H5Dcreate(dbfile->cwg, vname, ftype, space, H5P_DEFAULT, P_crprops, H5P_DEFAULT))<0) {
+               db_perror(vname, E_CALLFAIL, me);
+               UNWIND();
            }
        }
        
@@ -8987,13 +9085,9 @@ db_hdf5_WriteSlice(
                UNWIND();
            }
 
-           if (db_hdf5_set_properties(_dbfile, ndims, ds_size) < 0 ) {
-               db_perror("db_hdf5_set_properties", E_CALLFAIL, me);
-               UNWIND();
-           }
+           db_hdf5_set_properties(_dbfile, ndims, ds_size, mtype, ftype, COMPRESSION_ALL_ALLOWED);
 
-           if ((dset=H5Dcreate(dbfile->cwg, vname, ftype, fspace, H5P_DEFAULT,
-                               P_crprops, H5P_DEFAULT))<0) {
+           if ((dset=H5Dcreate(dbfile->cwg, vname, ftype, fspace, H5P_DEFAULT, P_crprops, H5P_DEFAULT))<0) {
                db_perror(vname, E_CALLFAIL, me);
                UNWIND();
            }
@@ -10486,9 +10580,9 @@ db_hdf5_GetDefvars(DBfile *_dbfile, char const *name)
  * Purpose:     Does some small work to prepare for possible mesh
  *              compression 
  *
- * Return:      Success:        ALLOW_MESH_COMPRESSION 
+ * Return:      Success:        0 
  *
- *              Failure:        0 
+ *              Failure:        ~COMPRESSION_HYPTOPO_ALLOWED 
  *
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
@@ -10500,9 +10594,9 @@ static int PrepareForQuadmeshCompression(DBfile *_dbfile)
 #ifdef HAVE_HZIP
     db_hdf5_hzip_clear_params();
     db_hdf5_hzip_params.isquad = 1;
-    return ALLOW_MESH_COMPRESSION;
+    return COMPRESSION_ALL_ALLOWED;
 #endif
-    return 0;
+    return ~COMPRESSION_HYPTOPO_ALLOWED;
 }
 
 /*-------------------------------------------------------------------------
@@ -10551,7 +10645,7 @@ db_hdf5_PutQuadmesh(DBfile *_dbfile, char const *name, char const * const *coord
     static char         *me = "db_hdf5_PutQuadmesh";
     int                 i, is_empty = 1;
     DBquadmesh_mt       m;
-    int                 compressionFlags;
+    int                 compressionFlags = COMPRESSION_ALL_ALLOWED;
     void const * const *coords = (void const * const *) _coords;
 
     memset(&_qm, 0, sizeof _qm);
@@ -10629,7 +10723,7 @@ db_hdf5_PutQuadmesh(DBfile *_dbfile, char const *name, char const * const *coord
             m.max_index[i] = _qm._maxindex_n[i];
         }
 
-        compressionFlags = PrepareForQuadmeshCompression(_dbfile);
+        compressionFlags &= PrepareForQuadmeshCompression(_dbfile);
         
         /* Write coordinate arrays */
         if (!is_empty)
@@ -10959,9 +11053,9 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
  * Purpose:     Does some small work to prepare for possible quadvar 
  *              compression 
  *
- * Return:      Success:        ALLOW_MESH_COMPRESSION 
+ * Return:      Success:        COMPRESSION_ALL_ALLOWED
  *
- *              Failure:        0 
+ *              Failure:        ~COMPRESSION_HYPTOPO_ALLOWED 
  *
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
@@ -10975,9 +11069,9 @@ PrepareForQuadvarCompression(DBfile *_dbfile, int centering, int datatype)
 #ifdef HAVE_HZIP
     db_hdf5_hzip_clear_params();
     db_hdf5_hzip_params.isquad = 1;
-    return ALLOW_MESH_COMPRESSION;
+    return COMPRESSION_ALL_ALLOWED;
 #endif
-    return 0;
+    return ~COMPRESSION_HYPTOPO_ALLOWED;
 
 }
 
@@ -11034,7 +11128,7 @@ db_hdf5_PutQuadvar(DBfile *_dbfile, char const *name, char const *meshname, int 
     char                *s = 0;
     DBquadvar_mt        m;
     int                 i, nels, is_empty = 1;
-    int                 compressionFlags;
+    int                 compressionFlags = COMPRESSION_ALL_ALLOWED;
     void const * const    *vars = (void const * const *) _vars;
     void const * const *mixvars = (void const * const *) _mixvars;
 
@@ -11081,7 +11175,7 @@ db_hdf5_PutQuadvar(DBfile *_dbfile, char const *name, char const *meshname, int 
         db_hdf5_handle_ctdt(dbfile, _qm._time_set, _qm._time,
             _qm._dtime_set, _qm._dtime, _qm._cycle); 
 
-        compressionFlags = PrepareForQuadvarCompression(_dbfile, centering, datatype);
+        compressionFlags &= PrepareForQuadvarCompression(_dbfile, centering, datatype);
 
         /* Write variable arrays: vars[] and mixvars[] */
         if (nvars>MAX_VARS) {
@@ -11392,9 +11486,9 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
  * Purpose:     Does some small work to prepare for possible mesh
  *              compression 
  *
- * Return:      Success:        ALLOW_MESH_COMPRESSION 
+ * Return:      Success:        COMPRESSION_ALL_ALLOWED
  *
- *              Failure:        0 
+ *              Failure:        ~COMPRESSION_HYPTOPO_ALLOWED
  *
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
@@ -11402,7 +11496,7 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
 static int PrepareForUcdmeshCompression(DBfile_hdf5 *dbfile,
     char const *meshname, char const *zlname)
 {
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return 0;
+    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
 
 #ifdef HAVE_HZIP
     if (LookupNodelist(dbfile, zlname, meshname) != 0)
@@ -11412,10 +11506,10 @@ static int PrepareForUcdmeshCompression(DBfile_hdf5 *dbfile,
         db_hdf5_hzip_params.zlname = zlname;
         db_hdf5_hzip_params.meshname = meshname;
         AddMeshnameToNodelist(dbfile, zlname, meshname);
-        return ALLOW_MESH_COMPRESSION;
+        return COMPRESSION_ALL_ALLOWED;
     }
 #endif
-    return 0;
+    return ~COMPRESSION_HYPTOPO_ALLOWED;
 }
 
 /*-------------------------------------------------------------------------
@@ -11470,7 +11564,7 @@ db_hdf5_PutUcdmesh(DBfile *_dbfile, char const *name, int ndims, char const * co
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     static char         *me = "db_hdf5_PutUcdmesh";
     DBucdmesh_mt        m;
-    int                 i, compressionFlags;
+    int                 i, compressionFlags = COMPRESSION_ALL_ALLOWED;
     void const * const *coords = (void const * const *) _coords;
 
     memset(&_um, 0, sizeof _um);
@@ -11495,7 +11589,7 @@ db_hdf5_PutUcdmesh(DBfile *_dbfile, char const *name, int ndims, char const * co
         db_ProcessOptlist(DB_UCDMESH, optlist);
 
         /* Prepare for possible compression of coords/gnodeno */
-        compressionFlags = PrepareForUcdmeshCompression(dbfile,
+        compressionFlags &= PrepareForUcdmeshCompression(dbfile,
             name, zlname); 
 
         /* hack to maintain backward compatibility with pdb driver */
@@ -12011,9 +12105,9 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
  * Purpose:     Does some small work to prepare for possible ucdvar 
  *              compression 
  *
- * Return:      Success:        ALLOW_MESH_COMPRESSION 
+ * Return:      Success:        COMPRESSION_ALL_ALLOWED
  *
- *              Failure:        0 
+ *              Failure:        ~COMPRESSION_HYPTOPO_ALLOWED
  *
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
@@ -12022,7 +12116,7 @@ static int
 PrepareForUcdvarCompression(DBfile_hdf5 *dbfile, char const *varname,
     char const *meshname, int datatype, int centering)
 {
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return 0;
+    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
 
 #ifdef HAVE_HZIP
     if (centering == DB_NODECENT)
@@ -12030,10 +12124,10 @@ PrepareForUcdvarCompression(DBfile_hdf5 *dbfile, char const *varname,
         db_hdf5_hzip_clear_params();
         db_hdf5_hzip_params.meshname = meshname;
         db_hdf5_hzip_params.dbfile = dbfile;
-        return ALLOW_MESH_COMPRESSION;
+        return COMPRESSION_ALL_ALLOWED;
     }
 #endif
-    return 0;
+    return ~COMPRESSION_HYPTOPO_ALLOWED;
 }
 
 /*-------------------------------------------------------------------------
@@ -12083,7 +12177,7 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
     char                *s = 0;
     DBucdvar_mt         m;
     int                 i, saved_ndims, saved_nnodes, saved_nzones;
-    int                 compressionFlags;
+    int                 compressionFlags = COMPRESSION_ALL_ALLOWED;
     void const * const    *vars = (void const * const *) _vars;
     void const * const *mixvars = (void const * const *) _mixvars;
 
@@ -12108,7 +12202,7 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
         db_ProcessOptlist(DB_UCDMESH, optlist); /*yes, UCDMESH*/
 
         /* Prepare for possible compression of ucdvars */
-        compressionFlags = PrepareForUcdvarCompression(dbfile, name, meshname,
+        compressionFlags &= PrepareForUcdvarCompression(dbfile, name, meshname,
             datatype, centering);
 
         /* hack to maintain backward compatibility with pdb driver */
@@ -12616,9 +12710,9 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
  * Purpose:     Does some small work to prepare for possible zonelist 
  *              compression 
  *
- * Return:      Success:        ALLOW_MESH_COMPRESSION 
+ * Return:      Success:        COMPRESSION_ALL_ALLOWED
  *
- *              Failure:        0 
+ *              Failure:        ~COMPRESSION_HYPTOPO_ALLOWED 
  *
  * HZIP supports only 2D quad meshes and 3D hex meshes.
  *
@@ -12633,8 +12727,8 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
 	int i;
     int ntopo = 0, zncnt = 0;
 
-    if (nshapes == 0) return 0;
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return 0;
+    if (nshapes == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
+    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
 
     zncnt = shapecnt[0];
 #ifdef HAVE_HZIP
@@ -12649,7 +12743,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
             {
                 zncnt += shapecnt[i];
                 if (shapetype[i] != DB_ZONETYPE_QUAD)
-                    return 0;
+                    return ~COMPRESSION_HYPTOPO_ALLOWED;
             }
         }
         else if (shapetype[0] == DB_ZONETYPE_HEX)
@@ -12659,12 +12753,12 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
             {
                 zncnt += shapecnt[i];
                 if (shapetype[i] != DB_ZONETYPE_HEX)
-                    return 0;
+                    return ~COMPRESSION_HYPTOPO_ALLOWED;
             }
         }
         else
         {
-            return 0;
+            return ~COMPRESSION_HYPTOPO_ALLOWED;
         }
     }
     else
@@ -12672,26 +12766,26 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         if (ndims == 2)
         {
             ntopo = 2;
-            for (i = 0; i < nshapes; i++)
+            for (i = 1; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 4)
-                    return 0;
+                    return ~COMPRESSION_HYPTOPO_ALLOWED;
             }
         }
         else if (ndims == 3)
         {
             ntopo = 3;
-            for (i = 0; i < nshapes; i++)
+            for (i = 1; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 8)
-                    return 0;
+                    return ~COMPRESSION_HYPTOPO_ALLOWED;
             }
         }
         else
         {
-            return 0;
+            return ~COMPRESSION_HYPTOPO_ALLOWED;
         }
     }
 
@@ -12700,11 +12794,11 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
     db_hdf5_hzip_params.zlname = name;
     db_hdf5_hzip_params.dbfile = dbfile;
     RegisterNodelist(dbfile, name, 0, ntopo, zncnt, origin, nodelist);
-    return ALLOW_MESH_COMPRESSION;
+    return COMPRESSION_ALL_ALLOWED;
 
 #else
 
-    return 0;
+    return ~COMPRESSION_HYPTOPO_ALLOWED;
 
 #endif
 }
@@ -12777,7 +12871,7 @@ db_hdf5_PutZonelist2(DBfile *_dbfile, char const *name, int nzones, int ndims,
 {
     DBfile_hdf5         *dbfile = (DBfile_hdf5*)_dbfile;
     DBzonelist_mt       m;
-    int                 compressionFlags;
+    int                 compressionFlags = COMPRESSION_ALL_ALLOWED & ~COMPRESSION_LOSSY_ALLOWED;
 
     memset(&m, 0, sizeof m);
     PROTECT {
@@ -12786,7 +12880,7 @@ db_hdf5_PutZonelist2(DBfile *_dbfile, char const *name, int nzones, int ndims,
         db_ProcessOptlist(DB_ZONELIST, optlist);
 
         /* Prepare for possible compression of zonelist */
-        compressionFlags = PrepareForZonelistCompression(dbfile,
+        compressionFlags &= PrepareForZonelistCompression(dbfile,
             name, origin, ndims, nshapes, shapetype, shapesize, shapecnt, nodelist);
 
         /* Write variable arrays (currently only support compression of nodelist) */
