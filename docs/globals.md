@@ -926,9 +926,11 @@ So, in rare cases, Silo may leak memory during a malformed object read.
   If it is unable the compress by at least this amount, Silo will either fallback or fail the write depending on the `ERRMODE` setting.
   `MINRATIO` is applicable only to the hzip compression method.
 
+  **Compression Strategies**
+
   Finally, different compression approaches can be specified by separating them with a semi-colon `;` in the `options` argument.
   This allows Silo applications to build up something more like a compression *strategy*.
-  For example, in the compression `options` string below (note the ';' separating the substrings)...
+  For example, in the compression `options` string below (note the `;` separating the substrings)...
 
   ```
   DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
@@ -1025,7 +1027,7 @@ So, in rare cases, Silo may leak memory during a malformed object read.
     If the plugin allows *lossy* compression, include the keyword `"LOSSY"` in the compression string as in...
 
     ```
-    DBSetCompression("METHOD=HDF5_PLUGIN ID=32013 CDVALS=2,8 LOSSY")
+    DBSetCompression("METHOD=HDF5_PLUGIN LOSSY ID=32013 CDVALS=2,8")
     ```
 
     In the example above, the `HDF5_PLUGIN` approach is being applied for the ZFP (`ID=32013`) filter in *precision* mode (`cdvals[0]=2`) with a precision of `8`.
@@ -1033,7 +1035,7 @@ So, in rare cases, Silo may leak memory during a malformed object read.
 
     This last method allows Silo data producers to use any HDF5 compression filter plugin available but not necessarily built into the Silo library.
     However, because Silo has no builtin knowledge of whatever compression method is specified here, it can wind up applying the method in cases where it may not be appropriate.
-    For example, if the method is lossy, Silo will know it is lossy *ONLY IF* the keyword `"LOSSY"` appears in the compression string.
+    For example, if the method is lossy, Silo will know it is lossy only if the keyword `LOSSY` appears in the compression string.
     Alternatively, the caller can bound the use of such methods with calls to set and the reset compression params over code blocks where the caller knows the data being written is compatible with the compression being used..
 
 {{ EndFunc }}
