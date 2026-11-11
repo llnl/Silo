@@ -165,6 +165,7 @@ main(int argc, char *argv[])
           zmix = 1;
           has_loss = 1;
        } else if (!strcmp(argv[i], "generic")) {
+          /* ID=1 is the deflate filter */
           DBSetCompression("ERRMODE=FAIL METHOD=HDF5_PLUGIN ID=1 CDVALS=2");
        /* These test fail/fallback behavior. We target a compresion ratio
           of 1000:1 and FAIL or FALLBACK if we can't hit...which we can't. */
