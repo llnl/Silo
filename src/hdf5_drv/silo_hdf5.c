@@ -13174,12 +13174,6 @@ db_hdf5_GetZonelist(DBfile *_dbfile, char const *name)
         zl->min_index = m.lo_offset;
         zl->max_index = m.nzones - m.hi_offset - 1;
 
-        if (zl->min_index < 0 || zl->min_index >= zl->nzones ||
-            zl->max_index < 0 || zl->max_index >= zl->nzones) {
-            db_perror(name, E_MALFORMED, me);
-            UNWIND();
-        }
-
         /* Prepare for possible zonelist decompression */
         PrepareForZonelistDecompression(dbfile, name,
             calledFromGetUcdmesh, zl->origin);
@@ -13197,6 +13191,12 @@ db_hdf5_GetZonelist(DBfile *_dbfile, char const *name)
                 (zl->shapetype && size3 != zl->nshapes) ||
                 (zl->nodelist &&  size4 != zl->lnodelist))
             {
+                db_perror(name, E_MALFORMED, me);
+                UNWIND();
+            }
+
+            if (zl->min_index < 0 || zl->min_index >= zl->nzones ||
+                zl->max_index < 0 || zl->max_index >= zl->nzones) {
                 db_perror(name, E_MALFORMED, me);
                 UNWIND();
             }
@@ -13324,20 +13324,24 @@ db_hdf5_GetPHZonelist(DBfile *_dbfile, char const *name)
 
         if (DBGetDataReadMask2File(_dbfile) & DBZonelistInfo)
         {
-            int ncntsize, nlsize, efsize, fcntsize, flsize;
+            int ncntsize, nlsize, efsize, fcntsize, flsize, maxoff;
 
             phzl->nodecnt = (int *)_db_hdf5_comprd(dbfile, m.nodecnt, 1, &ncntsize);
             phzl->nodelist = (int *)_db_hdf5_comprd(dbfile, m.nodelist, 1, &nlsize);
             phzl->extface = (char *)_db_hdf5_comprd(dbfile, m.extface, 1, &efsize);
             phzl->facecnt = (int *)_db_hdf5_comprd(dbfile, m.facecnt, 1, &fcntsize);
             phzl->facelist = (int  *)_db_hdf5_comprd(dbfile, m.facelist, 1, &flsize);
+
+            maxoff = phzl->nzones;
+            if (!phzl->facecnt && !phzl->facelist) maxoff = phzl->nfaces; /* 2D */
+
             if ((phzl->nodecnt && ncntsize != phzl->nfaces) ||
                 (phzl->nodelist && nlsize != phzl->lnodelist) ||
                 (phzl->extface && efsize != phzl->nfaces) ||
                 (phzl->facecnt && fcntsize != phzl->nzones) ||
                 (phzl->facelist && flsize != phzl->lfacelist) ||
-                (phzl->lo_offset < 0 || phzl->lo_offset >= phzl->nzones ||
-                 phzl->hi_offset < 0 || phzl->hi_offset >= phzl->nzones))
+                (phzl->lo_offset < 0 || phzl->lo_offset >= maxoff ||
+                 phzl->hi_offset < 0 || phzl->hi_offset >= maxoff))
             {
                 db_perror(name, E_MALFORMED, me);
                 UNWIND();
@@ -17807,7 +17811,7 @@ db_hdf5_GetGroupelmap(DBfile *_dbfile, char const *name)
 
         if (!gm->groupel_types || grpltypes_size != gm->num_segments ||
             !gm->segment_lengths || seglens_size != gm->num_segments ||
-            !gm->segment_ids || segids_size != gm->num_segments)
+            (gm->segment_ids && segids_size != gm->num_segments))
         {      
             db_perror(name, E_MALFORMED, me);
             UNWIND();
