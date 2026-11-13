@@ -13849,8 +13849,7 @@ db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***retArray
     if (strList[0] == ';')
         i = 1;
     strArray[n++] = &strList[i];
-    if (n == nblocks) completelyDone = 1;
-    while (!completelyDone)
+    while (!completelyDone && i < strListSize)
     {
         switch (strList[i])
         {
@@ -13861,7 +13860,14 @@ db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***retArray
                 strList[i] = '\0';
                 if (!completelyDone) i++;
                 if (strList[i] != '\0')
+                {
+                    if (n >= nblocks)
+                    {
+                        free(strArray);
+                        return -1;
+                    }
                     strArray[n++] = &strList[i];
+                }
                 if (hasColon)
                 {
                     int j;
@@ -13874,7 +13880,6 @@ db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***retArray
                 }
                 s = 0;
                 hasColon = 0;
-                if (n == nblocks) completelyDone = 1;
                 break;
             }
 #if !defined(_WIN32) /* linux case */

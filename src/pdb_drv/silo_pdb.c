@@ -5637,25 +5637,29 @@ db_pdb_GetQuadmesh (DBfile *_dbfile, char const *objname)
     }
 
     valid = E_NOERROR;
-    if (qm->coordtype == DB_COLLINEAR)
+    if (DBGetDataReadMask2File(_dbfile) & DBQMCoords)
     {
-        for (int i = 0; i < qm->ndims; i++)
+        if (qm->coordtype == DB_COLLINEAR)
         {
-            if (coords_size[i] != qm->dims[i])
-                valid = E_MALFORMED;
+            for (int i = 0; i < qm->ndims; i++)
+            {
+                if (coords_size[i] != qm->dims[i])
+                    valid = E_MALFORMED;
+            }
         }
-    }
-    else
-    {
-        for (int i = 0; i < qm->ndims; i++)
+        else
         {
-            if (coords_size[i] != nnodes)
-                valid = E_MALFORMED;
+            for (int i = 0; i < qm->ndims; i++)
+            {
+                if (coords_size[i] != nnodes)
+                    valid = E_MALFORMED;
+            }
         }
     }
 
-    if ((qm->ghost_node_labels && gnl_size != nnodes) ||
-        (qm->ghost_zone_labels && gzl_size != nzones))
+    if ((DBGetDataReadMask2File(_dbfile) & DBQMGhostNodeLabels) && qm->ghost_node_labels && gnl_size != nnodes)
+        valid = E_MALFORMED;
+    if ((DBGetDataReadMask2File(_dbfile) & DBQMGhostZoneLabels) && qm->ghost_zone_labels && gzl_size != nzones)
         valid = E_MALFORMED;
 
     if (valid != E_NOERROR)
@@ -6902,7 +6906,7 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
     DBphzonelist         tmpphzl;
     PJcomplist          *_tcl;
     char                *tmpaznum = 0;
-    int                  ncntsize, nlsize, efsize, fcntsize, flsize, znosize, gzlsize;
+    int                  ncntsize, nlsize, efsize, fcntsize, flsize, znosize, gzlsize, maxoff;
 
     /*------------------------------------------------------------*/
     /*          Comp. Name        Comp. Address     Data Type     */
@@ -6939,10 +6943,13 @@ db_pdb_GetPHZonelist(DBfile *_dbfile, char const *objname)
        return NULL;
     *phzl = tmpphzl;
 
+    maxoff = phzl->nzones;
+    if (!phzl->facecnt && !phzl->facelist) maxoff = phzl->nfaces; /* 2D */
+
     if (phzl->nfaces < 0 || phzl->lnodelist < 0 ||
         phzl->nzones < 0 || phzl->lfacelist < 0 ||
-        phzl->lo_offset < 0 || phzl->lo_offset >= phzl->nzones ||
-        phzl->hi_offset < 0 || phzl->hi_offset >= phzl->nzones)
+        phzl->lo_offset < 0 || phzl->lo_offset >= maxoff ||
+        phzl->hi_offset < 0 || phzl->hi_offset >= maxoff)
     {
         DBFreePHZonelist(phzl);
         FREE(tmpaznum);
@@ -8298,7 +8305,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
         segfracs_size < 0 || gm->num_segments < 0 || 
         gm->num_segments != grptypes_size ||
         gm->num_segments != seglens_size ||
-        gm->num_segments != segids_size ||
+        (gm->segment_ids && gm->num_segments != segids_size) ||
         (fraclens_size > 0 && gm->num_segments != fraclens_size) ||
         (fracsArray && !(tmpgm.fracs_data_type == DB_FLOAT || tmpgm.fracs_data_type == DB_DOUBLE)))
     {
