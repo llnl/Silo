@@ -11020,7 +11020,7 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
         /* Read coordinate arrays */
         for (i=0; i<qm->ndims; i++) {
             if (DBGetDataReadMask2File(_dbfile) & DBQMCoords) {
-                int size;
+                int size = 0;
                 qm->coords[i] = _db_hdf5_comprd(dbfile, m.coord[i], 0, &size);
                 if ((qm->coordtype == DB_COLLINEAR && size != qm->dims[i]) ||
                     (qm->coordtype == DB_NONCOLLINEAR && size != nnodes)) {
