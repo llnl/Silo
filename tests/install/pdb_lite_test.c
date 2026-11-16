@@ -85,6 +85,8 @@ In some tests, we leak memory for certain data ('ca' in test 2 and
 */
 #ifdef PDB_LITE
 
+#include <config.h>
+
 #include <lite_pdb.h>
 
 #include <assert.h>
