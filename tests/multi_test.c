@@ -924,7 +924,10 @@ main(int argc, char *argv[])
             DBSetSmallArrayByteSize(128);
             zmix = 1;
         } else if (!strcmp(argv[i], "zstrat")) {
-            DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=4;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
+            DBSetCompression("ERRMODE=FALLBACK METHOD=ZFP RATE=8;ERRMODE=FALLBACK METHOD=GZIP LEVEL=6");
+            /* We set the small array size threshold very low to enusre things like multimesh
+               objects, which cannot be compressed with ZFP, are compressed with gzip */
+            DBSetSmallArrayByteSize(64);
         } else {
             fprintf(stderr, "%s: unknown argument `%s'\n", argv[0], argv[i]);
             exit(1);

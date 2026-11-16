@@ -3945,7 +3945,7 @@ db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[],
     static char *me = "db_hdf5_set_properties";
     P_crprops = H5P_DEFAULT;
     int chunking_was_set = 0;
-    hsize_t npoints = 1;
+    hsize_t npoints = 1, maxSmallArrayByteSize;
     int zstatus;
 
     /* flush out any old dataset creation properties */
@@ -3958,8 +3958,14 @@ db_hdf5_set_properties(DBfile *dbfile, int rank, hsize_t size[],
 
     /* For small datasets, we store them in compact storage which
        does not permit any filters */
-    if ((H5Tget_size(ftype) * npoints) < DBGetSmallArrayByteSizeFile(dbfile))
+    maxSmallArrayByteSize = DBGetSmallArrayByteSizeFile(dbfile);
+    if ((H5Tget_size(ftype) * npoints) < maxSmallArrayByteSize)
     {
+        if (maxSmallArrayByteSize > 65520)
+        {
+            db_perror("small array byte size threshold too large", E_CALLFAIL, me);
+            return -1;
+        }
         H5Pset_layout(P_ckcrprops, H5D_COMPACT);
         return 0;
     }
@@ -4768,20 +4774,48 @@ db_hdf5_compwrz(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
  *   instead expects caller to pass in compression flags appropriate for
  *   the object it is being used within. Both compwr and compwrz are called
  *   from within various DBPutXxx methods to write array data for high
- *   level objects.
+ *   level objects. Originally, this method was designed to never allow
+ *   compression and only compwrz allowed compression. But, that design
+ *   was unnecessarily strict in preventing the use of compression in 
+ *   various cases where it could be reasonably applied. So, this method
+ *   was adjusted to also allow compression but to do so in more limited
+ *   ways than its companion method, compwrz.
  *-------------------------------------------------------------------------
  */
 PRIVATE int
 db_hdf5_compwr(DBfile_hdf5 *dbfile, int dtype, int rank, int const _size[],
                void const *buf, char *name/*in,out*/, char const *fname)
 {
-    int compressionFlags = COMPRESSION_ALL_ALLOWED;
+    /* At the level of abstraction this method is pitched, it cannot support
+       any of the topological aware compression methods */
+    int compressionFlags = COMPRESSION_ALL_ALLOWED &
+                          ~COMPRESSION_HYPTOPO_ALLOWED &
+                          ~COMPRESSION_SIMTOPO_ALLOWED;
 
-    if (dtype == DB_FLOAT || dtype == DB_DOUBLE)
-        compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
+    switch (dtype)
+    {
+        case DB_CHAR:
+        case DB_SHORT:
+            compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
+            compressionFlags &= ~COMPRESSION_NUMERIC_ALLOWED;
+            break;
+        case DB_INT:
+        case DB_INTA:
+        case DB_LONG:
+        case DB_LONG_LONG:
+            compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
+            break;
+        case DB_FLOAT:
+        case DB_FLOATA:
+        case DB_DOUBLE:
+        case DB_DOUBLEA:
+        case DB_FLOAT_OR_DOUBLE:
+            break;
+        default:
+            compressionFlags &= ~COMPRESSION_LOSSY_ALLOWED;
+    }
 
-    return db_hdf5_compwrz(dbfile, dtype, rank, _size, buf, name, fname,
-               COMPRESSION_NONE_ALLOWED);
+    return db_hdf5_compwrz(dbfile, dtype, rank, _size, buf, name, fname, compressionFlags);
 }
 
 /*-------------------------------------------------------------------------
@@ -10575,7 +10609,7 @@ db_hdf5_GetDefvars(DBfile *_dbfile, char const *name)
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForQuadmeshCompression
+ * Function:    PrepareForQuadmeshHypTopoCompression
  *
  * Purpose:     Does some small work to prepare for possible mesh
  *              compression 
@@ -10587,10 +10621,8 @@ db_hdf5_GetDefvars(DBfile *_dbfile, char const *name)
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
  */
-static int PrepareForQuadmeshCompression(DBfile *_dbfile)
+static int PrepareForQuadmeshHypTopoCompression(DBfile *_dbfile)
 {
-    if (DBGetCompressionFile(_dbfile) == 0) return 0;
-
 #ifdef HAVE_HZIP
     db_hdf5_hzip_clear_params();
     db_hdf5_hzip_params.isquad = 1;
@@ -10723,7 +10755,7 @@ db_hdf5_PutQuadmesh(DBfile *_dbfile, char const *name, char const * const *coord
             m.max_index[i] = _qm._maxindex_n[i];
         }
 
-        compressionFlags &= PrepareForQuadmeshCompression(_dbfile);
+        compressionFlags &= PrepareForQuadmeshHypTopoCompression(_dbfile);
         
         /* Write coordinate arrays */
         if (!is_empty)
@@ -10835,7 +10867,7 @@ db_hdf5_PutQuadmesh(DBfile *_dbfile, char const *name, char const * const *coord
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForQuadmeshDeompression
+ * Function:    PrepareForQuadmeshHypTopoDeompression
  *
  * Purpose:     Does some small work to prepare for possible mesh
  *              decompression 
@@ -10844,7 +10876,7 @@ db_hdf5_PutQuadmesh(DBfile *_dbfile, char const *name, char const * const *coord
  *-------------------------------------------------------------------------
  */
 static void
-PrepareForQuadmeshDecompression(DBfile_hdf5 *dbfile, char const *meshname,
+PrepareForQuadmeshHypTopoDecompression(DBfile_hdf5 *dbfile, char const *meshname,
     const DBquadmesh *qm)
 {
 #ifdef HAVE_HZIP
@@ -10983,7 +11015,7 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
             }
         }
 
-        PrepareForQuadmeshDecompression(dbfile, name, qm);
+        PrepareForQuadmeshHypTopoDecompression(dbfile, name, qm);
 
         /* Read coordinate arrays */
         for (i=0; i<qm->ndims; i++) {
@@ -11048,7 +11080,7 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForQuadvarCompression
+ * Function:    PrepareForQuadvarHypTopoCompression
  *
  * Purpose:     Does some small work to prepare for possible quadvar 
  *              compression 
@@ -11061,10 +11093,9 @@ db_hdf5_GetQuadmesh(DBfile *_dbfile, char const *name)
  *-------------------------------------------------------------------------
  */
 static int
-PrepareForQuadvarCompression(DBfile *_dbfile, int centering, int datatype)
+PrepareForQuadvarHypTopoCompression(DBfile *_dbfile, int centering, int datatype)
 {
-    if (DBGetCompressionFile(_dbfile) == 0) return 0;
-    if (centering == DB_ZONECENT) return 0;
+    if (centering == DB_ZONECENT) return ~COMPRESSION_HYPTOPO_ALLOWED;
 
 #ifdef HAVE_HZIP
     db_hdf5_hzip_clear_params();
@@ -11175,7 +11206,7 @@ db_hdf5_PutQuadvar(DBfile *_dbfile, char const *name, char const *meshname, int 
         db_hdf5_handle_ctdt(dbfile, _qm._time_set, _qm._time,
             _qm._dtime_set, _qm._dtime, _qm._cycle); 
 
-        compressionFlags &= PrepareForQuadvarCompression(_dbfile, centering, datatype);
+        compressionFlags &= PrepareForQuadvarHypTopoCompression(_dbfile, centering, datatype);
 
         /* Write variable arrays: vars[] and mixvars[] */
         if (nvars>MAX_VARS) {
@@ -11297,7 +11328,7 @@ db_hdf5_PutQuadvar(DBfile *_dbfile, char const *name, char const *meshname, int 
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForQuadvarDecompression
+ * Function:    PrepareForQuadvarHypTopoDecompression
  *
  * Purpose:     Does some small work to prepare for possible quadvar 
  *              decompression 
@@ -11306,7 +11337,7 @@ db_hdf5_PutQuadvar(DBfile *_dbfile, char const *name, char const *meshname, int 
  *-------------------------------------------------------------------------
  */
 static void
-PrepareForQuadvarDecompression(DBfile_hdf5 *dbfile, char const *varname,
+PrepareForQuadvarHypTopoDecompression(DBfile_hdf5 *dbfile, char const *varname,
     const DBquadvar *qv)
 {
 #ifdef HAVE_HZIP
@@ -11434,7 +11465,7 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
             nvals *= (m.dims[i]>0?m.dims[i]:1);
         }
 
-        PrepareForQuadvarDecompression(dbfile, name, qv);
+        PrepareForQuadvarHypTopoDecompression(dbfile, name, qv);
 
         /* Read the raw data */
         if ((m.nvals > MAX_VARS || nvals != qv->nels)) {
@@ -11481,7 +11512,7 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForUcdmeshCompression
+ * Function:    PrepareForUcdmeshHypTopoCompression
  *
  * Purpose:     Does some small work to prepare for possible mesh
  *              compression 
@@ -11493,11 +11524,9 @@ db_hdf5_GetQuadvar(DBfile *_dbfile, char const *name)
  * Programmer:  Mark C. Miller, Thu Jul 17 15:07:21 PDT 2008
  *-------------------------------------------------------------------------
  */
-static int PrepareForUcdmeshCompression(DBfile_hdf5 *dbfile,
+static int PrepareForUcdmeshHypTopoCompression(DBfile_hdf5 *dbfile,
     char const *meshname, char const *zlname)
 {
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
-
 #ifdef HAVE_HZIP
     if (LookupNodelist(dbfile, zlname, meshname) != 0)
     {
@@ -11589,7 +11618,7 @@ db_hdf5_PutUcdmesh(DBfile *_dbfile, char const *name, int ndims, char const * co
         db_ProcessOptlist(DB_UCDMESH, optlist);
 
         /* Prepare for possible compression of coords/gnodeno */
-        compressionFlags &= PrepareForUcdmeshCompression(dbfile,
+        compressionFlags &= PrepareForUcdmeshHypTopoCompression(dbfile,
             name, zlname); 
 
         /* hack to maintain backward compatibility with pdb driver */
@@ -11617,12 +11646,11 @@ db_hdf5_PutUcdmesh(DBfile *_dbfile, char const *name, int ndims, char const * co
                 compressionFlags);
         }
         if (_um._llong_gnodeno && (nnodes > 0))
-            db_hdf5_compwr(dbfile, DB_LONG_LONG, 1, &nnodes, _um._gnodeno,
-                m.gnodeno/*out*/, friendly_name(_dbfile,name, "_gnodeno",0));
+            db_hdf5_compwrz(dbfile, DB_LONG_LONG, 1, &nnodes, _um._gnodeno,
+                m.gnodeno/*out*/, friendly_name(_dbfile,name, "_gnodeno",0), compressionFlags);
         else if (nnodes > 0)
             db_hdf5_compwrz(dbfile, DB_INT, 1, &nnodes, _um._gnodeno,
-                m.gnodeno/*out*/, friendly_name(_dbfile,name, "_gnodeno",0),
-                compressionFlags);
+                m.gnodeno/*out*/, friendly_name(_dbfile,name, "_gnodeno",0), compressionFlags);
         
         if (nnodes && _um._ghost_node_labels)
         {
@@ -11841,7 +11869,7 @@ db_hdf5_PutUcdsubmesh(DBfile *_dbfile, char const *name, char const *parentmesh,
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForUcdmeshDecompression
+ * Function:    PrepareForUcdmeshHypTopoDecompression
  *
  * Purpose:     Does some small work to prepare for possible mesh
  *              decompression 
@@ -11850,7 +11878,7 @@ db_hdf5_PutUcdsubmesh(DBfile *_dbfile, char const *name, char const *parentmesh,
  *-------------------------------------------------------------------------
  */
 static void
-PrepareForUcdmeshDecompression(DBfile_hdf5 *dbfile, char const *meshname,
+PrepareForUcdmeshHypTopoDecompression(DBfile_hdf5 *dbfile, char const *meshname,
     char const *zlname)
 {
 #ifdef HAVE_HZIP
@@ -12025,7 +12053,7 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
         }
 
         /* Prepare for possible ucdmesh decompression */
-        PrepareForUcdmeshDecompression(dbfile, name, m.zonelist);
+        PrepareForUcdmeshHypTopoDecompression(dbfile, name, m.zonelist);
 
         /* Read the raw data */
         if (DBGetDataReadMask2File(_dbfile) & DBUMCoords)
@@ -12100,7 +12128,7 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForUcdvarCompression
+ * Function:    PrepareForUcdvarHypTopoCompression
  *
  * Purpose:     Does some small work to prepare for possible ucdvar 
  *              compression 
@@ -12113,11 +12141,9 @@ db_hdf5_GetUcdmesh(DBfile *_dbfile, char const *name)
  *-------------------------------------------------------------------------
  */
 static int
-PrepareForUcdvarCompression(DBfile_hdf5 *dbfile, char const *varname,
+PrepareForUcdvarHypTopoCompression(DBfile_hdf5 *dbfile, char const *varname,
     char const *meshname, int datatype, int centering)
 {
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
-
 #ifdef HAVE_HZIP
     if (centering == DB_NODECENT)
     {
@@ -12202,7 +12228,7 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
         db_ProcessOptlist(DB_UCDMESH, optlist); /*yes, UCDMESH*/
 
         /* Prepare for possible compression of ucdvars */
-        compressionFlags &= PrepareForUcdvarCompression(dbfile, name, meshname,
+        compressionFlags &= PrepareForUcdvarHypTopoCompression(dbfile, name, meshname,
             datatype, centering);
 
         /* hack to maintain backward compatibility with pdb driver */
@@ -12217,9 +12243,6 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
         for (i=0; i<nvars && nels; i++) {
             db_hdf5_compwrz(dbfile, datatype, 1, &nels, vars[i],
                 m.value[i]/*out*/, friendly_name(_dbfile,varnames[i], "_data", 0), compressionFlags);
-//#ifndef _MSC_VER
-//#warning WHY NOT COMPRESS MIX DATA TOO
-//#endif
             if (mixvars && mixvars[i] && mixlen>0) {
                 db_hdf5_compwr(dbfile, datatype, 1, &mixlen, mixvars[i],
                     m.mixed_value[i]/*out*/, friendly_name(_dbfile,varnames[i], "_mix", 0));
@@ -12293,7 +12316,7 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForUcdvarDecompression
+ * Function:    PrepareForUcdvarHypTopoDecompression
  *
  * Purpose:     Does some small work to prepare for possible ucdvar 
  *              decompression 
@@ -12309,7 +12332,7 @@ db_hdf5_PutUcdvar(DBfile *_dbfile, char const *name, char const *meshname, int n
  *-------------------------------------------------------------------------
  */
 static void
-PrepareForUcdvarDecompression(DBfile *_dbfile, char const *varname,
+PrepareForUcdvarHypTopoDecompression(DBfile *_dbfile, char const *varname,
     char const *meshname, char valnames[MAX_VARS][256], int nvals)
 {
 
@@ -12459,7 +12482,7 @@ db_hdf5_GetUcdvar(DBfile *_dbfile, char const *name)
         db_SetMissingValueForGet(uv->missing_value, m.missing_value);
 
         /* If var is compressed, we need to do some work to decompress it */
-        PrepareForUcdvarDecompression(_dbfile, name, uv->meshname?uv->meshname:"", m.value, m.nvals);
+        PrepareForUcdvarHypTopoDecompression(_dbfile, name, uv->meshname?uv->meshname:"", m.value, m.nvals);
 
         if ((DBGetDataReadMask2File(_dbfile) & DBUVData) && m.nvals)
         {
@@ -12705,7 +12728,7 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForZonelistCompression
+ * Function:    PrepareForZonelistHypTopoCompression
  *
  * Purpose:     Does some small work to prepare for possible zonelist 
  *              compression 
@@ -12720,17 +12743,16 @@ db_hdf5_GetFacelist(DBfile *_dbfile, char const *name)
  *-------------------------------------------------------------------------
  */
 static int
-PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
+PrepareForZonelistHypTopoCompression(DBfile_hdf5 *dbfile, char const *name,
     int origin, int ndims, int nshapes, int const *shapetype, int const *shapesize,
     int const *shapecnt, int const *nodelist)
 {
-	int i;
+    int i;
     int ntopo = 0, zncnt = 0;
 
     if (nshapes == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
-    if (DBGetCompressionFile((DBfile*)dbfile) == 0) return ~COMPRESSION_HYPTOPO_ALLOWED;
+    if (!shapecnt) return ~COMPRESSION_HYPTOPO_ALLOWED;
 
-    zncnt = shapecnt[0];
 #ifdef HAVE_HZIP
 
     if (shapetype)
@@ -12739,7 +12761,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         if (shapetype[0] == DB_ZONETYPE_QUAD)
         {
             ntopo = 2;
-            for (i = 1; i < nshapes; i++)
+            for (i = 0; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapetype[i] != DB_ZONETYPE_QUAD)
@@ -12749,7 +12771,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         else if (shapetype[0] == DB_ZONETYPE_HEX)
         {
             ntopo = 3;
-            for (i = 1; i < nshapes; i++)
+            for (i = 0; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapetype[i] != DB_ZONETYPE_HEX)
@@ -12761,12 +12783,12 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
             return ~COMPRESSION_HYPTOPO_ALLOWED;
         }
     }
-    else
+    else if (shapesize)
     {
         if (ndims == 2)
         {
             ntopo = 2;
-            for (i = 1; i < nshapes; i++)
+            for (i = 0; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 4)
@@ -12776,7 +12798,7 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         else if (ndims == 3)
         {
             ntopo = 3;
-            for (i = 1; i < nshapes; i++)
+            for (i = 0; i < nshapes; i++)
             {
                 zncnt += shapecnt[i];
                 if (shapesize[i] != 8)
@@ -12787,6 +12809,10 @@ PrepareForZonelistCompression(DBfile_hdf5 *dbfile, char const *name,
         {
             return ~COMPRESSION_HYPTOPO_ALLOWED;
         }
+    }
+    else
+    {
+        return ~COMPRESSION_HYPTOPO_ALLOWED;
     }
 
     db_hdf5_hzip_clear_params();
@@ -12880,7 +12906,7 @@ db_hdf5_PutZonelist2(DBfile *_dbfile, char const *name, int nzones, int ndims,
         db_ProcessOptlist(DB_ZONELIST, optlist);
 
         /* Prepare for possible compression of zonelist */
-        compressionFlags &= PrepareForZonelistCompression(dbfile,
+        compressionFlags &= PrepareForZonelistHypTopoCompression(dbfile,
             name, origin, ndims, nshapes, shapetype, shapesize, shapecnt, nodelist);
 
         /* Write variable arrays (currently only support compression of nodelist) */
@@ -13060,7 +13086,7 @@ db_hdf5_PutPHZonelist(DBfile *_dbfile, char const *name,
 }
 
 /*-------------------------------------------------------------------------
- * Function:    PrepareForZonelistDecompression
+ * Function:    PrepareForZonelistHypTopoDecompression
  *
  * Purpose:     Does some small work to prepare for possible zonelist 
  *              de compression 
@@ -13069,7 +13095,7 @@ db_hdf5_PutPHZonelist(DBfile *_dbfile, char const *name,
  *-------------------------------------------------------------------------
  */
 static void
-PrepareForZonelistDecompression(DBfile_hdf5* dbfile, char const *zlname,
+PrepareForZonelistHypTopoDecompression(DBfile_hdf5* dbfile, char const *zlname,
     char const *meshname, int origin)
 {
 #ifdef HAVE_HZIP
@@ -13175,7 +13201,7 @@ db_hdf5_GetZonelist(DBfile *_dbfile, char const *name)
         zl->max_index = m.nzones - m.hi_offset - 1;
 
         /* Prepare for possible zonelist decompression */
-        PrepareForZonelistDecompression(dbfile, name,
+        PrepareForZonelistHypTopoDecompression(dbfile, name,
             calledFromGetUcdmesh, zl->origin);
 
         /* Read the raw data */
@@ -13461,17 +13487,12 @@ db_hdf5_PutMaterial(
         /* Write raw data arrays */
         if (!is_empty)
             db_hdf5_compwr(dbfile, DB_INT, 1, &nels, matlist, m.matlist/*out*/, friendly_name(_dbfile,name,"_matlist", 0));
-        db_hdf5_compwr(dbfile, DB_INT, 1, &nmat, matnos,
-            m.matnos/*out*/, friendly_name(_dbfile,name,"_matnos", 0));
+        db_hdf5_compwr(dbfile, DB_INT, 1, &nmat, matnos, m.matnos/*out*/, friendly_name(_dbfile,name,"_matnos", 0));
         if (!is_empty && mixlen>0) {
-            db_hdf5_compwr(dbfile, datatype, 1, &mixlen, mix_vf,
-                m.mix_vf/*out*/, friendly_name(_dbfile,name,"_mix_vf", 0));
-            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_next,
-                m.mix_next/*out*/, friendly_name(_dbfile,name,"_mix_next", 0));
-            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_mat,
-                m.mix_mat/*out*/, friendly_name(_dbfile,name,"_mix_mat", 0));
-            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_zone,
-                m.mix_zone/*out*/, friendly_name(_dbfile,name,"_mix_zone", 0));
+            db_hdf5_compwr(dbfile, datatype, 1, &mixlen, mix_vf, m.mix_vf/*out*/, friendly_name(_dbfile,name,"_mix_vf", 0));
+            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_next, m.mix_next/*out*/, friendly_name(_dbfile,name,"_mix_next", 0));
+            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_mat, m.mix_mat/*out*/, friendly_name(_dbfile,name,"_mix_mat", 0));
+            db_hdf5_compwr(dbfile, DB_INT, 1, &mixlen, mix_zone, m.mix_zone/*out*/, friendly_name(_dbfile,name,"_mix_zone", 0));
         }
 
         if (_ma._matnames != NULL) {
