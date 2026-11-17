@@ -1973,6 +1973,10 @@ SILO_API extern int                    DBSetEvalNameschemes(int eval);
 SILO_API extern int                    DBGetEvalNameschemes(void);
 SILO_API extern int                    DBSetEvalNameschemesFile(DBfile *f, int eval);
 SILO_API extern int                    DBGetEvalNameschemesFile(DBfile *f);
+SILO_API extern int                    DBSetSmallArrayByteSize(int size);
+SILO_API extern int                    DBGetSmallArrayByteSize(void);
+SILO_API extern int                    DBSetSmallArrayByteSizeFile(DBfile *f, int size);
+SILO_API extern int                    DBGetSmallArrayByteSizeFile(DBfile *f);
 
 SILO_API extern int const *            DBSetUnknownDriverPriorities(int const *);
 SILO_API extern int const *            DBGetUnknownDriverPriorities();

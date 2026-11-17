@@ -248,4 +248,3 @@ static int StringToDriver(const char *str)
     fprintf(stderr, "Unable to determine driver from string \"%s\"\n", str);
     exit(EXIT_FAILURE);
 }
-

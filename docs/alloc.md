@@ -150,3 +150,52 @@ This section describes methods to allocate and initialize many of Silo's objects
 
 {{ EndFunc }}
 
+## `DBFreeNamescheme()`
+
+* **Summary:** Free all memory associated with a namescheme object 
+
+* **C Signature:**
+
+  ```
+  DBFreeNamescheme(DBnamescheme *ns)
+  ```
+
+* **Arguments:**
+
+  Arg name | Description
+  :---|:---
+  `ns` | Pointer to a namescheme object to be freed
+
+* **Description:**
+
+  `DBFreeNamescheme()` will free all memory associated with a `DBnamescheme` object.
+  What happens with externally-referenced arrays used in the namescheme?
+  The answer is that it depends on whether `DBMakeNamescheme()` allocated them or the caller did.
+  In the 3 forms of use of `DBMakeNamescheme()`, the two forms involving external array references differ in whether the caller allocated the memory for the arrays or `DBMakeNamescheme()` did.
+  In the second form, where the caller allocated the externally referenced arrays, `DBFreeNamescheme()` will **NOT** free them.
+  In the third form, where `DBMakeNamescheme()` finds in the provided file, allocates and reads the externally referenced arrays, `DBFreeNamescheme()` will also free them.
+
+{{ EndFunc }}
+
+## Freeing library internal caches
+
+* **Summary:** Freeing memory associated with various internal caches used in the library
+
+* **C Signature:**
+
+  ```
+  DBSPrintf(0); /* free circular cache entries used by this method */
+  DBGetName(0,-1); /* free circular cache entries used by this method */
+  ```
+
+* **Arguments:**
+
+  Varies by function.
+
+* **Description:**
+
+  In various places where Silo returns a small string, the library uses a small, internal, circular cache which is never normally freed.
+  This can lead to tiny leaks reported by various memory checker tools.
+  These can be addressed by using calls into the associated routines with arguments specifically designed, see above, to trigger freeing of those caches.
+
+{{ EndFunc }}

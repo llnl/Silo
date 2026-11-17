@@ -94,7 +94,7 @@ static int calc_material_object_size(DBmaterial const *mat)
     retval += mat->mixlen * (3 * sizeof(int));
 
     /* for mix_vf */
-    retval += mat->mixlen * (mat->datatype == DB_FLOAT)?sizeof(float):sizeof(double);
+    retval += mat->mixlen * ((mat->datatype == DB_FLOAT)?sizeof(float):sizeof(double));
 
     return retval;
 }

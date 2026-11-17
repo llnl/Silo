@@ -424,22 +424,33 @@ DBMakeNamescheme(char const *fmt, ...)
     */
     if (rv->ncspecs == 0)
     {
-        int rm_unnecessary_delim = 0;
-
-        if (n > 2 && fmt[0] == fmt[n-1])
-            rm_unnecessary_delim = !db_VariableNameValid(fmt);
-
         free(rv->fmt);
 
-        if (rm_unnecessary_delim)
+        /* If whole string is valid, take all of it. */
+        if (db_VariableNameValid(fmt))
+        {
+            rv->fmt = STRNDUP(&fmt[0],n);
+            rv->fmtlen = n;
+            return rv;
+        }
+
+        /* If whole string but first char is valid, take all but first char */
+        if (db_VariableNameValid(&fmt[1]))
+        {
+            rv->fmt = STRNDUP(&fmt[1],n-1);
+            rv->fmtlen = n-1;
+            return rv;
+        }
+
+        if (fmt[0] == fmt[n-1])
         {
             rv->fmt = STRNDUP(&fmt[1],n-2);
             rv->fmtlen = n-2;
         }
         else
         {
-            rv->fmt = STRNDUP(&fmt[0],n);
-            rv->fmtlen = n;
+            rv->fmt = STRNDUP(&fmt[0],n-1);
+            rv->fmtlen = n-1;
         }
 
         return rv;
