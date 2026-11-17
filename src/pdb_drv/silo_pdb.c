@@ -8359,7 +8359,7 @@ db_pdb_GetGroupelmap(DBfile *_dbfile, char const *name)
     FREE(segData);
 
     /* unflatten frac data if we have it */
-    if (fracLengths != NULL)
+    if (fracLengths && fracsArray)
     {
         tot_len = 0;
         for (i = 0; i < gm->num_segments; i++)

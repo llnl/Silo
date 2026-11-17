@@ -195,9 +195,13 @@ static void free_strings(char **strs)
 
 static double wall_clock_time()
 {
+#ifdef HAVE_SYS_TIME_H
     struct timeval tv;
     gettimeofday(&tv, 0);
     return (double) tv.tv_sec + (double) tv.tv_usec / 1e+6;
+#else
+    return 0.0;
+#endif
 }
 
 static int target_platform_n(int i) {return 1;};
