@@ -290,13 +290,8 @@ set(PDB_ONLY_SOURCES
 set(ROCKET_SOURCES
     rocket.cxx
     rocket_silo.cxx
+    rocket_vtk.cxx
 )
-if(VTK_DIR)
-    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
-    if (VTK_FOUND)
-        list(APPEND ROCKET_SOURCES rocket_vtk.cxx)
-    endif()
-endif()
 
 set(PARALLEL_SOURCES
     bcastopen.c
@@ -349,7 +344,7 @@ if(WIN32)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx pdbtst.c)
+    list(APPEND SKIP_TEST_SOURCES pdbtst.c)
 endif()
 
 #
@@ -387,26 +382,87 @@ if(NOT SILO_ENABLE_JSON)
     list(APPEND SKIP_TEST_SOURCES ${JSON_C_TEST_SOURCES})
 endif()
 
+#
+# Handle rocket test which uses c++ and dlopen to load shared
+# lib modules that do work with Silo of VTK (when present)
+#
+if(SILO_ENABLE_SHARED AND NOT WIN32 AND VTK_DIR)
 
-if(SILO_ENABLE_SHARED AND NOT WIN32)
+    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
+
+    # Main executable: provides geometry and shared symbols.
+    add_executable(rocket rocket.cxx)
+    target_link_libraries(rocket PRIVATE ${CMAKE_DL_LIBS})
+
+    # Allow dynamically loaded modules to resolve symbols
+    # defined by the rocket executable.
+    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+
+    # Silo writer plugin.
     add_library(rocket_silo MODULE rocket_silo.cxx)
-    add_dependencies(rocket_silo silo)
-    target_link_libraries(rocket_silo $<TARGET_LINKER_FILE:silo>)
-if(UNIX)
-    target_link_libraries(rocket_silo dl m)
-endif()
-    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_link_libraries(rocket_silo ${HDF5_C_LIBRARIES})
-        target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
-    endif()
+    target_link_libraries(rocket_silo PRIVATE silo)
+
     target_include_directories(rocket_silo PRIVATE
         ${silo_build_include_dir}
         ${Silo_SOURCE_DIR}/src/silo
-        ${SILO_TESTS_SOURCE_DIR})
-    if(APPLE)
-      target_link_options(rocket_silo PRIVATE "-Wl,-undefined,dynamic_lookup")
-    endif()
+        ${SILO_TESTS_SOURCE_DIR}
+    )
+
+    # The loader expects rocket_silo.so or rocket_silo.dylib,
+    # not librocket_silo.so.
     set_target_properties(rocket_silo PROPERTIES PREFIX "")
+
+    if(APPLE)
+        target_link_options(rocket_silo PRIVATE
+            "-Wl,-undefined,dynamic_lookup"
+        )
+    endif()
+
+    add_dependencies(rocket rocket_silo)
+
+    # Optional VTK writer plugin.
+    if(VTK_FOUND)
+        add_library(rocket_vtk MODULE rocket_vtk.cxx)
+
+        target_link_libraries(rocket_vtk PRIVATE
+            VTK::CommonCore
+            VTK::CommonDataModel
+            VTK::IOLegacy
+        )
+
+        set_target_properties(rocket_vtk PROPERTIES PREFIX "")
+
+        if(APPLE)
+            target_link_options(rocket_vtk PRIVATE
+                "-Wl,-undefined,dynamic_lookup"
+            )
+        endif()
+
+        add_dependencies(rocket rocket_vtk)
+    endif()
+
+    # Put both plugins alongside the executable so that
+    # rocket's directory search can find them.
+    set_target_properties(rocket PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+    )
+
+    set_target_properties(rocket_silo PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+    )
+
+    if(TARGET rocket_vtk)
+        set_target_properties(rocket_vtk PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+        )
+    endif()
+
+    add_test(NAME rocket COMMAND $<TARGET_FILE:rocket>)
+    set_tests_properties(rocket PROPERTIES
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:rocket>"
+        LABELS "rocket"
+    )
+
 endif()
 
 add_library(testlib_obj OBJECT testlib.c)
@@ -441,9 +497,9 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
         target_sources(${base} PRIVATE $<TARGET_OBJECTS:testlib_obj>)
     endif()
 
-    target_link_libraries(${base} $<TARGET_LINKER_FILE:silo>)
+    target_link_libraries(${base} PRIVATE $<TARGET_LINKER_FILE:silo>)
     if(UNIX)
-        target_link_libraries(${base} dl m)
+        target_link_libraries(${base} PRIVATE dl m)
     endif()
 
     target_include_directories(${base}  PRIVATE
@@ -468,7 +524,7 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
     endif()
 
     if(SILO_ENABLE_JSON AND JSONC_FOUND)
-        target_link_libraries(${base} ${JSONC_LIBRARY})
+        target_link_libraries(${base} PRIVATE ${JSONC_LIBRARY})
         target_include_directories(${base} PRIVATE ${JSONC_INCLUDE_DIR})
     endif()
 
@@ -528,10 +584,10 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 endforeach()
 
-if(SILO_ENABLE_SHARED AND NOT WIN32)
-    add_dependencies(rocket rocket_silo)
-    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
-endif()
+#if(SILO_ENABLE_SHARED AND NOT WIN32)
+#    add_dependencies(rocket rocket_silo)
+#    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+#endif()
 
 target_sources(listtypes PRIVATE listtypes_main.c listtypes.c)
 set_tests_properties(listtypes PROPERTIES DEPENDS ucd REQUIRED_FILES ucd.pdb)
