@@ -4029,8 +4029,8 @@ static int run_test(PFTest test, int n, char *host, int native)
 
 #if defined PRId64
     PRINT(STDOUT,
-          "\t\t     %3d    %8" PRId64 "  %8" PRIc64 "   %7" PRIc64 "     %.2g\n",
-          n, bytaa, bytfa, bytaa - bytfa, time);
+          "\t\t     %3d    %8" PRId64 "  %8" PRId64 "   %7" PRId64 "     %.2g\n",
+          n, (int64_t) bytaa, (int64_t) bytfa, (int64_t) (bytaa - bytfa), time);
 #else
     PRINT(STDOUT,
           "\t\t     %3d    %8lld  %8lld   %7lld     %.2g\n",
