@@ -20,16 +20,8 @@ However, maybe the associated problem-sized array of values does not contain 400
 Or, maybe the `datatype` member indicates the values are of type `float` but when the associated problem-sized array of values is read they are found to be of type `int`.
 
 Malformed objects can be problematic because they can lead to memory errors and security vulnerabilities.
-In most cases, detecting a malformed object requires very little computational work.
-In rare cases (like a `DBmrgtree` object), it may require visiting all the values in problem-sized arrays.
-
-However, a critical aspect of Silo's performant design is to avoid problem-sized work whenever possible and instead delegate this work to the caller.
-For complicated silo objects (e.g. `DBmaterial` with mixing, `DBzonelist`, etc.), new methods to *validate* the objects have been introduced.
-Readers may, at their discretion, use these methods to check objects read.
-However, these methods necessarily involve problem-sized work and so are not done by Silo automatically.
-
-It is conceivable a new global library behavior could be introduced to indicate whether Silo should *validate* objects as it reads them before returning them to the caller.
-Presently, it is up to the caller to decide whether to validate an object read by appropriate use of Silo's *validate* methods.
+In most cases, detecting a malformed object requires very little computational work and so should not impact read performance.
+In rare cases for objects with complex indexing schemes (like a `DBmrgtree` object), ensuring the object is not malformed may involve problem-sized work.
 
 Silo's *write* interface does very little to *prevent* a writer from creating malformed objects.
 All of the work to detect and flag malformed objects is done in the read interface.
@@ -42,6 +34,17 @@ The `E_MALFORMED` error code can be produced only during read operations.
 In rare cases, a malformed file object can lead to an `E_CALLFAIL` error condition instead of `E_MALFORMED`.
 In addition, when malformed file objects are encountered, Silo is not always able to fully clean up memory that was allocated as the read progressed.
 So, in rare cases, Silo may leak memory during a malformed object read.
+
+A critical aspect of Silo's performant design is to avoid problem-sized work whenever possible and instead delegate this work to the caller.
+For complicated silo objects (e.g. `DBmrgtree`, `DBmaterial` with mixing, etc.), new methods to *validate* the objects have been introduced.
+Readers may, at their discretion, use these methods to check objects obtained in the read interface.
+However, these methods necessarily involve problem-sized work and so are not done by Silo automatically.
+
+This feature has been thoroughly tested across files written by previous versions of Silo.
+However, there is always a chance that something was missed and the new malformed object validation logic prevents reading an object from Silo files that it otherwise should be able to read.
+There is also a chance that not all memory corrupting issues have been caught in this update.
+
+It is conceivable a new global library behavior could be introduced to a) disable malformed object checking and b) enable post-read, problem-sized object validation as Silo reads objects and before returning them to the caller.
 
 {{ EndFunc }}
 
