@@ -156,11 +156,6 @@ int SILO_VERS_TAG = 0;
 /* No lines of  the form 'int Silo_version_Maj_Min_Pat = 0;' below
    here indicates that this version is not backwards compatible with
    any previous versions.*/
-int Silo_version_4_12_0_pre2 = 0;
-int Silo_version_4_12_0_pre1 = 0;
-int Silo_version_4_12_0 = 0;
-int Silo_version_4_12 = 0;
-int Silo_version_4_12_1 = 0;
 
 /* Symbols for error handling */
 PUBLIC int     DBDebugAPI = 0;  /*file desc for API debug messages      */
@@ -307,36 +302,37 @@ static void const *db_static_void_ptr_not_set = (void*) "db_static_void_ptr_not_
 #define DB_CHAR_PTR_NOT_SET ((char const *)db_static_char_ptr_not_set)
 #define DB_VOID_PTR_NOT_SET ((void const *)db_static_void_ptr_not_set)
 
-SILO_Globals_t SILO_Globals = {
-    DBAll, /* dataReadMask */
-    TRUE,  /* allowOverwrites */
-    FALSE, /* allowEmptyObjects */
-    FALSE, /* enableChecksums */
-    FALSE, /* enableFriendlyHDF5Names */
-    FALSE, /* enableGrabDriver */
-#ifndef _WIN32
-#warning FIX THIS
-#endif
-    FALSE, /* darshanEnabled */
-    FALSE, /* allowLongStrComponents */
-    3,     /* maxDeprecateWarnings */
-    0,     /* compressionParams (null) */
-    2.0,   /* compressionMinratio */
-    0,     /* compressionErrmode (fallback) */
-    0,     /* compatability mode */
-    0,     /* evalNameschemes */
-    {      /* file options sets [32 of them] */
-        0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0
-    },
-    DB_TOP,/* _db_err_level */
-    0,     /* _db_err_func */
-    DB_NONE,/* _db_err_level_drvr */
-    0,     /* Jstk */
-    DEFAULT_DRIVER_PRIORITIES
-};
+#define SILO_GLOBALS_INIT {                          \
+    DBAll, /* dataReadMask */                        \
+    TRUE,  /* allowOverwrites */                     \
+    FALSE, /* allowEmptyObjects */                   \
+    FALSE, /* enableChecksums */                     \
+    FALSE, /* enableFriendlyHDF5Names */             \
+    FALSE, /* enableGrabDriver */                    \
+    FALSE, /* darshanEnabled */                      \
+    FALSE, /* allowLongStrComponents */              \
+    3,     /* maxDeprecateWarnings */                \
+    0,     /* compressionParams (null) */            \
+    2.0,   /* compressionMinratio */                 \
+    0,     /* compressionErrmode (fallback) */       \
+    0,     /* compatability mode */                  \
+    0,     /* evalNameschemes */                     \
+    2048,  /* smallArrayByteSize */                  \
+    {      /* file options sets [32 of them] */      \
+        0, 0, 0, 0, 0, 0, 0, 0,                      \
+	0, 0, 0, 0, 0, 0, 0, 0,                      \
+        0, 0, 0, 0, 0, 0, 0, 0,                      \
+	0, 0, 0, 0, 0, 0, 0, 0                       \
+    },                                               \
+    DB_TOP,/* _db_err_level */                       \
+    0,     /* _db_err_func */                        \
+    DB_NONE,/* _db_err_level_drvr */                 \
+    0,     /* Jstk */                                \
+    DEFAULT_DRIVER_PRIORITIES                        \
+}
+
+SILO_Globals_t SILO_Globals = SILO_GLOBALS_INIT;
+static const SILO_Globals_t SILO_Globals_init = SILO_GLOBALS_INIT;
 
 INTERNAL int
 db_FullyDeprecatedConvention(const char *name)
@@ -2577,7 +2573,10 @@ static Typ db_SetGet ## NM ## File(DBfile *f, Typ val, int set) \
     API_BEGIN("DB(Set|Get)" #NM "File", Typ, -1) {              \
         if (!f)                                                 \
             API_ERROR("DBfile*", E_BADARGS);                    \
-        retval = f->pub.file_scope_globals->nM;                 \
+        if (!f->pub.file_scope_globals)                         \
+            retval = NotSet;                                    \
+        else                                                    \
+            retval = f->pub.file_scope_globals->nM;             \
         if (set)                                                \
             f->pub.file_scope_globals->nM = val;                \
         if (retval == NotSet)                                   \
@@ -2611,26 +2610,26 @@ DB_SETGET(int, CompatibilityMode, compatibilityMode, DB_INTBOOL_NOT_SET)
 #warning WHAT ABOUT FORCESINGLE SHOWERRORS
 #endif
 DB_SETGET(int, EvalNameschemes, evalNameschemes, DB_INTBOOL_NOT_SET)
+DB_SETGET(int, SmallArrayByteSize, smallArrayByteSize, DB_INTBOOL_NOT_SET)
 
 /* The compression stuff has some custom initialization */
 static void _db_set_compression_params(char **dst, char const *s)
 {
-    if (s && *s == '\0') {
-        if (*dst)
+    if (s == 0 || *s == '\0')
+    {
+        if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
-        *dst = ALLOC_N(char, 12);
-        strcpy(*dst, "METHOD=GZIP");
-    }   
-    else if (s) {
-        if (*dst)
+
+        if (dst != &SILO_Globals.compressionParams)
+            *dst = (char*)DB_CHAR_PTR_NOT_SET;
+    }
+    else
+    {
+        if (*dst && *dst != db_static_char_ptr_not_set)
             FREE(*dst);
+
         *dst = ALLOC_N(char,strlen(s)+1);
         strcpy(*dst, s);
-    }
-    else {
-        if (*dst)
-            FREE(*dst);
-        *dst=0;
     }
 }
 
@@ -2661,7 +2660,10 @@ static char const *db_SetGetCompressionFile(DBfile *f, char const *val, int set)
     API_BEGIN("DB(Set|Get)CompressionFile", char const *, 0) {
         if (!f)
             API_ERROR("DBfile*", E_BADARGS);
-        retval = f->pub.file_scope_globals->compressionParams;
+        if (!f->pub.file_scope_globals)
+            retval = DB_CHAR_PTR_NOT_SET;
+        else
+            retval = f->pub.file_scope_globals->compressionParams;
         if (set)
             _db_set_compression_params(&(f->pub.file_scope_globals->compressionParams), val);
         if (retval == DB_CHAR_PTR_NOT_SET)
@@ -4138,6 +4140,13 @@ DBFileName(const DBfile *dbfile)
     return name;
 }
 
+#define INHERIT_SILO_GLOBAL(field, NotSetVal)                      \
+    if (SILO_Globals.field == SILO_Globals_init.field)             \
+        dbfile->pub.file_scope_globals->field = NotSetVal;         \
+    else                                                           \
+        dbfile->pub.file_scope_globals->field = SILO_Globals.field
+
+
 static void
 db_InitFileGlobals(DBfile *dbfile, int mode)
 {
@@ -4157,28 +4166,28 @@ db_InitFileGlobals(DBfile *dbfile, int mode)
        inheret *and* track all behaviors from Silo's globals. The first time
        any of these values are changed to a NOT_SET value, then forevermore, 
        that particular behavior is governed by the file */
-    dbfile->pub.file_scope_globals->dataReadMask            = DB_MASK_NOT_SET;
-    dbfile->pub.file_scope_globals->allowOverwrites         = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->allowEmptyObjects       = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableChecksums         = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableFriendlyHDF5Names = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->enableGrabDriver        = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->darshanEnabled          = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->allowLongStrComponents  = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->maxDeprecateWarnings    = DB_INTBOOL_NOT_SET;
-#ifndef _WIN32
-#warning ADD compressionMinSize
-#endif
-    dbfile->pub.file_scope_globals->compressionMinratio     = DB_FLOAT_NOT_SET;
-#ifndef _WIN32
-#warning CORRECT INITIALIZATION OF compressionErrmode
-#endif
-    dbfile->pub.file_scope_globals->compressionErrmode      = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->compatibilityMode       = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->compressionParams       = (char*) DB_CHAR_PTR_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_level           = DB_INTBOOL_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_func            = DB_VOID_PTR_NOT_SET;
-    dbfile->pub.file_scope_globals->_db_err_level_drvr      = DB_INTBOOL_NOT_SET;
+    INHERIT_SILO_GLOBAL(dataReadMask,            DB_MASK_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowOverwrites,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowOverwrites,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowEmptyObjects,       DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableChecksums,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableFriendlyHDF5Names, DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(enableGrabDriver,        DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(darshanEnabled,          DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(allowLongStrComponents,  DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(maxDeprecateWarnings,    DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(compressionMinratio,     DB_FLOAT_NOT_SET);
+    INHERIT_SILO_GLOBAL(compressionErrmode,      DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(compatibilityMode,       DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(evalNameschemes,         DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(smallArrayByteSize,      DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_level,           DB_INTBOOL_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_func,            DB_VOID_PTR_NOT_SET);
+    INHERIT_SILO_GLOBAL(_db_err_level_drvr,      DB_INTBOOL_NOT_SET);
+    if (SILO_Globals.compressionParams)
+        dbfile->pub.file_scope_globals->compressionParams = STRDUP(SILO_Globals.compressionParams);
+    else
+        dbfile->pub.file_scope_globals->compressionParams = (char*)DB_CHAR_PTR_NOT_SET;
 
     /* Jstk only relevant for lib as a whole, not specific to a file */
     dbfile->pub.file_scope_globals->Jstk = 0;
@@ -4630,6 +4639,7 @@ DBClose(DBfile *dbfile)
 
 	tmp_file_scope_globals = dbfile->pub.file_scope_globals; 
         retval = (dbfile->pub.close) (dbfile);
+        _db_set_compression_params(&tmp_file_scope_globals->compressionParams, 0);
         free(tmp_file_scope_globals);
         API_RETURN(retval);
     }
@@ -11677,7 +11687,7 @@ _DBdarrminmax(double arr[], int len, double *arr_min, double *arr_max)
     return 0;
 }
 
-INTERNAL int
+static int
 include_point(int ptidx, int ndims, int const *dims,
     int const *minidx, int const *maxidx)
 {
@@ -11710,7 +11720,7 @@ include_point(int ptidx, int ndims, int const *dims,
  *      Mark C. Miller, Mon May 20 12:25:25 PDT 2024
  *      Adjusted to avoid strict pointer aliasing optimization issues.
  *--------------------------------------------------------------------*/
-INTERNAL int
+static int
 _CalcExtents(DBVCP2_t coord_arrays, int datatype, int ndims, int npts,
              void *min_extents, void *max_extents,
              int const *dims, int const *minidx, int const *maxidx)
@@ -13837,8 +13847,7 @@ db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***retArray
     if (strList[0] == ';')
         i = 1;
     strArray[n++] = &strList[i];
-    if (n == nblocks) completelyDone = 1;
-    while (!completelyDone)
+    while (!completelyDone && i < strListSize)
     {
         switch (strList[i])
         {
@@ -13849,7 +13858,14 @@ db_StringListToStringArrayMBOpt(char *strList, int strListSize, char ***retArray
                 strList[i] = '\0';
                 if (!completelyDone) i++;
                 if (strList[i] != '\0')
+                {
+                    if (n >= nblocks)
+                    {
+                        free(strArray);
+                        return -1;
+                    }
                     strArray[n++] = &strList[i];
+                }
                 if (hasColon)
                 {
                     int j;

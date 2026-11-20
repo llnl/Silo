@@ -118,6 +118,8 @@
 # into D:/a/Silo/Silo/build/all_tests
 ##############################################################################
 
+set(CMAKE_BUILD_RPATH "@loader_path/../../lib")
+
 ###-------------------------------------------------------------------------------------
 # Set the output dir for test executables
 ###-------------------------------------------------------------------------------------
@@ -267,19 +269,17 @@ endif()
 
 set(SILO_TESTS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-    set(HDF5_ONLY_SOURCES
-        compression.c
-        grab.c
-        largefile.c
-        memfile_simple.c
-        mk_nasf_h5.c
-        partial_io.c
-        readstuff.c
-        testhdf5.c
-        locking.c
-    )
-endif()
+set(HDF5_ONLY_SOURCES
+    compression.c
+    grab.c
+    largefile.c
+    memfile_simple.c
+    mk_nasf_h5.c
+    partial_io.c
+    readstuff.c
+    testhdf5.c
+    locking.c
+)
 
 set(PDB_ONLY_SOURCES
     mk_nasf_pdb.c
@@ -290,13 +290,8 @@ set(PDB_ONLY_SOURCES
 set(ROCKET_SOURCES
     rocket.cxx
     rocket_silo.cxx
+    rocket_vtk.cxx
 )
-if(VTK_DIR)
-    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
-    if (VTK_FOUND)
-        list(APPEND ROCKET_SOURCES rocket_vtk.cxx)
-    endif()
-endif()
 
 set(PARALLEL_SOURCES
     bcastopen.c
@@ -346,14 +341,10 @@ set(SKIP_TEST_SOURCES
 )
 if(WIN32)
     list(APPEND SKIP_TEST_SOURCES locking.c)
-    list(APPEND SKIP_TEST_SOURCES rocket.cxx rocket_silo.cxx rocket_vtk.cxx)
 endif()
 
 if(NOT SILO_ENABLE_SHARED OR WIN32)
     list(APPEND SKIP_TEST_SOURCES pdbtst.c)
-endif()
-if(NOT VTK_DIR)
-    list(APPEND SKIP_TEST_SOURCES rocket_vtk.cxx)
 endif()
 
 #
@@ -392,49 +383,86 @@ if(NOT SILO_ENABLE_JSON)
 endif()
 
 #
-# Handle special logic for rocket test
+# Handle rocket test which uses c++ and dlopen to load shared
+# lib modules that do work with Silo of VTK (when present)
 #
-if(SILO_ENABLE_SHARED AND NOT WIN32)
+if(SILO_ENABLE_SHARED AND NOT WIN32 AND VTK_DIR)
 
+    find_package(VTK CONFIG COMPONENTS CommonCore CommonDataModel IOLegacy)
+
+    # Main executable: provides geometry and shared symbols.
     add_executable(rocket rocket.cxx)
-    target_link_libraries(rocket PRIVATE silo)
-    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
-    if(WIN32)
-        set_target_properties(rocket PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
-    endif()
-    if(CMAKE_DL_LIBS AND NOT APPLE)
-        target_link_libraries(rocket PRIVATE ${CMAKE_DL_LIBS})
-    endif()
-    if(UNIX)
-        target_link_libraries(rocket PRIVATE m)
-    endif()
+    target_link_libraries(rocket PRIVATE ${CMAKE_DL_LIBS})
 
-    # Silo plugin
+    # Allow dynamically loaded modules to resolve symbols
+    # defined by the rocket executable.
+    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+
+    # Silo writer plugin.
     add_library(rocket_silo MODULE rocket_silo.cxx)
-    target_link_libraries(rocket_silo PRIVATE silo rocket)
-    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        target_include_directories(rocket_silo PRIVATE ${HDF5_INCLUDE_DIRS})
-    endif()
+    target_link_libraries(rocket_silo PRIVATE silo)
+
     target_include_directories(rocket_silo PRIVATE
         ${silo_build_include_dir}
         ${Silo_SOURCE_DIR}/src/silo
-        ${SILO_TESTS_SOURCE_DIR})
+        ${SILO_TESTS_SOURCE_DIR}
+    )
+
+    # The loader expects rocket_silo.so or rocket_silo.dylib,
+    # not librocket_silo.so.
     set_target_properties(rocket_silo PROPERTIES PREFIX "")
 
-    # VTK plugin if requested
+    if(APPLE)
+        target_link_options(rocket_silo PRIVATE
+            "-Wl,-undefined,dynamic_lookup"
+        )
+    endif()
+
+    add_dependencies(rocket rocket_silo)
+
+    # Optional VTK writer plugin.
     if(VTK_FOUND)
         add_library(rocket_vtk MODULE rocket_vtk.cxx)
-        target_link_libraries(rocket_vtk PRIVATE rocket VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+
+        target_link_libraries(rocket_vtk PRIVATE
+            VTK::CommonCore
+            VTK::CommonDataModel
+            VTK::IOLegacy
+        )
+
         set_target_properties(rocket_vtk PROPERTIES PREFIX "")
-        if(COMMAND vtk_module_autoinit)
-            vtk_module_autoinit(TARGETS rocket_vtk MODULES VTK::CommonCore VTK::CommonDataModel VTK::IOLegacy)
+
+        if(APPLE)
+            target_link_options(rocket_vtk PRIVATE
+                "-Wl,-undefined,dynamic_lookup"
+            )
         endif()
+
+        add_dependencies(rocket rocket_vtk)
     endif()
+
+    # Put both plugins alongside the executable so that
+    # rocket's directory search can find them.
+    set_target_properties(rocket PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+    )
+
+    set_target_properties(rocket_silo PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+    )
+
+    if(TARGET rocket_vtk)
+        set_target_properties(rocket_vtk PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${silo_test_output_dir}"
+        )
+    endif()
+
     add_test(NAME rocket COMMAND $<TARGET_FILE:rocket>)
-    if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
-        add_test(NAME rocket-hdf5 COMMAND $<TARGET_FILE:rocket> DB_HDF5)
-        set_tests_properties(rocket-hdf5 PROPERTIES DEPENDS rocket)
-    endif()
+    set_tests_properties(rocket PROPERTIES
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:rocket>"
+        LABELS "rocket"
+    )
+
 endif()
 
 add_library(testlib_obj OBJECT testlib.c)
@@ -456,6 +484,11 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
         continue()
     endif()
 
+    # Skip any HDF5 specific executables if we're not building with HDF5
+    if(srcFile IN_LIST HDF5_ONLY_SOURCES AND NOT (SILO_ENABLE_HDF5 AND HDF5_FOUND))
+        continue()
+    endif()
+
     add_executable(${base} ${src})
     add_dependencies(${base} silo)
     target_compile_definitions(${base} PRIVATE PDB_LITE)
@@ -464,9 +497,9 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
         target_sources(${base} PRIVATE $<TARGET_OBJECTS:testlib_obj>)
     endif()
 
-    target_link_libraries(${base} $<TARGET_LINKER_FILE:silo>)
+    target_link_libraries(${base} PRIVATE $<TARGET_LINKER_FILE:silo>)
     if(UNIX)
-        target_link_libraries(${base} dl m)
+        target_link_libraries(${base} PRIVATE dl m)
     endif()
 
     target_include_directories(${base}  PRIVATE
@@ -491,7 +524,7 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
     endif()
 
     if(SILO_ENABLE_JSON AND JSONC_FOUND)
-        target_link_libraries(${base} ${JSONC_LIBRARY})
+        target_link_libraries(${base} PRIVATE ${JSONC_LIBRARY})
         target_include_directories(${base} PRIVATE ${JSONC_INCLUDE_DIR})
     endif()
 
@@ -550,6 +583,11 @@ foreach(src IN LISTS C_TEST_SOURCES CXX_TEST_SOURCES F_TEST_SOURCES)
 
 
 endforeach()
+
+#if(SILO_ENABLE_SHARED AND NOT WIN32)
+#    add_dependencies(rocket rocket_silo)
+#    set_target_properties(rocket PROPERTIES ENABLE_EXPORTS ON)
+#endif()
 
 target_sources(listtypes PRIVATE listtypes_main.c listtypes.c)
 set_tests_properties(listtypes PROPERTIES DEPENDS ucd REQUIRED_FILES ucd.pdb)
@@ -622,8 +660,9 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
     if(SILO_ENABLE_ZFP)
         add_test(NAME compression-zfp COMMAND $<TARGET_FILE:compression> zfp)
         add_test(NAME compression-zfp-read COMMAND $<TARGET_FILE:compression> zfp readonly)
+        add_test(NAME compression-zmix COMMAND $<TARGET_FILE:compression> zmix)
         set_tests_properties(compression-zfp-read PROPERTIES DEPENDS "compression-zfp")
-        list(APPEND COMPRESSION_TESTS compression-zfp compression-zfp-read)
+        list(APPEND COMPRESSION_TESTS compression-zfp compression-zfp-read compression-zmix)
     endif()
     if(COMPRESSION_TESTS)
         set_tests_properties(${COMPRESSION_TESTS} PROPERTIES RESOURCE_LOCK compression.h5)
@@ -686,7 +725,9 @@ if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
         set_tests_properties(multi_test-hzip PROPERTIES DEPENDS "dir-xcopy-input;dir-hdf5-xcopy-input")
         add_test(NAME multi_test-hzip-read COMMAND $<TARGET_FILE:multi_test> testread DB_HDF5)
         set_tests_properties(multi_test-hzip-read PROPERTIES DEPENDS multi_test-hzip)
-        list(APPEND MULTI_BLOCK_TESTS multi_test-hzip multi_test-hzip-read)
+        add_test(NAME multi_test-zstrat COMMAND $<TARGET_FILE:multi_test> zstrat DB_HDF5)
+        add_test(NAME multi_test-zmix COMMAND $<TARGET_FILE:multi_test> zmix DB_HDF5)
+        list(APPEND MULTI_BLOCK_TESTS multi_test-hzip multi_test-hzip-read multi_test-zstrat multi_test-zmix)
 
         add_custom_target(testhzip ALL)
         add_custom_command(TARGET testhzip POST_BUILD

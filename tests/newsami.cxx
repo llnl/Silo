@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < 8; i++)
     {
         char tmpname[32];
-        sprintf(tmpname, "brick_nd%d", i);
+        snprintf(tmpname, sizeof(tmpname), "brick_nd%d", i);
         DBWrite(dbfile, tmpname, &nodeids[i][0], &nzones, 1, DB_INT);
     }
 

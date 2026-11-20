@@ -89,13 +89,13 @@ target_include_directories(browser PRIVATE
     ${Silo_SOURCE_DIR}/src/silo
     ${Silo_SOURCE_DIR}/src/filters)
 
-target_link_libraries(browser $<TARGET_LINKER_FILE:silo>)
+target_link_libraries(browser PRIVATE $<TARGET_LINKER_FILE:silo>)
 
 if(UNIX)
-    target_link_libraries(browser m)
+    target_link_libraries(browser PRIVATE m)
 endif()
 
-target_link_libraries(browser ${CMAKE_DL_LIBS})
+target_link_libraries(browser PRIVATE ${CMAKE_DL_LIBS})
 
 if(SILO_ENABLE_HDF5 AND HDF5_FOUND)
     silo_target_link_hdf5(browser)
