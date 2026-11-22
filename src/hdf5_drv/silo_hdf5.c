@@ -16759,12 +16759,12 @@ db_hdf5_PutCompoundarray(
         len++; /*count null*/
 
         /* Write raw data arrays */
-        db_hdf5_compwr(dbfile, datatype, 1, &nvalues, values, m.values,
-            friendly_name(_dbfile,name, "_values", 0));
-        db_hdf5_compwr(dbfile, DB_CHAR, 1, &len, s, m.elemnames,
-            friendly_name(_dbfile,name, "_elemnames", 0));
-        db_hdf5_compwr(dbfile, DB_INT, 1, &nelmts, elmtlen, m.elemlengths,
-            friendly_name(_dbfile,name, "_elemlengths", 0));
+        if (nelmts > 0)
+            db_hdf5_compwr(dbfile, DB_INT, 1, &nelmts, elmtlen, m.elemlengths, friendly_name(_dbfile,name, "_elemlengths", 0));
+        if (len > 0)
+            db_hdf5_compwr(dbfile, DB_CHAR, 1, &len, s, m.elemnames, friendly_name(_dbfile,name, "_elemnames", 0));
+        if (nvalues > 0)
+            db_hdf5_compwr(dbfile, datatype, 1, &nvalues, values, m.values, friendly_name(_dbfile,name, "_values", 0));
 
         /* Initialize meta data */
         m.nelems = nelmts;
@@ -16846,7 +16846,7 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
             UNWIND();
         }
 
-        if (m.nelems <= 0 || m.nvalues <= 0)
+        if (m.nelems < 0 || m.nvalues < 0)
         {
             db_perror(name, E_MALFORMED, me);
             UNWIND();
@@ -16867,7 +16867,8 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
         /* Read the raw data */
         ca->elemlengths = (int *)_db_hdf5_comprd(dbfile, m.elemlengths, 1, &elemlengths_size);
         ca->values = _db_hdf5_comprd(dbfile, m.values, 1, &values_size);
-        if (!ca->elemlengths || elemlengths_size != m.nelems ||
+
+        if ((ca->elemlengths && elemlengths_size != m.nelems) ||
             (ca->values && values_size != m.nvalues))
         {
             db_perror(name, E_MALFORMED, me);
@@ -16882,7 +16883,7 @@ db_hdf5_GetCompoundarray(DBfile *_dbfile, char const *name)
             }
             nsum += ca->elemlengths[i];
         }
-        if (nsum != m.nvalues)
+        if (m.nvalues > 0 && nsum != m.nvalues)
         {
             db_perror(name, E_MALFORMED, me);
             UNWIND();
