@@ -364,6 +364,14 @@ if [ "$ext" = "pdb" ]; then
 else
     check_malformed mult_objs multimat mat_colors='"/arrs/strsB"'
 fi
+if [ -z "$old_silo" ]; then
+    check_malformed mult_objs multimat3 matnames='"/arrs/strsB"'
+    if [ "$ext" = "pdb" ]; then
+        check_malformed mult_objs multimat3 matcolors='"/arrs/strsB"'
+    else
+        check_malformed mult_objs multimat3 mat_colors='"/arrs/strsB"'
+    fi
+fi
 
 # Various corruptions of multimatspecies objects
 check_malformed mult_objs multimatspecies nspec=-1
@@ -379,6 +387,12 @@ fi
 if [ "$old_silo" != "46" ] && [ "$old_silo" != "47" ]; then
     check_malformed mult_objs multimatspecies empty_cnt=99
     check_malformed mult_objs multimatspecies empty_list='"/arrs/intsB"'
+fi
+if [ -z "$old_silo" ]; then
+    check_malformed mult_objs multimatspecies3 specnames='"/arrs/strsB"'
+    check_malformed mult_objs multimatspecies3 speccolors='"/arrs/strsB"'
+    check_malformed mult_objs multimatspecies4 specnames='"/arrs/strsB"'
+    check_malformed mult_objs multimatspecies4 speccolors='"/arrs/strsB"'
 fi
 
 # Various corruptions of pointmesh objects
