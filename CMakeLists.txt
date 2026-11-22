@@ -669,6 +669,21 @@ endif()
 add_library(silo ${silo_library_sources})
 set_target_properties(silo PROPERTIES VERSION ${SILO_VERSION} SOVERSION ${SILO_SOVERSION})
 
+# HZIP uses zlib directly, independently of HDF5.
+if(SILO_ENABLE_HZIP)
+    if(NOT ZLIB_FOUND)
+        message(FATAL_ERROR "HZIP requires zlib")
+    endif()
+
+    if(TARGET ZLIB::ZLIB)
+        target_link_libraries(silo ZLIB::ZLIB)
+    elseif(ZLIB_LIBRARY)
+        target_link_libraries(silo ${ZLIB_LIBRARY})
+    else()
+        message(FATAL_ERROR "HZIP enabled but no zlib library found")
+    endif()
+endif()
+
 target_compile_definitions(silo PRIVATE ${SILO_COMPILE_DEFINES})
 add_dependencies(silo pdb_detect)
 target_include_directories(silo PRIVATE ${silo_library_include_dirs})
