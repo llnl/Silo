@@ -115,6 +115,7 @@ main(int argc, char *argv[])
     void const * const vvars[3] = {(void*)1,(void*)2,(void*)3}; /* really funky dummy pointers */
     void           *var = (void*)1;
     int             iarr[3] = {1,1,1}; /* dummy int array */
+    int             iarr2[3] = {0,0,0}; /* dummy int array */
     int             ZDIMS[3] = {0,0,0};
     double          exts[6] = {0,0,0,0,0,0};
     DBoptlist      *ol = 0;
@@ -163,6 +164,10 @@ main(int argc, char *argv[])
 
            Note: 'ZZ' or 'ZDIMS' is the key argument in each call that triggers an empty
         */
+
+        /* empty compound array objects */
+        ASSERT(DBPutCompoundarray(dbfile, "empty_compoundarraya", cnames, iarr2, 3, exts, ZZ, DB_DOUBLE, 0),retval<0,retval==0);
+        ASSERT(DBPutCompoundarray(dbfile, "empty_compoundarrayb", cnames, iarr2, 0, exts, ZZ, DB_DOUBLE, 0),retval<0,retval==0);
 
         /* empty curve objects */
         ASSERT(DBPutCurve(dbfile,"empty_curvea",coords[0],coords[0],dt,ZZ,OL(ol)),retval<0,retval==0);
@@ -302,6 +307,18 @@ main(int argc, char *argv[])
 
     /* Ok, now try to read each empty object to make sure we get what we expect and nothing fails */
     dbfile = DBOpen(filename, DB_UNKNOWN, DB_READ);
+
+    /* test read back of empty compound array objects */
+    {   int i=0; char *canames[] = {"empty_compoundarraya", "empty_compoundarrayb", 0};
+        DBSetDir(dbfile, "DBPutCompoundarray");
+        while (canames[i])
+        {
+            DBcompoundarray *arr = DBGetCompoundarray(dbfile, canames[i++]);
+            assert(DBIsEmptyCompoundarray(arr));
+            DBFreeCompoundarray(arr);
+        }
+        DBSetDir(dbfile, "..");
+    }
 
     /* test read back of empty curves */
     {   int i=0; char *cnames[] = {"empty_curvea", "empty_curveb", "empty_curvec", 0};
