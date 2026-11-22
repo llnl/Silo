@@ -2045,6 +2045,13 @@ DBAllocCompoundarray(void)
     return array;
 }
 
+PUBLIC int
+DBIsEmptyCompoundarray(DBcompoundarray const *array)
+{
+    if (array && array->nvalues!=0) return 0;
+    return 1;
+}
+
 /*----------------------------------------------------------------------
  *  Function                                           DBFreeCompoundarray
  *
