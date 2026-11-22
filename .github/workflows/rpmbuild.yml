@@ -60,6 +60,19 @@ jobs:
         working-directory: Silo.rpm
         run: |
           rpmbuild -ba Silo.spec \
+            --define "_builddir $PWD/BUILD" \
             --define "_sourcedir $PWD" \
             --define "_srcrpmdir $PWD" \
             --define "_rpmdir $PWD"
+
+      - name: Upload RPM failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: rpmbuild-${{ matrix.config.arch }}-diagnostics
+          path: |
+            Silo.rpm/**/Testing/Temporary/
+            Silo.rpm/**/CMakeCache.txt
+            Silo.rpm/**/*.log
+          retention-days: 14
+          if-no-files-found: warn
