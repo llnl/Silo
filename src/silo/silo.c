@@ -9182,26 +9182,14 @@ DBPutCompoundarray(
             API_ERROR("overwrite not allowed", E_NOOVERWRITE);
         if (nelems < 0)
             API_ERROR("nelems<0", E_BADARGS);
-        if (nelems)
-        {
-            if (!nelems)
-                API_ERROR("nelems=0", E_BADARGS);
-            if (!elemnames)
-                API_ERROR("elemnames=0", E_BADARGS);
-            if (nvalues <= 0)
-                API_ERROR("nvalues=0", E_BADARGS);
-            if (!values)
-                API_ERROR("values=0", E_BADARGS);
-        }
-        else if (!DBGetAllowEmptyObjectsFile(dbfile))
-        {
-            /* this is an empty object but we don't know if it was intentional */
-            API_ERROR("nelems=0", E_EMPTYOBJECT);
-        }
-        else
-        {
-            nvalues = 0;
-        }
+        if (nelems>0 && (!elemnames || !elemlengths))
+            API_ERROR("elemnames==0 || elemlengths==0", E_BADARGS);
+        if (nvalues < 0)
+            API_ERROR("nvalues<0", E_BADARGS);
+        if (nvalues>0 && !values)
+            API_ERROR("values==0", E_BADARGS);
+        if (!DBGetAllowEmptyObjectsFile(dbfile) && (nelems==0 || nvalues==0))
+            API_ERROR("nelems==0 || nvalues==0", E_EMPTYOBJECT);
 
         if (NULL == dbfile->pub.p_ca)
             API_ERROR(dbfile->pub.name, E_NOTIMP);
