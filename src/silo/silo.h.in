@@ -2102,6 +2102,7 @@ SILO_API extern void                   DBFreeMrgvar(DBmrgvar *mrgv);
 SILO_API extern void                   DBFreeMrgtree(DBmrgtree *tree);
 SILO_API extern void                   DBFreeGroupelmap(DBgroupelmap *map);
 
+SILO_API extern int                    DBIsEmptyCompoundarray(DBcompoundarray const *array);
 SILO_API extern int                    DBIsEmptyCurve(DBcurve const *curve);
 SILO_API extern int                    DBIsEmptyPointmesh(DBpointmesh const *msh);
 SILO_API extern int                    DBIsEmptyPointvar(DBpointvar const *var);
