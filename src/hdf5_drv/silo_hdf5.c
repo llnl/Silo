@@ -277,7 +277,7 @@ typedef struct {
    associated action. For HDF5 driver, we handle the slash swap
    on the 'names' member of multi-block objects only and we
    never skip first semicolon. */
-static int const        skipFirstSemicolon = 0;
+static int const        skipFirstSemicolon = 1;
 
 /* Use `float' for all memory floating point values? */
 static int              force_single_g;
