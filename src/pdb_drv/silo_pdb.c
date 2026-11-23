@@ -3759,7 +3759,10 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
     *  separate names.  The delimiter is the first character of the
     *  name vector.
     */
-   if (name_vector && ca->nelems > 0) {
+   if (name_vector && ca->nelems <= 0) {
+      FREE(name_vector);
+      ca->nelems = 0;
+   } else if (name_vector) {
       int lensum = 0;
       ca->elemnames = ALLOC_N(char *, ca->nelems);
 
