@@ -9182,26 +9182,14 @@ DBPutCompoundarray(
             API_ERROR("overwrite not allowed", E_NOOVERWRITE);
         if (nelems < 0)
             API_ERROR("nelems<0", E_BADARGS);
-        if (nelems)
-        {
-            if (!nelems)
-                API_ERROR("nelems=0", E_BADARGS);
-            if (!elemnames)
-                API_ERROR("elemnames=0", E_BADARGS);
-            if (nvalues <= 0)
-                API_ERROR("nvalues=0", E_BADARGS);
-            if (!values)
-                API_ERROR("values=0", E_BADARGS);
-        }
-        else if (!DBGetAllowEmptyObjectsFile(dbfile))
-        {
-            /* this is an empty object but we don't know if it was intentional */
-            API_ERROR("nelems=0", E_EMPTYOBJECT);
-        }
-        else
-        {
-            nvalues = 0;
-        }
+        if (nelems>0 && (!elemnames || !elemlengths))
+            API_ERROR("elemnames==0 || elemlengths==0", E_BADARGS);
+        if (nvalues < 0)
+            API_ERROR("nvalues<0", E_BADARGS);
+        if (nvalues>0 && !values)
+            API_ERROR("values==0", E_BADARGS);
+        if (!DBGetAllowEmptyObjectsFile(dbfile) && (nelems==0 || nvalues==0))
+            API_ERROR("nelems==0 || nvalues==0", E_EMPTYOBJECT);
 
         if (NULL == dbfile->pub.p_ca)
             API_ERROR(dbfile->pub.name, E_NOTIMP);
@@ -13736,7 +13724,8 @@ DBStringArrayToStringList(
  *    as accept an input value or nothing at all.
  *--------------------------------------------------------------------*/
 INTERNAL char **
-db_StringListToStringArray(char const *strList, int *_n, char sep, int skipSepAtIndexZero)
+db_StringListToStringArray(char const *strList, int *_n, char sep,
+                           int skipSepAtIndexZero)
 {
     int i, l, n, add1 = 0;
     char **retval;
@@ -13753,7 +13742,7 @@ db_StringListToStringArray(char const *strList, int *_n, char sep, int skipSepAt
     {
         add1 = 1;
         n = 1;
-        i = (skipSepAtIndexZero&&strList[0]==sep)?1:0;
+        i = (skipSepAtIndexZero && strList[0] == sep) ? 1 : 0;
         while (strList[i] != '\0')
         {
             if (strList[i] == sep)
@@ -13772,35 +13761,47 @@ db_StringListToStringArray(char const *strList, int *_n, char sep, int skipSepAt
         return 0;
     }
 
-    retval = (char**) calloc(n+add1, sizeof(char*));
-    for (i=0, l=(skipSepAtIndexZero&&strList[0]==sep)?1:0; i<n; i++)
+    retval = (char **) calloc(n + add1, sizeof(char *));
+
+    for (i = 0, l = (skipSepAtIndexZero && strList[0] == sep) ? 1 : 0;
+         i < n; i++)
     {
         if (strList[l] == sep)
         {
-            retval[i] = STRDUP(""); 
+            /* Missing substring */
+            retval[i] = 0;
             l += 1;
         }
-        else if (strList[l] == '\n')
+        else if (strList[l] == '\n' &&
+                 (strList[l+1] == sep || strList[l+1] == '\0'))
         {
-            retval[i] = 0; 
-            l += 2;
+            /* Explicitly empty substring */
+            retval[i] = STRDUP("");
+            l += (strList[l+1] == sep) ? 2 : 1;
         }
         else
         {
             int len, lstart = l;
+
             while (strList[l] != sep && strList[l] != '\0')
                 l++;
-            len = l-lstart;
-            retval[i] = (char *) malloc(len+1);
-            memcpy(retval[i],&strList[lstart],len);
+
+            len = l - lstart;
+            retval[i] = (char *) malloc(len + 1);
+            memcpy(retval[i], &strList[lstart], len);
             retval[i][len] = '\0';
-            l++;
+
+            if (strList[l] == sep)
+                l++;
         }
     }
-    if (add1) retval[i] = 0;
+
+    if (add1)
+        retval[i] = 0;
 
     /* Return value of n computed if requested */
-    if (_n && *_n < 0) *_n = n;
+    if (_n && *_n < 0)
+        *_n = n;
 
     return retval;
 }

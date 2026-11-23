@@ -208,12 +208,12 @@ static PyObject *DBfile_DBGetVar(PyObject *self, PyObject *args)
                     PyObject *tmp2 = PyList_New(0);
                     for (int i = 0; i < narr; i++)
                     {
-                        if (i == 0 && strArr[i] && strArr[i][0] == '\0')
+                        if (i == 0 && (!strArr[i] || strArr[i][0] == '\0'))
                         {
                             FREE(strArr[i]);
                             continue; // skip an empty first entry
                         }
-                        if (i == (narr-1) && strArr[i] && strArr[i][0] == '\0')
+                        if (i == (narr-1) && (!strArr[i] || strArr[i][0] == '\0'))
                         {
                             FREE(strArr[i]);
                             continue; // skip an empty last entry

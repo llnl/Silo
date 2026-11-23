@@ -214,6 +214,7 @@ put_ucd_objects(DBfile *db)
     float u1[4] = {25.f,26.f,27.f,28.f};
     void *uvals[2] = {u0,u1};
     char *unames[2] = {"ucomp0","ucomp1"};
+    char *unames2[2] = {"vcomp0","vcomp1"};
     float uone[4] = {31.f,32.f,33.f,34.f};
     float mixu0[4] = {41.4,42.f,43.f};
     float mixu1[4] = {41.4,42.f,43.f};
@@ -263,7 +264,7 @@ put_ucd_objects(DBfile *db)
                     NULL, 0, DB_FLOAT, DB_ZONECENT, NULL));
 
     PUT(DBPutUcdvar(db, "ucdvar_mix", "ucdmesh", 2,
-                    (DBCAS_t)unames, uvals, 4,
+                    (DBCAS_t)unames2, uvals, 4,
                     mixuvals, 3, DB_FLOAT, DB_ZONECENT, NULL));
 
     PUT(DBPutUcdvar1(db, "ucdvar_one", "ucdmesh",
@@ -666,6 +667,8 @@ put_multi_objects(DBfile *db)
         int matnos[3] = {801,802,803};
         char *matnames[3] = {"copper","plastic","granite"};
         char *matcolors[3] = {"red","green","blue"};
+        char *matnames2[3] = {0,"plastic","granite"};
+        char *matcolors2[3] = {0,"green","blue"};
         int mixlens[5] = {111,112,113,114,115};
         int matcnts[5] = {2,2,3,3,2};
         int matlists[13] = {801,803, 801,802, 801,802,803, 801,802,803, 802,803};
@@ -688,6 +691,13 @@ put_multi_objects(DBfile *db)
 
         PUT(DBPutMultimat(db, "multimat2", 5, (DBCAS_t)names, NULL));
 
+        DBClearOption(ol, DBOPT_MATNAMES);
+        DBClearOption(ol, DBOPT_MATCOLORS);
+        DBAddOption(ol, DBOPT_MATNAMES, matnames2);
+        DBAddOption(ol, DBOPT_MATCOLORS, matcolors2);
+
+        PUT(DBPutMultimat(db, "multimat3", 5, (DBCAS_t)names, ol));
+
         DBClearOptlist(ol);
     }
 
@@ -697,6 +707,10 @@ put_multi_objects(DBfile *db)
         int nmatspec[3] = {2, 3, 4};
         char *specnames[9] = {"aaa", "aab",    "bba", "bbb", "bbc",    "cca", "ccb", "ccc", "ccd"};
         char *speccolors[9] = {"red", "green",    "blue", "cyan", "magenta",    "black", "white", "yellow", "orange"};
+        char *specnames2[9] = {"", "aab",    "bba", "bbb", "bbc",    "cca", "ccb", "ccc", "ccd"};
+        char *speccolors2[9] = {0, "green",    "blue", "cyan", "magenta",    "black", "white", "yellow", "orange"};
+        char *specnames3[9] = {"aaa", "aab",    "", "bbb", "bbc",    "cca", "ccb", "ccc", "ccd"};
+        char *speccolors3[9] = {"red", "green",    0, "cyan", "magenta",    "black", "white", "yellow", "orange"};
         int nmt = 2;
         int mtlist[2] = {0,1};
 
@@ -716,6 +730,24 @@ put_multi_objects(DBfile *db)
         PUT(DBPutMultimatspecies(db, "multimatspecies2",
                                  2, (DBCAS_t)names, 0));
 
+#ifdef DBOPT_SPECNAMES
+        DBClearOption(ol, DBOPT_SPECNAMES);
+        DBClearOption(ol, DBOPT_SPECCOLORS);
+        DBAddOption(ol, DBOPT_SPECNAMES, specnames2);
+        DBAddOption(ol, DBOPT_SPECCOLORS, speccolors2);
+#endif
+
+        PUT(DBPutMultimatspecies(db, "multimatspecies3",
+                                 2, (DBCAS_t)names, ol));
+#ifdef DBOPT_SPECNAMES
+        DBClearOption(ol, DBOPT_SPECNAMES);
+        DBClearOption(ol, DBOPT_SPECCOLORS);
+        DBAddOption(ol, DBOPT_SPECNAMES, specnames3);
+        DBAddOption(ol, DBOPT_SPECCOLORS, speccolors3);
+#endif
+
+        PUT(DBPutMultimatspecies(db, "multimatspecies4",
+                                 2, (DBCAS_t)names, ol));
     }
 
     /*

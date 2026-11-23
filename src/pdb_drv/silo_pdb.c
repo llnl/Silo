@@ -3724,8 +3724,10 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
       return NULL;
    *ca = tmpca;
 
-   if (ca->nelems <= 0 || ca->nvalues <= 0 || ca->datatype < 0 ||
-       !name_vector || !ca->elemlengths || elemlengths_size != ca->nelems) {
+   if (ca->nelems < 0 || ca->nvalues < 0 || ca->datatype < 0 ||
+       !name_vector || 
+       (ca->elemlengths && elemlengths_size != ca->nelems) ||
+       (ca->values && values_size != ca->nvalues)) {
       DBFreeCompoundarray(ca);
       FREE(name_vector);
       db_perror(array_name, E_MALFORMED, me);
@@ -3757,7 +3759,10 @@ db_pdb_GetCompoundarray (DBfile *_dbfile, char const *array_name)
     *  separate names.  The delimiter is the first character of the
     *  name vector.
     */
-   if (name_vector && ca->nelems > 0) {
+   if (name_vector && ca->nelems <= 0) {
+      FREE(name_vector);
+      ca->nelems = 0;
+   } else if (name_vector) {
       int lensum = 0;
       ca->elemnames = ALLOC_N(char *, ca->nelems);
 
@@ -8942,29 +8947,26 @@ db_pdb_PutCompoundarray (
    cur++;
    cur[0] = '\0';
 
-#if 0                           /*No global options available at this time */
-   db_ProcessOptlist(DB_ARRAY, optlist);
-#endif
    obj = DBMakeObject(array_name, DB_ARRAY, 25);
 
    /*
     * Write the compound array components to the database.
     */
    count[0] = (long) (cur - tmp) + 1;
-   DBWriteComponent(_dbfile, obj, "elemnames", array_name,
-                    "char", tmp, 1, count);
+   if (count[0] > 0)
+       DBWriteComponent(_dbfile, obj, "elemnames", array_name, "char", tmp, 1, count);
    FREE(tmp);
 
    count[0] = nelems;
-   DBWriteComponent(_dbfile, obj, "elemlengths", array_name,
-                    "integer", elemlengths, 1, count);
+   if (count[0] > 0)
+       DBWriteComponent(_dbfile, obj, "elemlengths", array_name, "integer", elemlengths, 1, count);
 
    DBAddIntComponent(obj, "nelems", nelems);
 
    count[0] = nvalues;
    tmp = db_GetDatatypeString(datatype);
-   DBWriteComponent(_dbfile, obj, "values", array_name,
-                    tmp, values, 1, count);
+   if (count[0] > 0)
+       DBWriteComponent(_dbfile, obj, "values", array_name, tmp, values, 1, count);
    FREE(tmp);
 
    DBAddIntComponent(obj, "nvalues", nvalues);
